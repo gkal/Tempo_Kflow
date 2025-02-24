@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { SearchBar } from "@/components/ui/search-bar";
 
 interface DataTableProps {
   columns?: Array<{
@@ -44,14 +45,7 @@ const DataTable = ({
     <div className="w-full bg-white p-4 rounded-lg shadow">
       {/* Search and Filter Section */}
       <div className="flex items-center justify-between mb-4">
-        <div className="relative w-64">
-          <Input
-            placeholder="Search..."
-            className="pl-10"
-            onChange={(e) => onFilter(e.target.value)}
-          />
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-        </div>
+        <SearchBar className="w-64" onChange={onFilter} />
       </div>
 
       {/* Table Section */}

@@ -16,21 +16,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const checkAuth = async () => {
+    setLoading(true);
     try {
-      const { data } = await supabase
+      const userId = sessionStorage.getItem("userId");
+      if (!userId) {
+        setUser(null);
+        return;
+      }
+
+      const { data, error } = await supabase
         .from("users")
-        .select("*")
+        .select()
+        .eq("id", userId)
         .eq("status", "active")
         .single();
+
+      if (error || !data) {
+        setUser(null);
+        sessionStorage.removeItem("userId");
+        return;
+      }
+
       setUser(data);
     } catch (error) {
+      console.error("Auth check error:", error);
       setUser(null);
+      sessionStorage.removeItem("userId");
     } finally {
       setLoading(false);
     }
   };
 
   const logout = async () => {
+    sessionStorage.removeItem("userId");
+    localStorage.removeItem("rememberedUser");
     setUser(null);
   };
 

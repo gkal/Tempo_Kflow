@@ -33,17 +33,76 @@ export async function createFirstAdmin(
     console.error("Error creating user:", error);
     throw error;
   }
+
+  if (userData.rememberMe) {
+    localStorage.setItem(
+      "rememberedUser",
+      JSON.stringify({
+        username: userData.username,
+        password: userData.password,
+      }),
+    );
+  }
+
+  sessionStorage.setItem("userId", data.id);
   return data;
 }
 
-export async function loginUser(username: string, password: string) {
+export async function loginUser(
+  username: string,
+  password: string,
+  rememberMe: boolean = false,
+): Promise<User> {
+  // First check if user exists
+  const { data: userExists } = await supabase
+    .from("users")
+    .select("username")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (!userExists) {
+    throw new Error("Λάθος όνομα χρήστη");
+  }
+
+  // Then check password
   const { data, error } = await supabase
     .from("users")
     .select()
     .eq("username", username)
-    .eq("password", password) // Note: In production, use proper password hashing
+    .eq("password", password)
+    .eq("status", "active")
     .single();
 
-  if (error) throw error;
+  if (error || !data) {
+    throw new Error("Λάθος κωδικός πρόσβασης");
+  }
+
+  // Update last login
+  await supabase
+    .from("users")
+    .update({ last_login_at: new Date().toISOString() })
+    .eq("id", data.id);
+
+  if (rememberMe) {
+    localStorage.setItem(
+      "rememberedUser",
+      JSON.stringify({
+        username,
+        password,
+      }),
+    );
+  } else {
+    localStorage.removeItem("rememberedUser");
+  }
+
+  sessionStorage.setItem("userId", data.id);
   return data;
+}
+
+export function getRememberedUser() {
+  const remembered = localStorage.getItem("rememberedUser");
+  if (remembered) {
+    return JSON.parse(remembered);
+  }
+  return null;
 }

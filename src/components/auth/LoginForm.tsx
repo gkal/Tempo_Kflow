@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { checkIfFirstUser, createFirstAdmin, loginUser } from "@/lib/auth";
+import {
+  checkIfFirstUser,
+  createFirstAdmin,
+  loginUser,
+  getRememberedUser,
+} from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
@@ -31,6 +36,16 @@ export default function LoginForm() {
   });
 
   useEffect(() => {
+    const remembered = getRememberedUser();
+    if (remembered) {
+      setFormData((prev) => ({
+        ...prev,
+        username: remembered.username,
+        password: remembered.password,
+        rememberMe: true,
+      }));
+    }
+
     const checkFirst = async () => {
       try {
         const isFirst = await checkIfFirstUser();
@@ -41,6 +56,7 @@ export default function LoginForm() {
     };
     checkFirst();
   }, []);
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
@@ -73,15 +89,19 @@ export default function LoginForm() {
           navigate("/dashboard");
         }, 1500);
       } else {
-        await loginUser(formData.username, formData.password);
-        await checkAuth();
+        const userData = await loginUser(
+          formData.username,
+          formData.password,
+          formData.rememberMe,
+        );
         setSuccess(true);
-        setTimeout(() => {
+        await checkAuth();
+        if (userData) {
           navigate("/dashboard");
-        }, 1500);
+        }
       }
-    } catch (error) {
-      setError("Λάθος στοιχεία σύνδεσης");
+    } catch (error: any) {
+      setError(error.message || "Λάθος στοιχεία σύνδεσης");
     } finally {
       setIsLoading(false);
     }
@@ -100,13 +120,13 @@ export default function LoginForm() {
         }}
       >
         <div className="text-center space-y-2">
-          <motion.div
+          <motion.img
             initial={{ scale: 0.5 }}
             animate={{ scale: 1 }}
-            className="h-16 w-16 rounded-full bg-[#84a98c] text-[#2f3e46] flex items-center justify-center font-bold text-2xl mx-auto mb-4"
-          >
-            K
-          </motion.div>
+            src="https://kronoseco.gr/favicon.ico"
+            alt="K-Flow Logo"
+            className="h-16 w-16 mx-auto mb-4"
+          />
           <h1 className="text-3xl font-bold text-[#cad2c5]">K-Flow</h1>
           <p className="text-[#84a98c]">
             {isFirstUser ? "Δημιουργία Διαχειριστή" : "Σύστημα Διαχείρισης"}

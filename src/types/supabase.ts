@@ -9,56 +9,123 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      departments: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      history_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string
+          table_name: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id: string
+          table_name: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string
+          table_name?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "history_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
-          avatar_url: string | null
-          created_at: string | null
-          department: string
-          email: string
+          created_at: string
+          department_id: string
+          email: string | null
           fullname: string
           id: string
           last_login_at: string | null
           password: string
           phone: string | null
-          preferences: Json | null
-          role: string
-          status: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          status: string
           updated_at: string | null
           username: string
         }
         Insert: {
-          avatar_url?: string | null
-          created_at?: string | null
-          department: string
-          email: string
+          created_at?: string
+          department_id: string
+          email?: string | null
           fullname: string
           id?: string
           last_login_at?: string | null
           password: string
           phone?: string | null
-          preferences?: Json | null
-          role: string
-          status?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          status?: string
           updated_at?: string | null
           username: string
         }
         Update: {
-          avatar_url?: string | null
-          created_at?: string | null
-          department?: string
-          email?: string
+          created_at?: string
+          department_id?: string
+          email?: string | null
           fullname?: string
           id?: string
           last_login_at?: string | null
           password?: string
           phone?: string | null
-          preferences?: Json | null
-          role?: string
-          status?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          status?: string
           updated_at?: string | null
           username?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -68,7 +135,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      user_role: "Admin" | "Super User" | "User" | "Μόνο ανάγνωση"
     }
     CompositeTypes: {
       [_ in never]: never

@@ -1,7 +1,0 @@
-import LoginForm from "@/components/auth/LoginForm";
-
-const LoginStoryboard = () => {
-  return <LoginForm />;
-};
-
-export default LoginStoryboard;
