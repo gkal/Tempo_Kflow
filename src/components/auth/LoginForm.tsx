@@ -11,14 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertCircle, Phone, Mail, CheckCircle } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { AlertCircle, CheckCircle } from "lucide-react";
 
 export default function LoginForm() {
   const navigate = useNavigate();
@@ -40,8 +33,8 @@ export default function LoginForm() {
     if (remembered) {
       setFormData((prev) => ({
         ...prev,
-        username: remembered.username,
-        password: remembered.password,
+        username: remembered.username || "",
+        password: remembered.password || "",
         rememberMe: true,
       }));
     }
@@ -59,6 +52,29 @@ export default function LoginForm() {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  const handleLogin = async (
+    username: string,
+    password: string,
+    rememberMe: boolean,
+  ) => {
+    setError("");
+    setSuccess(false);
+    setIsLoading(true);
+
+    try {
+      const userData = await loginUser(username, password, rememberMe);
+      setSuccess(true);
+      await checkAuth();
+      if (userData) {
+        navigate("/dashboard");
+      }
+    } catch (error: any) {
+      setError(error.message || "Λάθος στοιχεία σύνδεσης");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,16 +105,11 @@ export default function LoginForm() {
           navigate("/dashboard");
         }, 1500);
       } else {
-        const userData = await loginUser(
+        await handleLogin(
           formData.username,
           formData.password,
           formData.rememberMe,
         );
-        setSuccess(true);
-        await checkAuth();
-        if (userData) {
-          navigate("/dashboard");
-        }
       }
     } catch (error: any) {
       setError(error.message || "Λάθος στοιχεία σύνδεσης");
@@ -199,57 +210,21 @@ export default function LoginForm() {
             />
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="rememberMe"
-                checked={formData.rememberMe}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, rememberMe: checked as boolean })
-                }
-                className="border-[#84a98c] data-[state=checked]:bg-[#84a98c] data-[state=checked]:border-[#84a98c]"
-              />
-              <label
-                htmlFor="rememberMe"
-                className="text-sm font-medium text-[#cad2c5] cursor-pointer"
-              >
-                Να με θυμάσαι
-              </label>
-            </div>
-            <Dialog>
-              <DialogTrigger asChild>
-                <button
-                  type="button"
-                  className="text-sm text-[#84a98c] hover:text-[#cad2c5] transition-colors"
-                >
-                  Ξεχάσατε τον κωδικό;
-                </button>
-              </DialogTrigger>
-              <DialogContent className="bg-[#354f52] border-[#52796f] text-[#cad2c5]">
-                <DialogHeader>
-                  <DialogTitle className="text-[#cad2c5]">
-                    Επαναφορά Κωδικού
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <p className="text-[#84a98c]">
-                    Για λόγους ασφαλείας, μόνο οι διαχειριστές μπορούν να
-                    επαναφέρουν τους κωδικούς πρόσβασης. Παρακαλώ επικοινωνήστε
-                    με τον διαχειριστή του συστήματος:
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2 text-[#cad2c5]">
-                      <Phone className="h-4 w-4" />
-                      <span>210-1234567</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-[#cad2c5]">
-                      <Mail className="h-4 w-4" />
-                      <span>admin@k-flow.gr</span>
-                    </div>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="rememberMe"
+              checked={formData.rememberMe}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, rememberMe: checked as boolean })
+              }
+              className="border-[#84a98c] data-[state=checked]:bg-[#84a98c] data-[state=checked]:border-[#84a98c]"
+            />
+            <label
+              htmlFor="rememberMe"
+              className="text-sm font-medium text-[#cad2c5] cursor-pointer"
+            >
+              Να με θυμάσαι
+            </label>
           </div>
 
           {(error || success) && (

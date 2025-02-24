@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -7,8 +7,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { SearchBar } from "@/components/ui/search-bar";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Search } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type SortDirection = "asc" | "desc";
@@ -17,7 +25,8 @@ interface Column {
   header: string;
   accessor: string;
   sortable?: boolean;
-  cell?: (value: any) => React.ReactNode;
+  cell?: (value: any, row?: any) => React.ReactNode;
+  width?: number;
 }
 
 interface DataTableBaseProps {
@@ -30,6 +39,7 @@ interface DataTableBaseProps {
   rowClassName?: string;
   containerClassName?: string;
   showSearch?: boolean;
+  pageSize?: number;
 }
 
 export function DataTableBase({
@@ -42,6 +52,7 @@ export function DataTableBase({
   rowClassName = "",
   containerClassName = "",
   showSearch = true,
+  pageSize = 20,
 }: DataTableBaseProps) {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -51,7 +62,32 @@ export function DataTableBase({
     direction: defaultSortDirection,
   });
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredData, setFilteredData] = useState(data);
+  const [selectedColumn, setSelectedColumn] = useState("all");
+  const [filteredData, setFilteredData] = useState([]);
+  const [displayedData, setDisplayedData] = useState([]);
+  const [page, setPage] = useState(1);
+  const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
+    {},
+  );
+  const loader = useRef(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  // Initialize column widths
+  useEffect(() => {
+    const defaultWidths = {};
+    columns.forEach((column) => {
+      defaultWidths[column.accessor] = column.width || 200;
+    });
+    setColumnWidths(defaultWidths);
+  }, [columns]);
+
+  // Handle column resize
+  const handleColumnResize = (accessor: string, width: number) => {
+    setColumnWidths((prev) => ({
+      ...prev,
+      [accessor]: width,
+    }));
+  };
 
   // Handle sorting
   const handleSort = (key: string) => {
@@ -64,22 +100,28 @@ export function DataTableBase({
     });
   };
 
-  // Update filtered and sorted data
+  // Update filtered data
   useEffect(() => {
     let result = [...data];
 
-    // Apply search filter
     if (searchTerm) {
-      result = result.filter((item) =>
-        Object.values(item).some(
-          (val) =>
-            val &&
-            val.toString().toLowerCase().includes(searchTerm.toLowerCase()),
-        ),
-      );
+      result = result.filter((item) => {
+        if (selectedColumn === "all") {
+          return Object.values(item).some(
+            (val) =>
+              val &&
+              val.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+          );
+        } else {
+          const value = item[selectedColumn];
+          return (
+            value &&
+            value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+          );
+        }
+      });
     }
 
-    // Apply sorting
     result.sort((a, b) => {
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
@@ -93,77 +135,244 @@ export function DataTableBase({
     });
 
     setFilteredData(result);
-  }, [data, searchTerm, sortConfig]);
+    setPage(1);
+    setDisplayedData(result.slice(0, pageSize));
+  }, [data, searchTerm, selectedColumn, sortConfig, pageSize]);
+
+  // Handle intersection observer for infinite scroll
+  const handleObserver = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      const target = entries[0];
+      if (target.isIntersecting && displayedData.length < filteredData.length) {
+        setPage((prev) => prev + 1);
+      }
+    },
+    [displayedData.length, filteredData.length],
+  );
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(handleObserver, {
+      root: null,
+      rootMargin: "20px",
+      threshold: 0,
+    });
+
+    if (loader.current) {
+      observer.observe(loader.current);
+    }
+
+    return () => observer.disconnect();
+  }, [handleObserver]);
+
+  // Load more data when page changes
+  useEffect(() => {
+    const end = page * pageSize;
+    setDisplayedData(filteredData.slice(0, end));
+  }, [page, filteredData, pageSize]);
 
   return (
-    <div className={containerClassName}>
+    <div className="w-full flex flex-col" ref={tableRef}>
       {showSearch && (
-        <div className="mb-4">
-          <SearchBar
-            placeholder={searchPlaceholder}
-            value={searchTerm}
-            onChange={setSearchTerm}
-            className="w-64"
-          />
+        <div className="flex justify-center p-4 border-b border-[#52796f]">
+          <div className="relative w-96">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-[#84a98c]" />
+            <Input
+              placeholder={searchPlaceholder}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 pr-[200px] bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+            />
+            <div className="absolute right-0 top-0 h-full">
+              <Select value={selectedColumn} onValueChange={setSelectedColumn}>
+                <SelectTrigger className="h-full border-0 bg-transparent text-[#84a98c] rounded-l-none w-[190px] focus:ring-0 hover:bg-transparent">
+                  <SelectValue
+                    placeholder="All Columns"
+                    className="text-right"
+                  />
+                </SelectTrigger>
+                <SelectContent
+                  className="bg-[#2f3e46] border-[#52796f]"
+                  style={{ width: "max-content", minWidth: "250px" }}
+                >
+                  <SelectItem
+                    value="all"
+                    className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
+                  >
+                    All Columns
+                  </SelectItem>
+                  {columns.map((column) => (
+                    <SelectItem
+                      key={column.accessor}
+                      value={column.accessor}
+                      className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
+                    >
+                      {column.header}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {columns.map((column) => (
-                <TableHead
-                  key={column.accessor}
-                  className={cn(
-                    "text-[#84a98c]",
-                    column.sortable !== false && "select-none",
-                  )}
-                  onClick={() =>
-                    column.sortable !== false && handleSort(column.accessor)
-                  }
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{column.header}</span>
-                    {column.sortable !== false &&
-                      sortConfig.key === column.accessor && (
-                        <span className="ml-2">
-                          {sortConfig.direction === "asc" ? (
-                            <ArrowUp className="h-4 w-4" />
-                          ) : (
-                            <ArrowDown className="h-4 w-4" />
+      <div className="relative overflow-x-auto">
+        <div className="max-h-[calc(70vh-8rem)] overflow-y-auto">
+          <Table className="w-max">
+            <TableHeader className="bg-[#2f3e46] border-b border-[#52796f] sticky top-0 z-10">
+              <TableRow className="hover:bg-transparent">
+                {columns.map((column, index) => (
+                  <TableHead
+                    key={column.accessor}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      width: columnWidths[column.accessor],
+                      minWidth: columnWidths[column.accessor],
+                    }}
+                    className={cn(
+                      "text-[#84a98c] select-none whitespace-nowrap relative group",
+                      column.sortable !== false
+                        ? "cursor-pointer"
+                        : "cursor-default",
+                    )}
+                  >
+                    <div className="flex items-center space-x-2 pr-4 overflow-hidden">
+                      {column.sortable !== false && (
+                        <ArrowUp
+                          className={cn(
+                            "h-4 w-4 flex-shrink-0",
+                            sortConfig.key !== column.accessor && "opacity-0",
+                            sortConfig.direction === "desc" && "rotate-180",
                           )}
-                        </span>
+                        />
                       )}
-                  </div>
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredData.map((row, index) => (
-              <TableRow
-                key={index}
-                onClick={() => onRowClick?.(row)}
-                className={cn(
-                  onRowClick && "cursor-pointer",
-                  rowClassName,
-                  "group",
-                )}
-              >
-                {columns.map((column) => (
-                  <TableCell key={column.accessor} className="text-[#cad2c5]">
-                    <span className="cursor-text hover:underline">
-                      {column.cell
-                        ? column.cell(row[column.accessor])
-                        : row[column.accessor]}
-                    </span>
-                  </TableCell>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          column.sortable !== false &&
+                            handleSort(column.accessor);
+                        }}
+                        className={cn(
+                          "truncate",
+                          column.sortable !== false
+                            ? "cursor-pointer hover:text-[#cad2c5]"
+                            : "",
+                        )}
+                      >
+                        {column.header}
+                      </span>
+                    </div>
+                    {index < columns.length - 1 && (
+                      <div
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-[#52796f]/20 hover:bg-[#52796f] opacity-0 group-hover:opacity-100 transition-colors"
+                        onDoubleClick={() => {
+                          const headerCell = document.querySelector(
+                            `th:nth-child(${index + 1}) span`,
+                          );
+                          const headerWidth =
+                            headerCell?.getBoundingClientRect().width || 0;
+
+                          const cells = document.querySelectorAll(
+                            `td:nth-child(${index + 1})`,
+                          );
+                          let maxContentWidth = 0;
+
+                          cells.forEach((cell) => {
+                            const cellContent = cell.firstElementChild || cell;
+                            const width =
+                              cellContent.getBoundingClientRect().width;
+                            maxContentWidth = Math.max(maxContentWidth, width);
+                          });
+
+                          const finalWidth =
+                            maxContentWidth > headerWidth
+                              ? maxContentWidth + 16
+                              : headerWidth + 16;
+                          handleColumnResize(column.accessor, finalWidth);
+                        }}
+                        onMouseDown={(e) => {
+                          const startX = e.pageX;
+                          const startWidth = columnWidths[column.accessor];
+
+                          const handleMouseMove = (e: MouseEvent) => {
+                            const diff = e.pageX - startX;
+                            handleColumnResize(
+                              column.accessor,
+                              Math.max(50, startWidth + diff),
+                            );
+                          };
+
+                          const handleMouseUp = () => {
+                            document.removeEventListener(
+                              "mousemove",
+                              handleMouseMove,
+                            );
+                            document.removeEventListener(
+                              "mouseup",
+                              handleMouseUp,
+                            );
+                          };
+
+                          document.addEventListener(
+                            "mousemove",
+                            handleMouseMove,
+                          );
+                          document.addEventListener("mouseup", handleMouseUp);
+                        }}
+                      />
+                    )}
+                  </TableHead>
                 ))}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {displayedData.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="text-center py-8 text-[#84a98c]"
+                  >
+                    No data found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                displayedData.map((row, index) => (
+                  <TableRow
+                    key={index}
+                    onClick={() => onRowClick?.(row)}
+                    className={cn(
+                      rowClassName,
+                      "group cursor-pointer transition-colors duration-150",
+                    )}
+                  >
+                    {columns.map((column) => (
+                      <TableCell
+                        key={column.accessor}
+                        style={{
+                          width: columnWidths[column.accessor],
+                          minWidth: columnWidths[column.accessor],
+                        }}
+                        className="text-[#cad2c5] whitespace-nowrap group-hover:underline"
+                      >
+                        {column.cell
+                          ? column.cell(row[column.accessor], row)
+                          : row[column.accessor]}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        {displayedData.length < filteredData.length && (
+          <div
+            ref={loader}
+            className="w-full h-20 flex items-center justify-center text-[#84a98c]"
+          >
+            Loading more...
+          </div>
+        )}
       </div>
     </div>
   );

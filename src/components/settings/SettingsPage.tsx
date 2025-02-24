@@ -26,27 +26,40 @@ export default function SettingsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchUsers();
-    }
-  }, [user]);
-
   const fetchUsers = async () => {
     try {
       const { data, error } = await supabase
         .from("users")
-        .select("*")
+        .select(
+          `
+          *,
+          departments:department_id (name)
+        `,
+        )
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setUsers(data || []);
+
+      // Transform the data to flatten the departments object
+      const transformedData =
+        data?.map((user) => ({
+          ...user,
+          department: user.departments?.name || "N/A",
+        })) || [];
+
+      setUsers(transformedData);
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user) {
+      fetchUsers();
+    }
+  }, [user]);
 
   const handleDeleteUser = async () => {
     if (
@@ -72,53 +85,53 @@ export default function SettingsPage() {
     }
   };
 
+  const isAdmin = user?.role === "Admin";
+  const isSuperUser = user?.role === "Super User";
+
   // For regular users and readonly, show only their own data
-  if (user?.role === "User" || user?.role === "Μόνο ανάγνωση") {
+  if (!isAdmin && !isSuperUser) {
     const currentUser = users.find((u) => u.id === user.id);
     return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold text-[#cad2c5] mb-4">
-          Διαχείριση Χρηστών
+      <div className="p-4">
+        <h1 className="text-2xl font-bold text-[#cad2c5] mb-2">
+          Τα στοιχεία μου
         </h1>
-        <DataTableBase
-          columns={[
-            { header: "Όνομα Χρήστη", accessor: "username" },
-            { header: "Ονοματεπώνυμο", accessor: "fullname" },
-            { header: "Email", accessor: "email" },
-            { header: "Τμήμα", accessor: "department" },
-            { header: "Ρόλος", accessor: "role" },
-            {
-              header: "Κατάσταση",
-              accessor: "status",
-              cell: (value) => (
-                <span
-                  className={`px-2 py-1 rounded-full text-xs ${value === "active" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}
-                >
-                  {value === "active" ? "Ενεργός" : "Ανενεργός"}
-                </span>
-              ),
-            },
-          ]}
-          data={currentUser ? [currentUser] : []}
-          defaultSortColumn="fullname"
-          containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
-          rowClassName="hover:bg-[#354f52]/50"
-          showSearch={false}
-        />
+        {currentUser && (
+          <div className="mt-4">
+            <UserManagementDialog
+              open={true}
+              onClose={() => {}}
+              user={currentUser}
+              currentUserRole={user?.role}
+              fetchUsers={fetchUsers}
+            />
+          </div>
+        )}
       </div>
     );
   }
 
+  const handleRowClick = (row) => {
+    // Super users can't edit admin users
+    if (isSuperUser && row.role === "Admin") return;
+
+    setSelectedUser(row);
+    setShowUserDialog(true);
+  };
+
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#cad2c5] mb-4">
+    <div className="p-4">
+      <div className="mb-2">
+        <h1 className="text-2xl font-bold text-[#cad2c5] mb-2">
           Διαχείριση Χρηστών
         </h1>
-        {user?.role === "Admin" && (
+        {isAdmin && (
           <Button
-            onClick={() => setShowUserDialog(true)}
-            className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] mb-6"
+            onClick={() => {
+              setSelectedUser(null);
+              setShowUserDialog(true);
+            }}
+            className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] mb-2"
           >
             <Plus className="h-4 w-4 mr-2" />
             Νέος Χρήστης
@@ -144,7 +157,7 @@ export default function SettingsPage() {
               </span>
             ),
           },
-          user?.role === "Admin" && {
+          isAdmin && {
             header: "",
             accessor: "actions",
             sortable: false,
@@ -169,27 +182,21 @@ export default function SettingsPage() {
         data={users}
         defaultSortColumn="fullname"
         searchPlaceholder="Αναζήτηση χρήστη..."
-        onRowClick={(row) => {
-          if (user?.role === "Admin") {
-            setSelectedUser(row);
-            setShowUserDialog(true);
-          }
-        }}
+        onRowClick={handleRowClick}
         containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
-        rowClassName="hover:bg-[#354f52]/50"
+        rowClassName={`hover:bg-[#354f52]/50 ${isSuperUser ? 'cursor-pointer [&[data-role="Admin"]]:cursor-not-allowed [&[data-role="Admin"]]:opacity-50' : ""}`}
       />
 
-      {showUserDialog && (
-        <UserManagementDialog
-          open={showUserDialog}
-          onClose={() => {
-            setShowUserDialog(false);
-            setSelectedUser(null);
-          }}
-          user={selectedUser}
-          currentUserRole={user?.role}
-        />
-      )}
+      <UserManagementDialog
+        open={showUserDialog}
+        onClose={() => {
+          setShowUserDialog(false);
+          setSelectedUser(null);
+        }}
+        user={selectedUser}
+        currentUserRole={user?.role}
+        fetchUsers={fetchUsers}
+      />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">

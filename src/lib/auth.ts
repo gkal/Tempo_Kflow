@@ -65,6 +65,17 @@ export async function loginUser(
   }
 
   // Then check password
+  // First check if user exists and is active
+  const { data: userStatus } = await supabase
+    .from("users")
+    .select("status")
+    .eq("username", username)
+    .single();
+
+  if (userStatus?.status === "inactive") {
+    throw new Error("Ο λογαριασμός σας είναι ανενεργός");
+  }
+
   const { data, error } = await supabase
     .from("users")
     .select()
@@ -83,6 +94,7 @@ export async function loginUser(
     .update({ last_login_at: new Date().toISOString() })
     .eq("id", data.id);
 
+  // Handle remember me
   if (rememberMe) {
     localStorage.setItem(
       "rememberedUser",
