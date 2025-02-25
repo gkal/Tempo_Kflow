@@ -50,6 +50,7 @@ export default function SettingsPage() {
       setUsers(transformedData);
     } catch (error) {
       console.error("Error fetching users:", error);
+      // TODO: Add proper error handling/notification here
     } finally {
       setLoading(false);
     }
@@ -79,6 +80,7 @@ export default function SettingsPage() {
       await fetchUsers();
     } catch (error) {
       console.error("Error deactivating user:", error);
+      // TODO: Add proper error handling/notification here
     } finally {
       setShowDeleteDialog(false);
       setUserToDelete(null);
@@ -181,7 +183,7 @@ export default function SettingsPage() {
         ].filter(Boolean)}
         data={users}
         defaultSortColumn="fullname"
-        searchPlaceholder="Αναζήτηση χρήστη..."
+        searchPlaceholder="Αναζήτηση..."
         onRowClick={handleRowClick}
         containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
         rowClassName={`hover:bg-[#354f52]/50 ${isSuperUser ? 'cursor-pointer [&[data-role="Admin"]]:cursor-not-allowed [&[data-role="Admin"]]:opacity-50' : ""}`}
@@ -204,7 +206,7 @@ export default function SettingsPage() {
             <AlertDialogTitle>Απενεργοποίηση Χρήστη</AlertDialogTitle>
             <AlertDialogDescription className="text-[#84a98c]">
               Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε τον χρήστη{" "}
-              {userToDelete?.fullname};
+              {userToDelete?.fullname}?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

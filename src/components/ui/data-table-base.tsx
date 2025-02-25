@@ -9,15 +9,16 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DataSelect,
+  DataSelectContent,
+  DataSelectItem,
+  DataSelectTrigger,
+  DataSelectValue,
+} from "@/components/ui/data-select";
 import { Search } from "lucide-react";
 import { ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { searchBarStyles } from "@/lib/styles/search-bar";
 
 type SortDirection = "asc" | "desc";
 
@@ -62,7 +63,7 @@ export function DataTableBase({
     direction: defaultSortDirection,
   });
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedColumn, setSelectedColumn] = useState("all");
+  const [selectedColumn, setSelectedColumn] = useState(defaultSortColumn);
   const [filteredData, setFilteredData] = useState([]);
   const [displayedData, setDisplayedData] = useState([]);
   const [page, setPage] = useState(1);
@@ -106,19 +107,11 @@ export function DataTableBase({
 
     if (searchTerm) {
       result = result.filter((item) => {
-        if (selectedColumn === "all") {
-          return Object.values(item).some(
-            (val) =>
-              val &&
-              val.toString().toLowerCase().includes(searchTerm.toLowerCase()),
-          );
-        } else {
-          const value = item[selectedColumn];
-          return (
-            value &&
-            value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-          );
-        }
+        const value = item[selectedColumn];
+        return (
+          value &&
+          value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+        );
       });
     }
 
@@ -173,44 +166,51 @@ export function DataTableBase({
   return (
     <div className="w-full flex flex-col" ref={tableRef}>
       {showSearch && (
-        <div className="flex justify-center p-4 border-b border-[#52796f]">
-          <div className="relative w-96">
+        <div className="flex p-4 border-b border-[#52796f] mt-4">
+          <div className="relative w-96 ml-[200px]">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-[#84a98c]" />
             <Input
               placeholder={searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 pr-[200px] bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+              className={`pl-8 pr-[200px] ${searchBarStyles.inputClasses}`}
             />
             <div className="absolute right-0 top-0 h-full">
-              <Select value={selectedColumn} onValueChange={setSelectedColumn}>
-                <SelectTrigger className="h-full border-0 bg-transparent text-[#84a98c] rounded-l-none w-[190px] focus:ring-0 hover:bg-transparent">
-                  <SelectValue
-                    placeholder="All Columns"
+              <DataSelect
+                value={selectedColumn}
+                onValueChange={setSelectedColumn}
+              >
+                <DataSelectTrigger className="h-full border-0 bg-transparent text-[#84a98c] rounded-l-none w-[190px] focus:ring-0 hover:bg-transparent">
+                  <DataSelectValue
+                    placeholder={
+                      columns.find((c) => c.accessor === defaultSortColumn)
+                        ?.header
+                    }
                     className="text-right"
                   />
-                </SelectTrigger>
-                <SelectContent
+                </DataSelectTrigger>
+                <DataSelectContent
                   className="bg-[#2f3e46] border-[#52796f]"
-                  style={{ width: "max-content", minWidth: "250px" }}
+                  style={{
+                    width: "max-content",
+                    minWidth: `${Math.max(
+                      ...columns.map((col) => col.header.length * 6 + 16),
+                    )}px`,
+                  }}
+                  align="end"
+                  sideOffset={5}
                 >
-                  <SelectItem
-                    value="all"
-                    className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
-                  >
-                    All Columns
-                  </SelectItem>
                   {columns.map((column) => (
-                    <SelectItem
+                    <DataSelectItem
                       key={column.accessor}
                       value={column.accessor}
-                      className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
+                      className="text-[#84a98c] focus:bg-[#354f52] focus:text-[#cad2c5] flex items-center justify-between"
                     >
-                      {column.header}
-                    </SelectItem>
+                      <span>{column.header}</span>
+                    </DataSelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+                </DataSelectContent>
+              </DataSelect>
             </div>
           </div>
         </div>
@@ -332,7 +332,7 @@ export function DataTableBase({
                     colSpan={columns.length}
                     className="text-center py-8 text-[#84a98c]"
                   >
-                    No data found
+                    Δεν βρέθηκαν αποτελέσματα
                   </TableCell>
                 </TableRow>
               ) : (
