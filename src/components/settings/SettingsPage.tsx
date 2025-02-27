@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import { DataTableBase } from "@/components/ui/data-table-base";
@@ -25,6 +26,8 @@ export default function SettingsPage() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchColumn, setSearchColumn] = useState("fullname");
 
   const fetchUsers = async () => {
     try {
@@ -121,6 +124,14 @@ export default function SettingsPage() {
     setShowUserDialog(true);
   };
 
+  const searchColumns = [
+    { header: "Όνομα Χρήστη", accessor: "username" },
+    { header: "Ονοματεπώνυμο", accessor: "fullname" },
+    { header: "Email", accessor: "email" },
+    { header: "Τμήμα", accessor: "department" },
+    { header: "Ρόλος", accessor: "role" },
+  ];
+
   return (
     <div className="p-4">
       <div className="mb-2">
@@ -139,6 +150,16 @@ export default function SettingsPage() {
             Νέος Χρήστης
           </Button>
         )}
+      </div>
+
+      <div className="flex justify-center mb-4">
+        <SearchBar
+          onChange={(value) => setSearchTerm(value)}
+          value={searchTerm}
+          columns={searchColumns}
+          selectedColumn={searchColumn}
+          onColumnChange={(column) => setSearchColumn(column)}
+        />
       </div>
 
       <DataTableBase
@@ -163,27 +184,29 @@ export default function SettingsPage() {
             header: "",
             accessor: "actions",
             sortable: false,
-            cell: (_, row) => (
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 hover:bg-[#354f52] text-red-400"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUserToDelete(row);
-                    setShowDeleteDialog(true);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ),
+            cell: (_, row) =>
+              row.status === "active" ? (
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-[#354f52] text-red-400"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUserToDelete(row);
+                      setShowDeleteDialog(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : null,
           },
         ].filter(Boolean)}
         data={users}
         defaultSortColumn="fullname"
-        searchPlaceholder="Αναζήτηση..."
+        searchTerm={searchTerm}
+        searchColumn={searchColumn}
         onRowClick={handleRowClick}
         containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
         rowClassName={`hover:bg-[#354f52]/50 ${isSuperUser ? 'cursor-pointer [&[data-role="Admin"]]:cursor-not-allowed [&[data-role="Admin"]]:opacity-50' : ""}`}

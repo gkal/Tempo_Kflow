@@ -132,13 +132,34 @@ export default function UserManagementDialog({
           .update(updateData)
           .eq("id", user.id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          if (
+            updateError.code === "23505" &&
+            updateError.message.includes("users_username_key")
+          ) {
+            throw new Error(
+              "Το όνομα χρήστη χρησιμοποιείται ήδη. Παρακαλώ επιλέξτε διαφορετικό.",
+            );
+          }
+          throw updateError;
+        }
       } else {
         // Create new user
         const { error: createError } = await supabase
           .from("users")
           .insert([formData]);
-        if (createError) throw createError;
+
+        if (createError) {
+          if (
+            createError.code === "23505" &&
+            createError.message.includes("users_username_key")
+          ) {
+            throw new Error(
+              "Το όνομα χρήστη χρησιμοποιείται ήδη. Παρακαλώ επιλέξτε διαφορετικό.",
+            );
+          }
+          throw createError;
+        }
       }
 
       setSuccess(true);

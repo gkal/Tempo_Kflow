@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Table,
   TableBody,
@@ -7,10 +7,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SearchBar } from "@/components/ui/search-bar";
+import { DataTableBase } from "@/components/ui/data-table-base";
 
 interface DataTableProps {
   columns?: Array<{
@@ -20,6 +20,7 @@ interface DataTableProps {
   data?: Array<Record<string, any>>;
   onSort?: (column: string) => void;
   onFilter?: (searchTerm: string) => void;
+  defaultSortColumn?: string;
 }
 
 const defaultColumns = [
@@ -40,54 +41,62 @@ const DataTable = ({
   data = defaultData,
   onSort = () => {},
   onFilter = () => {},
+  defaultSortColumn = "name",
 }: DataTableProps) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedColumn, setSelectedColumn] = useState(defaultSortColumn);
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    onFilter(value);
+  };
+
+  const handleColumnChange = (column: string) => {
+    setSelectedColumn(column);
+  };
+
   return (
-    <div className="w-full bg-white p-4 rounded-lg shadow">
+    <div className="w-full bg-[#354f52] p-4 rounded-lg border border-[#52796f] overflow-hidden">
       {/* Search and Filter Section */}
-      <div className="flex items-center justify-between mb-4">
-        <SearchBar className="w-64" onChange={onFilter} />
+      <div className="flex items-center justify-center mb-4">
+        <SearchBar
+          onChange={handleSearch}
+          value={searchTerm}
+          columns={columns}
+          selectedColumn={selectedColumn}
+          onColumnChange={handleColumnChange}
+        />
       </div>
 
       {/* Table Section */}
-      <div className="border rounded-md">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {columns.map((column) => (
-                <TableHead
-                  key={column.accessor}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => onSort(column.accessor)}
-                >
-                  {column.header}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.map((row, index) => (
-              <TableRow key={index}>
-                {columns.map((column) => (
-                  <TableCell key={column.accessor}>
-                    {row[column.accessor]}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTableBase
+        columns={columns}
+        data={data}
+        searchTerm={searchTerm}
+        searchColumn={selectedColumn}
+        defaultSortColumn={defaultSortColumn}
+        rowClassName="hover:bg-[#354f52]/50 group"
+        containerClassName="border border-[#52796f] rounded-md overflow-hidden"
+      />
 
       {/* Pagination Section */}
       <div className="flex items-center justify-between mt-4">
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-[#84a98c]">
           Showing 1 to {data.length} of {data.length} results
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="icon">
+          <Button
+            variant="outline"
+            size="icon"
+            className="border-[#52796f] text-[#84a98c] hover:bg-[#354f52]/50 hover:text-[#cad2c5]"
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon">
+          <Button
+            variant="outline"
+            size="icon"
+            className="border-[#52796f] text-[#84a98c] hover:bg-[#354f52]/50 hover:text-[#cad2c5]"
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

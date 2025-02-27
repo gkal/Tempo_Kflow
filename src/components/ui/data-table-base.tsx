@@ -35,7 +35,8 @@ interface DataTableBaseProps {
   data: any[];
   defaultSortColumn?: string;
   defaultSortDirection?: SortDirection;
-  searchPlaceholder?: string;
+  searchTerm?: string;
+  searchColumn?: string;
   onRowClick?: (row: any) => void;
   rowClassName?: string;
   containerClassName?: string;
@@ -48,11 +49,12 @@ export function DataTableBase({
   data,
   defaultSortColumn = "fullname",
   defaultSortDirection = "asc",
-  searchPlaceholder = "Αναζήτηση...",
+  searchTerm = "",
+  searchColumn = "",
   onRowClick,
   rowClassName = "",
   containerClassName = "",
-  showSearch = true,
+  showSearch = false, // Default to false since search is now external
   pageSize = 20,
 }: DataTableBaseProps) {
   const [sortConfig, setSortConfig] = useState<{
@@ -62,8 +64,7 @@ export function DataTableBase({
     key: defaultSortColumn,
     direction: defaultSortDirection,
   });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedColumn, setSelectedColumn] = useState(defaultSortColumn);
+  // Search state is now passed as props
   const [filteredData, setFilteredData] = useState([]);
   const [displayedData, setDisplayedData] = useState([]);
   const [page, setPage] = useState(1);
@@ -105,9 +106,9 @@ export function DataTableBase({
   useEffect(() => {
     let result = [...data];
 
-    if (searchTerm) {
+    if (searchTerm && searchColumn) {
       result = result.filter((item) => {
-        const value = item[selectedColumn];
+        const value = item[searchColumn];
         return (
           value &&
           value.toString().toLowerCase().includes(searchTerm.toLowerCase())
@@ -130,7 +131,7 @@ export function DataTableBase({
     setFilteredData(result);
     setPage(1);
     setDisplayedData(result.slice(0, pageSize));
-  }, [data, searchTerm, selectedColumn, sortConfig, pageSize]);
+  }, [data, searchTerm, searchColumn, sortConfig, pageSize]);
 
   // Handle intersection observer for infinite scroll
   const handleObserver = useCallback(
@@ -165,214 +166,188 @@ export function DataTableBase({
 
   return (
     <div className="w-full flex flex-col" ref={tableRef}>
-      {showSearch && (
-        <div className="flex p-4 border-b border-[#52796f] mt-4">
-          <div className="relative w-96 ml-[200px]">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-[#84a98c]" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`pl-8 pr-[200px] ${searchBarStyles.inputClasses}`}
-            />
-            <div className="absolute right-0 top-0 h-full">
-              <DataSelect
-                value={selectedColumn}
-                onValueChange={setSelectedColumn}
-              >
-                <DataSelectTrigger className="h-full border-0 bg-transparent text-[#84a98c] rounded-l-none w-[190px] focus:ring-0 hover:bg-transparent">
-                  <DataSelectValue
-                    placeholder={
-                      columns.find((c) => c.accessor === defaultSortColumn)
-                        ?.header
-                    }
-                    className="text-right"
-                  />
-                </DataSelectTrigger>
-                <DataSelectContent
-                  className="bg-[#2f3e46] border-[#52796f]"
-                  style={{
-                    width: "max-content",
-                    minWidth: `${Math.max(
-                      ...columns.map((col) => col.header.length * 6 + 16),
-                    )}px`,
-                  }}
-                  align="end"
-                  sideOffset={5}
-                >
-                  {columns.map((column) => (
-                    <DataSelectItem
+      {/* Main table container with fixed header */}
+      <div className="relative overflow-hidden border border-[#52796f] rounded-md">
+        {/* Container with both horizontal and vertical scrollbars */}
+        <div className="overflow-x-scroll overflow-y-scroll scrollbar-visible max-h-[calc(70vh-8rem)]">
+          {/* Table with fixed layout */}
+          <div className="min-w-full inline-block align-middle">
+            <table className="min-w-full table-fixed border-collapse">
+              {/* Fixed header */}
+              <thead className="bg-[#2f3e46] border-b border-[#52796f] sticky top-0 z-10">
+                <tr className="hover:bg-transparent">
+                  <th className="text-[#84a98c] select-none whitespace-nowrap relative group w-10 text-center p-3 font-normal text-sm">
+                    #
+                  </th>
+                  {columns.map((column, index) => (
+                    <th
                       key={column.accessor}
-                      value={column.accessor}
-                      className="text-[#84a98c] focus:bg-[#354f52] focus:text-[#cad2c5] flex items-center justify-between"
-                    >
-                      <span>{column.header}</span>
-                    </DataSelectItem>
-                  ))}
-                </DataSelectContent>
-              </DataSelect>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="relative overflow-x-auto">
-        <div className="max-h-[calc(70vh-8rem)] overflow-y-auto">
-          <Table className="w-max">
-            <TableHeader className="bg-[#2f3e46] border-b border-[#52796f] sticky top-0 z-10">
-              <TableRow className="hover:bg-transparent">
-                {columns.map((column, index) => (
-                  <TableHead
-                    key={column.accessor}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      width: columnWidths[column.accessor],
-                      minWidth: columnWidths[column.accessor],
-                    }}
-                    className={cn(
-                      "text-[#84a98c] select-none whitespace-nowrap relative group",
-                      column.sortable !== false
-                        ? "cursor-pointer"
-                        : "cursor-default",
-                    )}
-                  >
-                    <div className="flex items-center space-x-2 pr-4 overflow-hidden">
-                      {column.sortable !== false && (
-                        <ArrowUp
-                          className={cn(
-                            "h-4 w-4 flex-shrink-0",
-                            sortConfig.key !== column.accessor && "opacity-0",
-                            sortConfig.direction === "desc" && "rotate-180",
-                          )}
-                        />
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: columnWidths[column.accessor],
+                        minWidth: columnWidths[column.accessor],
+                      }}
+                      className={cn(
+                        "text-[#84a98c] select-none whitespace-nowrap relative group p-3 text-left font-normal text-sm",
+                        column.sortable !== false
+                          ? "cursor-pointer"
+                          : "cursor-default",
                       )}
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          column.sortable !== false &&
-                            handleSort(column.accessor);
-                        }}
-                        className={cn(
-                          "truncate",
-                          column.sortable !== false
-                            ? "cursor-pointer hover:text-[#cad2c5]"
-                            : "",
+                    >
+                      <div className="flex items-center space-x-2 pr-4 overflow-hidden">
+                        {column.sortable !== false && (
+                          <ArrowUp
+                            className={cn(
+                              "h-4 w-4 flex-shrink-0",
+                              sortConfig.key !== column.accessor && "opacity-0",
+                              sortConfig.direction === "desc" && "rotate-180",
+                            )}
+                          />
                         )}
-                      >
-                        {column.header}
-                      </span>
-                    </div>
-                    {index < columns.length - 1 && (
-                      <div
-                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-[#52796f]/20 hover:bg-[#52796f] opacity-0 group-hover:opacity-100 transition-colors"
-                        onDoubleClick={() => {
-                          const headerCell = document.querySelector(
-                            `th:nth-child(${index + 1}) span`,
-                          );
-                          const headerWidth =
-                            headerCell?.getBoundingClientRect().width || 0;
-
-                          const cells = document.querySelectorAll(
-                            `td:nth-child(${index + 1})`,
-                          );
-                          let maxContentWidth = 0;
-
-                          cells.forEach((cell) => {
-                            const cellContent = cell.firstElementChild || cell;
-                            const width =
-                              cellContent.getBoundingClientRect().width;
-                            maxContentWidth = Math.max(maxContentWidth, width);
-                          });
-
-                          const finalWidth =
-                            maxContentWidth > headerWidth
-                              ? maxContentWidth + 16
-                              : headerWidth + 16;
-                          handleColumnResize(column.accessor, finalWidth);
-                        }}
-                        onMouseDown={(e) => {
-                          const startX = e.pageX;
-                          const startWidth = columnWidths[column.accessor];
-
-                          const handleMouseMove = (e: MouseEvent) => {
-                            const diff = e.pageX - startX;
-                            handleColumnResize(
-                              column.accessor,
-                              Math.max(50, startWidth + diff),
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            column.sortable !== false &&
+                              handleSort(column.accessor);
+                          }}
+                          className={cn(
+                            "truncate",
+                            column.sortable !== false
+                              ? "cursor-pointer hover:text-[#cad2c5]"
+                              : "",
+                          )}
+                        >
+                          {column.header}
+                        </span>
+                      </div>
+                      {index < columns.length - 1 && (
+                        <div
+                          className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-[#52796f]/20 hover:bg-[#52796f] opacity-0 group-hover:opacity-100 transition-colors"
+                          onDoubleClick={() => {
+                            const headerCell = document.querySelector(
+                              `th:nth-child(${index + 1}) span`,
                             );
-                          };
+                            const headerWidth =
+                              headerCell?.getBoundingClientRect().width || 0;
 
-                          const handleMouseUp = () => {
-                            document.removeEventListener(
+                            const cells = document.querySelectorAll(
+                              `td:nth-child(${index + 1})`,
+                            );
+                            let maxContentWidth = 0;
+
+                            cells.forEach((cell) => {
+                              const cellContent =
+                                cell.firstElementChild || cell;
+                              const width =
+                                cellContent.getBoundingClientRect().width;
+                              maxContentWidth = Math.max(
+                                maxContentWidth,
+                                width,
+                              );
+                            });
+
+                            const finalWidth =
+                              maxContentWidth > headerWidth
+                                ? maxContentWidth + 16
+                                : headerWidth + 16;
+                            handleColumnResize(column.accessor, finalWidth);
+                          }}
+                          onMouseDown={(e) => {
+                            const startX = e.pageX;
+                            const startWidth = columnWidths[column.accessor];
+
+                            const handleMouseMove = (e: MouseEvent) => {
+                              const diff = e.pageX - startX;
+                              handleColumnResize(
+                                column.accessor,
+                                Math.max(50, startWidth + diff),
+                              );
+                            };
+
+                            const handleMouseUp = () => {
+                              document.removeEventListener(
+                                "mousemove",
+                                handleMouseMove,
+                              );
+                              document.removeEventListener(
+                                "mouseup",
+                                handleMouseUp,
+                              );
+                            };
+
+                            document.addEventListener(
                               "mousemove",
                               handleMouseMove,
                             );
-                            document.removeEventListener(
-                              "mouseup",
-                              handleMouseUp,
-                            );
-                          };
+                            document.addEventListener("mouseup", handleMouseUp);
+                          }}
+                        />
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
 
-                          document.addEventListener(
-                            "mousemove",
-                            handleMouseMove,
-                          );
-                          document.addEventListener("mouseup", handleMouseUp);
-                        }}
-                      />
-                    )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {displayedData.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="text-center py-8 text-[#84a98c]"
-                  >
-                    Δεν βρέθηκαν αποτελέσματα
-                  </TableCell>
-                </TableRow>
-              ) : (
-                displayedData.map((row, index) => (
-                  <TableRow
-                    key={index}
-                    onClick={() => onRowClick?.(row)}
-                    className={cn(
-                      rowClassName,
-                      "group cursor-pointer transition-colors duration-150",
-                    )}
-                  >
-                    {columns.map((column) => (
-                      <TableCell
-                        key={column.accessor}
-                        style={{
-                          width: columnWidths[column.accessor],
-                          minWidth: columnWidths[column.accessor],
-                        }}
-                        className="text-[#cad2c5] whitespace-nowrap group-hover:underline"
+              {/* Table body */}
+              <tbody>
+                {displayedData.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={columns.length + 1}
+                      className="text-center py-8 text-[#84a98c] p-3"
+                    >
+                      Δεν βρέθηκαν αποτελέσματα
+                    </td>
+                  </tr>
+                ) : (
+                  displayedData.map((row, index) => (
+                    <tr
+                      key={index}
+                      onClick={() => onRowClick?.(row)}
+                      className={cn(
+                        rowClassName,
+                        "group cursor-pointer transition-colors duration-150 h-12",
+                      )}
+                      data-role={row.role}
+                    >
+                      <td className="text-[#cad2c5] whitespace-nowrap w-10 text-center p-3">
+                        {index + 1}
+                      </td>
+                      {columns.map((column) => (
+                        <td
+                          key={column.accessor}
+                          style={{
+                            width: columnWidths[column.accessor],
+                            minWidth: columnWidths[column.accessor],
+                          }}
+                          className="text-[#cad2c5] whitespace-nowrap group-hover:underline p-3"
+                        >
+                          {column.cell
+                            ? column.cell(row[column.accessor], row)
+                            : row[column.accessor]}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
+
+                {/* Loader for infinite scrolling */}
+                {displayedData.length < filteredData.length && (
+                  <tr>
+                    <td colSpan={columns.length + 1}>
+                      <div
+                        ref={loader}
+                        className="w-full h-20 flex items-center justify-center text-[#84a98c]"
                       >
-                        {column.cell
-                          ? column.cell(row[column.accessor], row)
-                          : row[column.accessor]}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        {displayedData.length < filteredData.length && (
-          <div
-            ref={loader}
-            className="w-full h-20 flex items-center justify-center text-[#84a98c]"
-          >
-            Loading more...
+                        Loading more...
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

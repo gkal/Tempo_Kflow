@@ -1,82 +1,96 @@
-import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { Input } from "./input";
+import { cn } from "@/lib/utils";
 import {
-  SearchSelect,
-  SearchSelectContent,
-  SearchSelectItem,
-  SearchSelectTrigger,
-  SearchSelectValue,
-} from "@/components/ui/search-select";
-import { getSearchBarStyle } from "@/lib/styles/search-bar";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-interface SearchBarProps {
+interface Column {
+  header: string;
+  accessor: string;
+}
+
+interface SearchBarProps extends React.InputHTMLAttributes<HTMLInputElement> {
   placeholder?: string;
   value?: string;
   onChange?: (value: string) => void;
-  className?: string;
-  columns?: Array<{ header: string; accessor: string }>;
-  selectedColumn?: string;
   onColumnChange?: (column: string) => void;
-  defaultColumn?: string;
+  className?: string;
+  columns?: Column[];
+  selectedColumn?: string;
 }
 
-function SearchBar({
-  placeholder = "Αναζήτηση",
+export function SearchBar({
+  placeholder = "Αναζήτηση....",
   value = "",
   onChange = () => {},
+  onColumnChange = () => {},
   className = "",
   columns = [],
-  selectedColumn,
-  onColumnChange,
-  defaultColumn,
+  selectedColumn = "name",
+  ...props
 }: SearchBarProps) {
+  const selectedColumnText =
+    columns.find((col) => col.accessor === selectedColumn)?.header ||
+    "Όλα τα πεδία";
+
   return (
-    <div className={`flex justify-end ${className}`}>
-      <div className={getSearchBarStyle("containerClasses")}>
-        <Search className={getSearchBarStyle("iconClasses")} />
+    <div className="w-96">
+      <div
+        className={cn(
+          "flex items-center h-10 rounded-md border border-[#52796f] bg-[#354f52] overflow-hidden shadow-md shadow-green-500/20",
+          className,
+        )}
+      >
+        <div className="flex-none pl-4">
+          <Search className="h-4 w-4 text-[#84a98c]" />
+        </div>
+
         <Input
+          type="text"
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={getSearchBarStyle("inputClasses")}
+          className="flex-1 border-0 bg-transparent h-full focus-visible:ring-0 focus-visible:ring-offset-0 text-[#cad2c5] placeholder:text-[#84a98c]"
+          {...props}
         />
+
         {columns.length > 0 && (
-          <div className="absolute right-0 top-0 h-full">
-            <SearchSelect value={selectedColumn} onValueChange={onColumnChange}>
-              <SearchSelectTrigger className="h-full border-0 bg-transparent text-[#84a98c] rounded-l-none w-[190px] focus:ring-0 hover:bg-transparent text-right">
-                <SearchSelectValue
-                  placeholder={
-                    columns.find((c) => c.accessor === defaultColumn)?.header
-                  }
-                />
-              </SearchSelectTrigger>
-              <SearchSelectContent
-                className="bg-[#2f3e46] border-[#52796f]"
-                style={{
-                  width: "max-content",
-                  minWidth: `${Math.max(
-                    ...columns.map((col) => col.header.length * 6 + 16),
-                  )}px`,
-                }}
+          <div className="relative">
+            <Select
+              value={selectedColumn}
+              onValueChange={onColumnChange}
+              defaultValue={selectedColumn}
+            >
+              <SelectTrigger className="border-0 bg-transparent h-full focus:ring-0 focus:ring-offset-0 text-[#84a98c] p-0 min-w-[120px] text-right">
+                <SelectValue className="text-right">
+                  {selectedColumnText}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent
+                className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] z-50"
                 align="end"
-                sideOffset={5}
+                sideOffset={10}
+                avoidCollisions={true}
               >
                 {columns.map((column) => (
-                  <SearchSelectItem
+                  <SelectItem
                     key={column.accessor}
                     value={column.accessor}
-                    className="text-[#84a98c] focus:bg-[#354f52] focus:text-[#cad2c5] flex items-center justify-between [&>span:last-child]:hidden"
+                    className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5] text-right"
                   >
-                    <span>{column.header}</span>
-                  </SearchSelectItem>
+                    {column.header}
+                  </SelectItem>
                 ))}
-              </SearchSelectContent>
-            </SearchSelect>
+              </SelectContent>
+            </Select>
           </div>
         )}
       </div>
     </div>
   );
 }
-
-export { SearchBar };
