@@ -167,8 +167,10 @@ export default function UserManagementDialog({
 
       setTimeout(() => {
         setSuccess(false);
-        if (!isAdmin && !isSuperUser) {
-          window.location.href = "/dashboard";
+        if (currentUserRole === "User" || currentUserRole === "Μόνο ανάγνωση") {
+          window.location.href = window.location.pathname.includes("/settings")
+            ? "/dashboard"
+            : window.location.pathname;
         } else {
           onClose();
         }
@@ -198,7 +200,18 @@ export default function UserManagementDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog
+      open={open}
+      onOpenChange={() => {
+        if (currentUserRole === "User" || currentUserRole === "Μόνο ανάγνωση") {
+          window.location.href = window.location.pathname.includes("/settings")
+            ? "/dashboard"
+            : window.location.pathname;
+        } else {
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="max-w-md bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
         <DialogHeader>
           <DialogTitle className="text-[#cad2c5]">

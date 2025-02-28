@@ -56,6 +56,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/customers/*"
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
 
         {import.meta.env.VITE_TEMPO === "true" && (
           <Route path="/tempobook/*" element={<div />} />

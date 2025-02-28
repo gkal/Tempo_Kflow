@@ -27,7 +27,15 @@ interface Column {
   accessor: string;
   sortable?: boolean;
   cell?: (value: any, row?: any) => React.ReactNode;
-  width?: number;
+  type?:
+    | "id"
+    | "name"
+    | "status"
+    | "date"
+    | "description"
+    | "numeric"
+    | "default";
+  priority?: "high" | "medium" | "low";
 }
 
 interface DataTableBaseProps {
@@ -42,6 +50,7 @@ interface DataTableBaseProps {
   containerClassName?: string;
   showSearch?: boolean;
   pageSize?: number;
+  tableId?: string;
 }
 
 export function DataTableBase({
@@ -55,7 +64,8 @@ export function DataTableBase({
   rowClassName = "",
   containerClassName = "",
   showSearch = false, // Default to false since search is now external
-  pageSize = 20,
+  pageSize = 50,
+  tableId = "default-table",
 }: DataTableBaseProps) {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -68,28 +78,8 @@ export function DataTableBase({
   const [filteredData, setFilteredData] = useState([]);
   const [displayedData, setDisplayedData] = useState([]);
   const [page, setPage] = useState(1);
-  const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>(
-    {},
-  );
   const loader = useRef(null);
   const tableRef = useRef<HTMLDivElement>(null);
-
-  // Initialize column widths
-  useEffect(() => {
-    const defaultWidths = {};
-    columns.forEach((column) => {
-      defaultWidths[column.accessor] = column.width || 200;
-    });
-    setColumnWidths(defaultWidths);
-  }, [columns]);
-
-  // Handle column resize
-  const handleColumnResize = (accessor: string, width: number) => {
-    setColumnWidths((prev) => ({
-      ...prev,
-      [accessor]: width,
-    }));
-  };
 
   // Handle sorting
   const handleSort = (key: string) => {
@@ -164,31 +154,66 @@ export function DataTableBase({
     setDisplayedData(filteredData.slice(0, end));
   }, [page, filteredData, pageSize]);
 
+  // Helper function to infer column type from accessor if not explicitly provided
+  const inferColumnType = (accessor: string) => {
+    if (/id$/i.test(accessor)) return "id";
+    if (/name|title/i.test(accessor)) return "name";
+    if (/status|state/i.test(accessor)) return "status";
+    if (/date|time|created|updated/i.test(accessor)) return "date";
+    if (/description|notes|details/i.test(accessor)) return "description";
+    if (/count|amount|total|price|quantity/i.test(accessor)) return "numeric";
+    return "default";
+  };
+
+  // Get column width based on type
+  const getColumnWidth = (column: Column) => {
+    const type = column.type || inferColumnType(column.accessor);
+
+    switch (type) {
+      case "id":
+        return "w-16";
+      case "status":
+        return "w-32";
+      case "date":
+        return "w-40";
+      case "name":
+        return "w-1/4";
+      case "numeric":
+        return "w-24";
+      case "description":
+        return ""; // flexible width
+      default:
+        return "w-auto";
+    }
+  };
+
   return (
     <div className="w-full flex flex-col" ref={tableRef}>
       {/* Main table container with fixed header */}
       <div className="relative overflow-hidden border border-[#52796f] rounded-md">
+        {/* Fixed header border that doesn't scroll */}
+        <div className="absolute top-[39px] left-0 right-0 h-[1px] bg-[#52796f] z-20"></div>
         {/* Container with both horizontal and vertical scrollbars */}
-        <div className="overflow-x-scroll overflow-y-scroll scrollbar-visible max-h-[calc(70vh-8rem)]">
+        <div
+          className="overflow-x-auto overflow-y-auto scrollbar-visible"
+          style={{ maxHeight: "calc(70vh - 8rem)", height: "750px" }}
+        >
           {/* Table with fixed layout */}
           <div className="min-w-full inline-block align-middle">
             <table className="min-w-full table-fixed border-collapse">
               {/* Fixed header */}
-              <thead className="bg-[#2f3e46] border-b border-[#52796f] sticky top-0 z-10">
+              <thead className="bg-[#2f3e46] sticky top-0 z-10">
                 <tr className="hover:bg-transparent">
                   <th className="text-[#84a98c] select-none whitespace-nowrap relative group w-10 text-center p-3 font-normal text-sm">
                     #
                   </th>
-                  {columns.map((column, index) => (
+                  {columns.map((column) => (
                     <th
                       key={column.accessor}
                       onClick={(e) => e.stopPropagation()}
-                      style={{
-                        width: columnWidths[column.accessor],
-                        minWidth: columnWidths[column.accessor],
-                      }}
                       className={cn(
-                        "text-[#84a98c] select-none whitespace-nowrap relative group p-3 text-left font-normal text-sm",
+                        "text-[#84a98c] select-none whitespace-nowrap relative p-3 text-left font-normal text-sm",
+                        getColumnWidth(column),
                         column.sortable !== false
                           ? "cursor-pointer"
                           : "cursor-default",
@@ -220,69 +245,6 @@ export function DataTableBase({
                           {column.header}
                         </span>
                       </div>
-                      {index < columns.length - 1 && (
-                        <div
-                          className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-[#52796f]/20 hover:bg-[#52796f] opacity-0 group-hover:opacity-100 transition-colors"
-                          onDoubleClick={() => {
-                            const headerCell = document.querySelector(
-                              `th:nth-child(${index + 1}) span`,
-                            );
-                            const headerWidth =
-                              headerCell?.getBoundingClientRect().width || 0;
-
-                            const cells = document.querySelectorAll(
-                              `td:nth-child(${index + 1})`,
-                            );
-                            let maxContentWidth = 0;
-
-                            cells.forEach((cell) => {
-                              const cellContent =
-                                cell.firstElementChild || cell;
-                              const width =
-                                cellContent.getBoundingClientRect().width;
-                              maxContentWidth = Math.max(
-                                maxContentWidth,
-                                width,
-                              );
-                            });
-
-                            const finalWidth =
-                              maxContentWidth > headerWidth
-                                ? maxContentWidth + 16
-                                : headerWidth + 16;
-                            handleColumnResize(column.accessor, finalWidth);
-                          }}
-                          onMouseDown={(e) => {
-                            const startX = e.pageX;
-                            const startWidth = columnWidths[column.accessor];
-
-                            const handleMouseMove = (e: MouseEvent) => {
-                              const diff = e.pageX - startX;
-                              handleColumnResize(
-                                column.accessor,
-                                Math.max(50, startWidth + diff),
-                              );
-                            };
-
-                            const handleMouseUp = () => {
-                              document.removeEventListener(
-                                "mousemove",
-                                handleMouseMove,
-                              );
-                              document.removeEventListener(
-                                "mouseup",
-                                handleMouseUp,
-                              );
-                            };
-
-                            document.addEventListener(
-                              "mousemove",
-                              handleMouseMove,
-                            );
-                            document.addEventListener("mouseup", handleMouseUp);
-                          }}
-                        />
-                      )}
                     </th>
                   ))}
                 </tr>
@@ -306,21 +268,20 @@ export function DataTableBase({
                       onClick={() => onRowClick?.(row)}
                       className={cn(
                         rowClassName,
-                        "group cursor-pointer transition-colors duration-150 h-12",
+                        "group cursor-pointer transition-colors duration-150 h-8",
                       )}
                       data-role={row.role}
                     >
-                      <td className="text-[#cad2c5] whitespace-nowrap w-10 text-center p-3">
+                      <td className="text-[#cad2c5] whitespace-nowrap w-10 text-center py-1 px-3">
                         {index + 1}
                       </td>
                       {columns.map((column) => (
                         <td
                           key={column.accessor}
-                          style={{
-                            width: columnWidths[column.accessor],
-                            minWidth: columnWidths[column.accessor],
-                          }}
-                          className="text-[#cad2c5] whitespace-nowrap group-hover:underline p-3"
+                          className={cn(
+                            "text-[#cad2c5] whitespace-nowrap group-hover:underline py-1 px-3 text-sm",
+                            column.type === "status" && "whitespace-nowrap",
+                          )}
                         >
                           {column.cell
                             ? column.cell(row[column.accessor], row)

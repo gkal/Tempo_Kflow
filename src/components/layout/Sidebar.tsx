@@ -24,7 +24,7 @@ interface SidebarProps {
 
 const navigation = [
   { name: "Πίνακας Ελέγχου", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Πελάτες", href: "/dashboard/customers", icon: Users },
+  { name: "Πελάτες", href: "/customers", icon: Users },
   { name: "Προσφορές", href: "/dashboard/offers", icon: Package },
   { name: "Κλήσεις", href: "/dashboard/calls", icon: Phone },
   { name: "Ρυθμίσεις", href: "/dashboard/settings", icon: Settings },

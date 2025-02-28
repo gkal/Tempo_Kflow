@@ -16,6 +16,17 @@ const Home = () => {
       return <SettingsPage />;
     }
 
+    if (path.includes("/customers")) {
+      const CustomersPage = React.lazy(
+        () => import("./customers/CustomersPage"),
+      );
+      return (
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <CustomersPage />
+        </React.Suspense>
+      );
+    }
+
     return (
       <div className="p-8">
         <div className="mb-8">

@@ -170,6 +170,42 @@ export default function SettingsPage() {
           { header: "Τμήμα", accessor: "department" },
           { header: "Ρόλος", accessor: "role" },
           {
+            header: "Ημ/νία Δημιουργίας",
+            accessor: "created_at",
+            cell: (value) =>
+              value
+                ? new Date(value).toLocaleDateString("el-GR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  }) +
+                  " " +
+                  new Date(value).toLocaleTimeString("el-GR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })
+                : "-",
+          },
+          {
+            header: "Τελευταία Σύνδεση",
+            accessor: "last_login_at",
+            cell: (value) =>
+              value
+                ? new Date(value).toLocaleDateString("el-GR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  }) +
+                  " " +
+                  new Date(value).toLocaleTimeString("el-GR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })
+                : "-",
+          },
+          {
             header: "Κατάσταση",
             accessor: "status",
             cell: (value) => (
@@ -184,9 +220,9 @@ export default function SettingsPage() {
             header: "",
             accessor: "actions",
             sortable: false,
-            cell: (_, row) =>
-              row.status === "active" ? (
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+            cell: (_, row) => (
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                {row.status === "active" ? (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -199,8 +235,11 @@ export default function SettingsPage() {
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
-                </div>
-              ) : null,
+                ) : (
+                  <div className="h-8 w-8"></div>
+                )}
+              </div>
+            ),
           },
         ].filter(Boolean)}
         data={users}
