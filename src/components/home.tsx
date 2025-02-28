@@ -16,13 +16,24 @@ const Home = () => {
       return <SettingsPage />;
     }
 
-    if (path.includes("/customers")) {
+    if (path === "/customers") {
       const CustomersPage = React.lazy(
         () => import("./customers/CustomersPage"),
       );
       return (
         <React.Suspense fallback={<div>Loading...</div>}>
           <CustomersPage />
+        </React.Suspense>
+      );
+    }
+
+    if (path.includes("/customers/")) {
+      const CustomerDetailPage = React.lazy(
+        () => import("./customers/CustomerDetailPage"),
+      );
+      return (
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <CustomerDetailPage />
         </React.Suspense>
       );
     }

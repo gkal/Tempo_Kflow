@@ -57,7 +57,15 @@ function App() {
           }
         />
         <Route
-          path="/customers/*"
+          path="/customers"
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers/:id"
           element={
             <ProtectedRoute>
               <Home />

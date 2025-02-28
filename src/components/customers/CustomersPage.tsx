@@ -1,18 +1,36 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, ArrowLeft } from "lucide-react";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { formatDateTime } from "@/lib/utils";
+import CustomerForm from "./CustomerForm";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function CustomersPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchColumn, setSearchColumn] = useState("name");
+  const [searchColumn, setSearchColumn] = useState("company_name");
+  const [showForm, setShowForm] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState(null);
+  const [formValid, setFormValid] = useState(false);
 
   const fetchCustomers = async () => {
     try {
@@ -38,18 +56,112 @@ export default function CustomersPage() {
     }
   }, [user]);
 
-  const handleRowClick = (row) => {
-    // TODO: Implement customer details/edit dialog
-    console.log("Customer clicked:", row);
+  const handleEditCustomer = (customer) => {
+    setSelectedCustomer(customer);
+    setShowForm(true);
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!customerToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("customers")
+        .update({
+          status: "inactive",
+          modified_by: user?.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", customerToDelete.id);
+
+      if (error) throw error;
+      await fetchCustomers();
+    } catch (error) {
+      console.error("Error deactivating customer:", error);
+    } finally {
+      setShowDeleteDialog(false);
+      setCustomerToDelete(null);
+    }
   };
 
   const searchColumns = [
-    { header: "Όνομα", accessor: "name" },
-    { header: "ΑΦΜ", accessor: "vat" },
+    { header: "Επωνυμία", accessor: "company_name" },
+    { header: "Τύπος", accessor: "customer_type" },
+    { header: "ΑΦΜ", accessor: "afm" },
     { header: "Email", accessor: "email" },
-    { header: "Τηλέφωνο", accessor: "phone" },
+    { header: "Τηλέφωνο", accessor: "telephone" },
     { header: "Διεύθυνση", accessor: "address" },
   ];
+
+  // If showing the form, render it instead of the customer list
+  if (showForm) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex items-center justify-between mb-4 p-4 bg-[#354f52] border-b border-[#52796f]">
+          <h1 className="text-xl font-bold text-[#a8c5b5]">
+            {selectedCustomer ? (
+              <>
+                <span>{selectedCustomer.company_name}</span>{" "}
+                <span className="text-sm font-normal text-[#84a98c]">
+                  ({selectedCustomer.customer_type || "Εταιρεία"})
+                </span>
+              </>
+            ) : (
+              "Νέος Πελάτης"
+            )}
+          </h1>
+          <div className="flex items-center space-x-2">
+            <Button
+              form="customer-form"
+              type="submit"
+              disabled={!formValid}
+              className="bg-[#52796f] hover:bg-[#52796f]/90 text-white rounded-md px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Αποθήκευση
+            </Button>
+            <button
+              onClick={() => {
+                setShowForm(false);
+                setSelectedCustomer(null);
+              }}
+              className="h-7 w-7 rounded-sm bg-transparent hover:bg-[#52796f] text-[#52796f] hover:text-white flex items-center justify-center transition-colors"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto relative">
+          <CustomerForm
+            customerId={selectedCustomer?.id}
+            onSave={() => {
+              fetchCustomers();
+              setShowForm(false);
+              setSelectedCustomer(null);
+            }}
+            onCancel={() => {
+              setShowForm(false);
+              setSelectedCustomer(null);
+            }}
+            onValidityChange={setFormValid}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4">
@@ -59,8 +171,9 @@ export default function CustomersPage() {
         </h1>
         <Button
           onClick={() => {
-            // TODO: Implement new customer dialog
-            console.log("Add new customer");
+            setSelectedCustomer(null);
+            setShowForm(true);
+            setFormValid(false);
           }}
           className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] mb-2"
         >
@@ -81,10 +194,11 @@ export default function CustomersPage() {
 
       <DataTableBase
         columns={[
-          { header: "Όνομα", accessor: "name" },
-          { header: "ΑΦΜ", accessor: "vat" },
+          { header: "Επωνυμία", accessor: "company_name" },
+          { header: "Τύπος", accessor: "customer_type" },
+          { header: "ΑΦΜ", accessor: "afm" },
           { header: "Email", accessor: "email" },
-          { header: "Τηλέφωνο", accessor: "phone" },
+          { header: "Τηλέφωνο", accessor: "telephone" },
           { header: "Διεύθυνση", accessor: "address" },
           {
             header: "Ημ/νία Δημιουργίας",
@@ -102,15 +216,83 @@ export default function CustomersPage() {
               </span>
             ),
           },
+          {
+            header: "",
+            accessor: "actions",
+            sortable: false,
+            cell: (_, row) => (
+              <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:bg-[#354f52] text-[#cad2c5]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/customers/${row.id}`);
+                  }}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:bg-[#354f52] text-[#cad2c5]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditCustomer(row);
+                    setFormValid(true); // Existing customers already have required fields
+                  }}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:bg-[#354f52] text-red-400"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCustomerToDelete(row);
+                    setShowDeleteDialog(true);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ),
+          },
         ]}
         data={customers}
-        defaultSortColumn="name"
+        defaultSortColumn="company_name"
         searchTerm={searchTerm}
         searchColumn={searchColumn}
-        onRowClick={handleRowClick}
+        onRowClick={(row) => navigate(`/customers/${row.id}`)}
         containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
-        rowClassName="hover:bg-[#354f52]/50 cursor-pointer"
+        rowClassName="hover:bg-[#354f52]/50 cursor-pointer group"
       />
+
+      {/* Delete Customer Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Απενεργοποίηση Πελάτη</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#84a98c]">
+              Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε τον πελάτη{" "}
+              {customerToDelete?.company_name};
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#354f52] text-[#cad2c5] hover:bg-[#354f52]/90">
+              Άκυρο
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={handleDeleteCustomer}
+            >
+              Απενεργοποίηση
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

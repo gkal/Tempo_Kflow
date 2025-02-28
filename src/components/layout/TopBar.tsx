@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { VERSION } from "@/lib/version";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -32,6 +32,29 @@ export default function TopBar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Update current date every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDate(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Format current date in Greek
+  const formatGreekDate = (date) => {
+    const options = {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    };
+    return date.toLocaleDateString("el-GR", options);
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -79,39 +102,44 @@ export default function TopBar() {
           </h1>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Avatar className="h-12 w-12 cursor-pointer">
-              <AvatarFallback
-                className="text-[#2f3e46] text-lg font-medium"
-                style={{
-                  backgroundColor: generateAvatarColor(user?.fullname),
-                }}
+        <div className="flex items-center space-x-4">
+          <div className="px-3 py-1 border border-[#84a98c]/50 rounded-full text-[#84a98c] text-xs mr-1 bg-[#354f52] -mt-8">
+            {formatGreekDate(currentDate)}
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Avatar className="h-12 w-12 cursor-pointer">
+                <AvatarFallback
+                  className="text-[#2f3e46] text-lg font-medium"
+                  style={{
+                    backgroundColor: generateAvatarColor(user?.fullname),
+                  }}
+                >
+                  {getInitials(user?.fullname)}
+                </AvatarFallback>
+              </Avatar>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-48 bg-[#2f3e46] border-[#52796f]"
+            >
+              <DropdownMenuItem
+                className="cursor-pointer hover:bg-[#324249] text-[#cad2c5] transition-colors"
+                onClick={() => navigate("/dashboard/settings")}
               >
-                {getInitials(user?.fullname)}
-              </AvatarFallback>
-            </Avatar>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="w-48 bg-[#2f3e46] border-[#52796f]"
-          >
-            <DropdownMenuItem
-              className="cursor-pointer hover:bg-[#324249] text-[#cad2c5] transition-colors"
-              onClick={() => navigate("/dashboard/settings")}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Ρυθμίσεις
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer hover:bg-[#324249] text-[#cad2c5] transition-colors"
-              onClick={handleLogout}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Αποσύνδεση
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                <Settings className="mr-2 h-4 w-4" />
+                Ρυθμίσεις
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="cursor-pointer hover:bg-[#324249] text-[#cad2c5] transition-colors"
+                onClick={handleLogout}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Αποσύνδεση
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </>
   );

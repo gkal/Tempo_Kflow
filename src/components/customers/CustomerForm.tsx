@@ -1,0 +1,516 @@
+import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import ContactDialog from "./ContactDialog";
+import { Textarea } from "@/components/ui/textarea";
+
+interface CustomerFormProps {
+  customerId?: string;
+  onSave?: () => void;
+  onCancel?: () => void;
+  viewOnly?: boolean;
+  onValidityChange?: (isValid: boolean) => void;
+}
+
+const CustomerForm = ({
+  customerId,
+  onSave,
+  onCancel,
+  viewOnly = false,
+  onValidityChange,
+}: CustomerFormProps) => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    company_name: "",
+    afm: "",
+    doy: "",
+    customer_type: "Εταιρεία",
+    address: "",
+    postal_code: "",
+    town: "",
+    telephone: "",
+    email: "",
+    webpage: "",
+    fax_number: "",
+    notes: "",
+  });
+
+  const [contacts, setContacts] = useState([]);
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [selectedContact, setSelectedContact] = useState(null);
+  const [primaryContact, setPrimaryContact] = useState(null);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  // Fetch customer data if editing
+  useEffect(() => {
+    if (customerId) {
+      fetchCustomerData();
+      fetchContacts();
+    }
+  }, [customerId]);
+
+  const fetchCustomerData = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("customers")
+        .select(
+          `*, created_by:users!created_by(fullname), modified_by:users!modified_by(fullname)`,
+        )
+        .eq("id", customerId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setFormData({
+          company_name: data.company_name || "",
+          afm: data.afm || "",
+          doy: data.doy || "",
+          customer_type: data.customer_type || "Εταιρεία",
+          address: data.address || "",
+          postal_code: data.postal_code || "",
+          town: data.town || "",
+          telephone: data.telephone || "",
+          email: data.email || "",
+          webpage: data.webpage || "",
+          fax_number: data.fax_number || "",
+          notes: data.notes || "",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching customer:", error);
+      setError("Σφάλμα κατά την ανάκτηση δεδομένων πελάτη");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchContacts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("*")
+        .eq("customer_id", customerId)
+        .eq("status", "active");
+
+      if (error) throw error;
+      setContacts(data || []);
+
+      // Set the first contact as primary if available
+      if (data && data.length > 0) {
+        setPrimaryContact(data[0]);
+      }
+    } catch (error) {
+      console.error("Error fetching contacts:", error);
+    }
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const isFormValid = () => {
+    // Check mandatory fields
+    return (
+      formData.company_name.trim() !== "" && formData.telephone.trim() !== ""
+    );
+  };
+
+  // Update parent component about form validity whenever form data changes
+  useEffect(() => {
+    if (onValidityChange) {
+      onValidityChange(isFormValid());
+    }
+  }, [formData, onValidityChange]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isFormValid()) return;
+
+    setLoading(true);
+    setError("");
+    setSuccess(false);
+
+    try {
+      if (customerId) {
+        // Update existing customer
+        const { error } = await supabase
+          .from("customers")
+          .update({
+            ...formData,
+            modified_by: user?.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", customerId);
+
+        if (error) throw error;
+      } else {
+        // Create new customer
+        const { error } = await supabase.from("customers").insert([
+          {
+            ...formData,
+            created_by: user?.id,
+            modified_by: user?.id,
+            status: "active",
+          },
+        ]);
+
+        if (error) throw error;
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        if (onSave) onSave();
+      }, 1000);
+    } catch (error: any) {
+      console.error("Error saving customer:", error);
+      setError(error.message || "Σφάλμα κατά την αποθήκευση");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContactClick = (contact) => {
+    setSelectedContact(contact);
+    setShowContactDialog(true);
+  };
+
+  // Generate initials for avatar
+  const getInitials = (name) => {
+    if (!name) return "?";
+    const parts = name.split(" ");
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`;
+    }
+    return name[0] || "?";
+  };
+
+  // Generate avatar color based on name
+  const generateAvatarColor = (name) => {
+    if (!name) return "hsl(200, 70%, 50%)";
+    const hash = name.split("").reduce((acc, char) => {
+      return char.charCodeAt(0) + ((acc << 5) - acc);
+    }, 0);
+    const hue = Math.abs(hash % 360);
+    return `hsl(${hue}, 70%, 50%)`;
+  };
+
+  return (
+    <div className="h-full overflow-auto bg-[#2f3e46] text-[#cad2c5]">
+      <form id="customer-form" onSubmit={handleSubmit} className="p-4">
+        {/* Form Sections */}
+        <div className="space-y-4 max-w-5xl mx-auto">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Account Information Section */}
+            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+              <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
+                <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                  ΣΤΟΙΧΕΙΑ ΠΕΛΑΤΗ
+                </h2>
+              </div>
+              <div className="p-3 space-y-1">
+                <div className="flex items-center mb-1">
+                  <div className="w-1/3 text-[#a8c5b5] text-sm">
+                    Επωνυμία <span className="text-red-500">*</span>
+                  </div>
+                  <div className="w-2/3">
+                    <input
+                      id="company_name"
+                      name="company_name"
+                      value={formData.company_name}
+                      onChange={handleInputChange}
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      disabled={viewOnly}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center mb-1">
+                  <div className="w-1/3 text-[#a8c5b5] text-sm">
+                    Τηλέφωνο <span className="text-red-500">*</span>
+                  </div>
+                  <div className="w-2/3">
+                    <input
+                      id="telephone"
+                      name="telephone"
+                      value={formData.telephone}
+                      onChange={handleInputChange}
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      disabled={viewOnly}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center mb-1">
+                  <div className="w-1/3 text-[#a8c5b5] text-sm">ΑΦΜ</div>
+                  <div className="w-2/3">
+                    <input
+                      id="afm"
+                      name="afm"
+                      value={formData.afm}
+                      onChange={handleInputChange}
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      disabled={viewOnly}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center mb-1">
+                  <div className="w-1/3 text-[#a8c5b5] text-sm">Δ.Ο.Υ.</div>
+                  <div className="w-2/3">
+                    <input
+                      id="doy"
+                      name="doy"
+                      value={formData.doy}
+                      onChange={handleInputChange}
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      disabled={viewOnly}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center mb-1">
+                  <div className="w-1/3 text-[#a8c5b5] text-sm">
+                    Τύπος Πελάτη
+                  </div>
+                  <div className="w-2/3">
+                    <select
+                      id="customer_type"
+                      name="customer_type"
+                      value={formData.customer_type}
+                      onChange={handleInputChange}
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      disabled={viewOnly}
+                    >
+                      <option value="Ιδιώτης">Ιδιώτης</option>
+                      <option value="Εταιρεία">Εταιρεία</option>
+                      <option value="Δημόσιο">Δημόσιο</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center mb-1">
+                  <div className="w-1/3 text-[#a8c5b5] text-sm">Email</div>
+                  <div className="w-2/3">
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      disabled={viewOnly}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Company Contacts Section */}
+            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+              <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f] flex justify-between items-center">
+                <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                  ΕΠΑΦΕΣ ΕΤΑΙΡΕΙΑΣ
+                </h2>
+                {customerId && (
+                  <div className="flex space-x-2">
+                    <button
+                      type="button"
+                      className="h-7 text-[#a8c5b5] hover:text-[#cad2c5] hover:bg-[#2f3e46] flex items-center text-sm px-2 rounded"
+                      onClick={() => {
+                        // Open contact selection dialog or dropdown
+                      }}
+                      disabled={viewOnly || contacts.length === 0}
+                    >
+                      <Search className="h-4 w-4 mr-1" />
+                      Επιλογή
+                    </button>
+                    <button
+                      type="button"
+                      className="h-7 w-7 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-400 rounded-full flex items-center justify-center"
+                      onClick={() => {
+                        setSelectedContact(null);
+                        setShowContactDialog(true);
+                      }}
+                      disabled={viewOnly}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="p-3">
+                {primaryContact ? (
+                  <div className="flex items-center">
+                    <Avatar className="h-10 w-10 mr-3">
+                      <AvatarFallback
+                        style={{
+                          backgroundColor: generateAvatarColor(
+                            primaryContact.full_name,
+                          ),
+                        }}
+                        className="text-[#2f3e46] text-sm font-medium"
+                      >
+                        {getInitials(primaryContact.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-medium text-[#a8c5b5]">
+                        {primaryContact.full_name}
+                      </h3>
+                      <p className="text-sm text-[#a8c5b5]">
+                        {primaryContact.position || "Χωρίς θέση"}
+                      </p>
+                      <div className="flex space-x-4 mt-1 text-sm text-[#a8c5b5]">
+                        {primaryContact.telephone && (
+                          <span>{primaryContact.telephone}</span>
+                        )}
+                        {primaryContact.email && (
+                          <span>{primaryContact.email}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-3 text-[#a8c5b5]">
+                    {customerId
+                      ? contacts.length > 0
+                        ? "Επιλέξτε κύρια επαφή"
+                        : "Δεν υπάρχουν επαφές. Δημιουργήστε μια νέα επαφή."
+                      : "Αποθηκεύστε πρώτα τον πελάτη για να προσθέσετε επαφές."}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Address Section */}
+            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+              <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
+                <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                  ΣΤΟΙΧΕΙΑ ΔΙΕΥΘΥΝΣΕΩΣ
+                </h2>
+              </div>
+              <div className="p-3 space-y-1">
+                <div className="flex items-center mb-1">
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Οδός</div>
+                  <div className="w-3/4">
+                    <input
+                      id="address"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      disabled={viewOnly}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center mb-1">
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Πόλη</div>
+                  <div className="w-3/4">
+                    <input
+                      id="town"
+                      name="town"
+                      value={formData.town}
+                      onChange={handleInputChange}
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      disabled={viewOnly}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center mb-1">
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Τ.Κ.</div>
+                  <div className="w-3/4">
+                    <input
+                      id="postal_code"
+                      name="postal_code"
+                      value={formData.postal_code}
+                      onChange={handleInputChange}
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      disabled={viewOnly}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Notes Section */}
+            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+              <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
+                <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                  ΣΗΜΕΙΩΣΕΙΣ
+                </h2>
+              </div>
+              <div className="p-3">
+                <Textarea
+                  id="notes"
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleInputChange}
+                  className="bg-[#2f3e46] border-0 text-[#cad2c5] placeholder:text-[#a8c5b5] min-h-[100px] focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all"
+                  placeholder="Προσθέστε σημειώσεις για αυτόν τον πελάτη..."
+                  disabled={viewOnly}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Error and Success Messages */}
+          {error && (
+            <div className="bg-red-500/10 text-red-400 p-3 rounded-md mb-4">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="bg-green-500/10 text-green-400 p-3 rounded-md mb-4">
+              Η αποθήκευση ολοκληρώθηκε με επιτυχία!
+            </div>
+          )}
+        </div>
+      </form>
+
+      {/* Contact Dialog */}
+      {customerId && (
+        <ContactDialog
+          open={showContactDialog}
+          onClose={() => {
+            setShowContactDialog(false);
+            setSelectedContact(null);
+          }}
+          contact={selectedContact}
+          customerId={customerId}
+          onSave={() => {
+            fetchContacts();
+            // If no primary contact is set, set the newly created one as primary
+            if (!primaryContact) {
+              setTimeout(() => {
+                fetchContacts();
+              }, 500);
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+export default CustomerForm;
