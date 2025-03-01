@@ -3,6 +3,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { CloseButton } from "@/components/ui/close-button";
 
 const Dialog = DialogPrimitive.Root;
 
@@ -42,9 +43,11 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 h-10 w-10 rounded-full border border-[#84a98c]/20 text-[#84a98c] hover:bg-[#84a98c]/20 hover:border-[#84a98c]/40 transition-colors">
-        <X className="h-5 w-5 m-auto" />
-        <span className="sr-only">Close</span>
+      <DialogPrimitive.Close asChild>
+        <div className="absolute right-4 top-4">
+          <CloseButton onClick={() => {}} />
+          <span className="sr-only">Close</span>
+        </div>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>

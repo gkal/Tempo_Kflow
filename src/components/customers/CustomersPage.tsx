@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { CloseButton } from "@/components/ui/close-button";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
@@ -38,6 +39,7 @@ export default function CustomersPage() {
       const { data, error } = await supabase
         .from("customers")
         .select("*")
+        .eq("status", "active")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -119,28 +121,13 @@ export default function CustomersPage() {
             >
               Αποθήκευση
             </Button>
-            <button
+            <CloseButton
+              size="md"
               onClick={() => {
                 setShowForm(false);
                 setSelectedCustomer(null);
               }}
-              className="h-7 w-7 rounded-sm bg-transparent hover:bg-[#52796f] text-[#52796f] hover:text-white flex items-center justify-center transition-colors"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M18 6 6 18" />
-                <path d="m6 6 12 12" />
-              </svg>
-            </button>
+            />
           </div>
         </div>
 

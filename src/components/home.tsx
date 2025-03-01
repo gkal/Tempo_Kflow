@@ -21,7 +21,17 @@ const Home = () => {
         () => import("./customers/CustomersPage"),
       );
       return (
-        <React.Suspense fallback={<div>Loading...</div>}>
+        <React.Suspense
+          fallback={
+            <div className="flex items-center justify-center p-8">
+              <div className="flex items-center justify-center space-x-2">
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.2s]" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.4s]" />
+              </div>
+            </div>
+          }
+        >
           <CustomersPage />
         </React.Suspense>
       );
@@ -32,7 +42,17 @@ const Home = () => {
         () => import("./customers/CustomerDetailPage"),
       );
       return (
-        <React.Suspense fallback={<div>Loading...</div>}>
+        <React.Suspense
+          fallback={
+            <div className="flex items-center justify-center p-8">
+              <div className="flex items-center justify-center space-x-2">
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.2s]" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.4s]" />
+              </div>
+            </div>
+          }
+        >
           <CustomerDetailPage />
         </React.Suspense>
       );

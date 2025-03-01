@@ -22,28 +22,28 @@ function deepFreeze<T extends object>(obj: T): Readonly<T> {
 
 export const closeButtonStyles = deepFreeze({
   // Colors
-  bg: "#354f52",
-  hoverBg: "#52796f/20",
+  bg: "#2f3e46",
+  hoverBg: "#354f52",
   text: "#cad2c5",
-  border: "#84a98c/50",
+  border: "#52796f",
   borderWidth: "1px",
 
   // Sizes
   size: {
     sm: {
-      height: "h-7",
-      width: "w-7",
-      iconSize: "h-4 w-4",
-    },
-    md: {
-      height: "h-9",
-      width: "w-9",
+      height: "h-8",
+      width: "w-8",
       iconSize: "h-5 w-5",
     },
-    lg: {
+    md: {
       height: "h-10",
       width: "w-10",
       iconSize: "h-6 w-6",
+    },
+    lg: {
+      height: "h-12",
+      width: "w-12",
+      iconSize: "h-7 w-7",
     },
   },
 

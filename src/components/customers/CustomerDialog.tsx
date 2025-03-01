@@ -26,7 +26,7 @@ export default function CustomerDialog({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
-        <DialogHeader className="flex justify-between items-center">
+        <DialogHeader>
           <DialogTitle className="text-[#cad2c5]">
             {viewOnly
               ? "Προβολή Πελάτη"
@@ -34,7 +34,6 @@ export default function CustomerDialog({
                 ? "Επεξεργασία Πελάτη"
                 : "Νέος Πελάτης"}
           </DialogTitle>
-          <CloseButton onClick={onClose} />
         </DialogHeader>
 
         <CustomerForm

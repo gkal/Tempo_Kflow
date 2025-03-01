@@ -10,10 +10,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
   Save,
-  Plus,
   Users,
   FileText,
-  Trash2,
   ArrowLeft,
   Phone,
   Mail,
@@ -23,14 +21,16 @@ import {
   Clock,
 } from "lucide-react";
 import { CloseButton } from "@/components/ui/close-button";
-import ContactDialog from "./ContactDialog";
+import ContactDialog from "../contacts/ContactDialog";
 import CustomerForm from "./CustomerForm";
+import { ContactList } from "@/components/contacts/ContactList";
+import { ContactCard } from "@/components/contacts/ContactCard";
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [customer, setCustomer] = useState(null);
+  const [customer, setCustomer] = useState<any>(null);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showContactDialog, setShowContactDialog] = useState(false);
@@ -80,6 +80,31 @@ export default function CustomerDetailPage() {
       console.error("Error fetching customer:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Set primary contact for a customer
+  const setPrimaryContact = async (contactId: string) => {
+    if (!id) return;
+
+    try {
+      // Update customer with primary contact
+      const { error } = await supabase
+        .from("customers")
+        .update({
+          primary_contact_id: contactId,
+          modified_by: user?.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      // Refresh data
+      await fetchCustomerData();
+      await fetchContacts();
+    } catch (error) {
+      console.error("Error setting primary contact:", error);
     }
   };
 
@@ -211,7 +236,7 @@ export default function CustomerDetailPage() {
                 <Save className="h-4 w-4 mr-2" />
                 Επεξεργασία
               </Button>
-              <CloseButton onClick={() => navigate("/customers")} />
+              <CloseButton size="md" onClick={() => navigate("/customers")} />
             </div>
           </div>
         </div>
@@ -225,63 +250,18 @@ export default function CustomerDetailPage() {
                 <h2 className="text-lg font-semibold mb-4 text-[#a8c5b5]">
                   Επαφές
                 </h2>
-                <div className="space-y-4">
-                  {contacts.length > 0 ? (
-                    contacts.map((contact) => (
-                      <div
-                        key={contact.id}
-                        className="flex items-center p-2 hover:bg-[#2f3e46] rounded-lg cursor-pointer"
-                        onClick={() => {
-                          setSelectedContact(contact);
-                          setShowContactDialog(true);
-                        }}
-                      >
-                        <Avatar className="h-8 w-8 mr-2">
-                          <AvatarFallback
-                            style={{
-                              backgroundColor: generateAvatarColor(
-                                contact.full_name,
-                              ),
-                            }}
-                            className="text-[#2f3e46] text-xs font-medium"
-                          >
-                            {getInitials(contact.full_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="font-medium text-[#a8c5b5]">
-                            {contact.full_name}
-                            {contact.telephone && (
-                              <span className="ml-2 text-xs text-[#84a98c]">
-                                {contact.telephone}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-[#84a98c]">
-                            {contact.position || "—"}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-[#84a98c] py-4">
-                      Δεν υπάρχουν επαφές
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-end mt-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedContact(null);
-                      setShowContactDialog(true);
-                    }}
-                    className="border-[#84a98c]/50 text-[#cad2c5] hover:bg-[#52796f]/20 h-7 w-7 p-0 rounded-full border border-yellow-400"
-                  >
-                    <Plus className="h-4 w-4 text-yellow-400" />
-                  </Button>
-                </div>
+                <ContactList
+                  contacts={contacts}
+                  primaryContactId={customer?.primary_contact_id}
+                  onContactClick={(contact) => {
+                    setSelectedContact(contact);
+                    setShowContactDialog(true);
+                  }}
+                  onAddContact={() => {
+                    setSelectedContact(null);
+                    setShowContactDialog(true);
+                  }}
+                />
               </CardContent>
             </Card>
 
@@ -431,7 +411,7 @@ export default function CustomerDetailPage() {
                         size="sm"
                         className="border-[#52796f] text-[#cad2c5] hover:bg-[#52796f]/20"
                       >
-                        <Plus className="h-4 w-4 mr-2" />
+                        <span className="h-4 w-4 mr-2">+</span>
                         Νέα Δραστηριότητα
                       </Button>
                     </div>
@@ -623,6 +603,8 @@ export default function CustomerDetailPage() {
         }}
         contact={selectedContact}
         customerId={id}
+        isPrimary={selectedContact?.id === customer?.primary_contact_id}
+        onSetPrimary={setPrimaryContact}
         onSave={fetchContacts}
       />
     </div>

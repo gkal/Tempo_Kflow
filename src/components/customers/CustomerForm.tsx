@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Search } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import ContactDialog from "./ContactDialog";
+import ContactDialog from "../contacts/ContactDialog";
 import { Textarea } from "@/components/ui/textarea";
+import { ContactList } from "@/components/contacts/ContactList";
 
 interface CustomerFormProps {
   customerId?: string;
@@ -16,12 +16,13 @@ interface CustomerFormProps {
 }
 
 const CustomerForm = ({
-  customerId,
+  customerId: initialCustomerId,
   onSave,
   onCancel,
   viewOnly = false,
   onValidityChange,
 }: CustomerFormProps) => {
+  const [customerId, setCustomerId] = useState(initialCustomerId);
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -37,12 +38,13 @@ const CustomerForm = ({
     webpage: "",
     fax_number: "",
     notes: "",
+    primary_contact_id: "",
   });
 
   const [contacts, setContacts] = useState([]);
   const [showContactDialog, setShowContactDialog] = useState(false);
   const [selectedContact, setSelectedContact] = useState(null);
-  const [primaryContact, setPrimaryContact] = useState(null);
+  // No longer needed as we're using primary_contact_id in formData
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
@@ -81,6 +83,7 @@ const CustomerForm = ({
           webpage: data.webpage || "",
           fax_number: data.fax_number || "",
           notes: data.notes || "",
+          primary_contact_id: data.primary_contact_id || "",
         });
       }
     } catch (error) {
@@ -102,12 +105,48 @@ const CustomerForm = ({
       if (error) throw error;
       setContacts(data || []);
 
-      // Set the first contact as primary if available
-      if (data && data.length > 0) {
-        setPrimaryContact(data[0]);
+      // Get the customer's primary contact ID
+      const { data: customerData } = await supabase
+        .from("customers")
+        .select("primary_contact_id")
+        .eq("id", customerId)
+        .single();
+
+      if (customerData && customerData.primary_contact_id) {
+        setFormData((prev) => ({
+          ...prev,
+          primary_contact_id: customerData.primary_contact_id,
+        }));
+      } else if (data && data.length > 0) {
+        // If no primary contact is set but contacts exist, set the first one as primary
+        await setPrimaryContact(data[0].id);
       }
     } catch (error) {
       console.error("Error fetching contacts:", error);
+    }
+  };
+
+  // Primary contact management
+  const setPrimaryContact = async (contactId: string) => {
+    if (!customerId) return;
+
+    try {
+      // Update customer with primary contact
+      const { error } = await supabase
+        .from("customers")
+        .update({
+          primary_contact_id: contactId,
+          modified_by: user?.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", customerId);
+
+      if (error) throw error;
+
+      // Refresh contacts to show updated primary status
+      await fetchContacts();
+    } catch (error) {
+      console.error("Error setting primary contact:", error);
     }
   };
 
@@ -137,13 +176,16 @@ const CustomerForm = ({
     }
   }, [formData, onValidityChange]);
 
+  const [saveDisabled, setSaveDisabled] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid()) return;
+    if (!isFormValid() || saveDisabled) return;
 
     setLoading(true);
     setError("");
     setSuccess(false);
+    setSaveDisabled(true);
 
     try {
       if (customerId) {
@@ -154,31 +196,46 @@ const CustomerForm = ({
             ...formData,
             modified_by: user?.id,
             updated_at: new Date().toISOString(),
+            primary_contact_id: formData.primary_contact_id || null,
           })
           .eq("id", customerId);
 
         if (error) throw error;
       } else {
         // Create new customer
-        const { error } = await supabase.from("customers").insert([
-          {
-            ...formData,
-            created_by: user?.id,
-            modified_by: user?.id,
-            status: "active",
-          },
-        ]);
+        const { data, error } = await supabase
+          .from("customers")
+          .insert([
+            {
+              ...formData,
+              created_by: user?.id,
+              modified_by: user?.id,
+              status: "active",
+              primary_contact_id: null, // Explicitly set to null for new customers
+            },
+          ])
+          .select();
 
         if (error) throw error;
+
+        // Set the customerId to the newly created customer's ID
+        if (data && data.length > 0) {
+          const newCustomerId = data[0].id;
+          setCustomerId(newCustomerId);
+        }
       }
 
       setSuccess(true);
+      setSaveDisabled(true);
       setTimeout(() => {
-        if (onSave) onSave();
+        setSuccess(false);
       }, 1000);
+      // Don't navigate away after saving - allow user to add contacts
+      // if (onSave) onSave();
     } catch (error: any) {
       console.error("Error saving customer:", error);
       setError(error.message || "Σφάλμα κατά την αποθήκευση");
+      setSaveDisabled(false); // Re-enable save button on error
     } finally {
       setLoading(false);
     }
@@ -187,26 +244,6 @@ const CustomerForm = ({
   const handleContactClick = (contact) => {
     setSelectedContact(contact);
     setShowContactDialog(true);
-  };
-
-  // Generate initials for avatar
-  const getInitials = (name) => {
-    if (!name) return "?";
-    const parts = name.split(" ");
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`;
-    }
-    return name[0] || "?";
-  };
-
-  // Generate avatar color based on name
-  const generateAvatarColor = (name) => {
-    if (!name) return "hsl(200, 70%, 50%)";
-    const hash = name.split("").reduce((acc, char) => {
-      return char.charCodeAt(0) + ((acc << 5) - acc);
-    }, 0);
-    const hue = Math.abs(hash % 360);
-    return `hsl(${hue}, 70%, 50%)`;
   };
 
   return (
@@ -323,7 +360,7 @@ const CustomerForm = ({
             </div>
 
             {/* Company Contacts Section */}
-            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden h-[350px]">
               <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f] flex justify-between items-center">
                 <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
                   ΕΠΑΦΕΣ ΕΤΑΙΡΕΙΑΣ
@@ -343,7 +380,7 @@ const CustomerForm = ({
                     </button>
                     <button
                       type="button"
-                      className="h-7 w-7 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-400 rounded-full flex items-center justify-center"
+                      className="h-7 w-7 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-600 rounded-full flex items-center justify-center"
                       onClick={() => {
                         setSelectedContact(null);
                         setShowContactDialog(true);
@@ -356,44 +393,21 @@ const CustomerForm = ({
                 )}
               </div>
               <div className="p-3">
-                {primaryContact ? (
-                  <div className="flex items-center">
-                    <Avatar className="h-10 w-10 mr-3">
-                      <AvatarFallback
-                        style={{
-                          backgroundColor: generateAvatarColor(
-                            primaryContact.full_name,
-                          ),
-                        }}
-                        className="text-[#2f3e46] text-sm font-medium"
-                      >
-                        {getInitials(primaryContact.full_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-medium text-[#a8c5b5]">
-                        {primaryContact.full_name}
-                      </h3>
-                      <p className="text-sm text-[#a8c5b5]">
-                        {primaryContact.position || "Χωρίς θέση"}
-                      </p>
-                      <div className="flex space-x-4 mt-1 text-sm text-[#a8c5b5]">
-                        {primaryContact.telephone && (
-                          <span>{primaryContact.telephone}</span>
-                        )}
-                        {primaryContact.email && (
-                          <span>{primaryContact.email}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                {customerId ? (
+                  <ContactList
+                    contacts={contacts}
+                    primaryContactId={formData.primary_contact_id}
+                    onContactClick={handleContactClick}
+                    onAddContact={() => {
+                      setSelectedContact(null);
+                      setShowContactDialog(true);
+                    }}
+                    onSetPrimary={setPrimaryContact}
+                    maxHeight="max-h-[200px]"
+                  />
                 ) : (
                   <div className="text-center py-3 text-[#a8c5b5]">
-                    {customerId
-                      ? contacts.length > 0
-                        ? "Επιλέξτε κύρια επαφή"
-                        : "Δεν υπάρχουν επαφές. Δημιουργήστε μια νέα επαφή."
-                      : "Αποθηκεύστε πρώτα τον πελάτη για να προσθέσετε επαφές."}
+                    Αποθηκεύστε πρώτα τον πελάτη για να προσθέσετε επαφές.
                   </div>
                 )}
               </div>
@@ -466,7 +480,7 @@ const CustomerForm = ({
                   name="notes"
                   value={formData.notes}
                   onChange={handleInputChange}
-                  className="bg-[#2f3e46] border-0 text-[#cad2c5] placeholder:text-[#a8c5b5] min-h-[100px] focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all"
+                  className="bg-[#2f3e46] border-0 text-[#cad2c5] placeholder:text-[#a8c5b5] h-[100px] max-h-[100px] resize-none focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all"
                   placeholder="Προσθέστε σημειώσεις για αυτόν τον πελάτη..."
                   disabled={viewOnly}
                 />
@@ -498,14 +512,10 @@ const CustomerForm = ({
           }}
           contact={selectedContact}
           customerId={customerId}
+          isPrimary={selectedContact?.id === formData.primary_contact_id}
+          onSetPrimary={setPrimaryContact}
           onSave={() => {
             fetchContacts();
-            // If no primary contact is set, set the newly created one as primary
-            if (!primaryContact) {
-              setTimeout(() => {
-                fetchContacts();
-              }, 500);
-            }
           }}
         />
       )}
