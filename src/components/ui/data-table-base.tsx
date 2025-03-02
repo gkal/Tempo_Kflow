@@ -187,6 +187,35 @@ export function DataTableBase({
     }
   };
 
+  // Update the sorting function in the DataTableBase component
+  const sortData = (data, sortColumn, sortDirection) => {
+    if (!sortColumn) return data;
+    
+    return [...data].sort((a, b) => {
+      // Get the values to compare
+      const valueA = a[sortColumn];
+      const valueB = b[sortColumn];
+      
+      // Handle null or undefined values
+      if (valueA == null) return 1;
+      if (valueB == null) return -1;
+      
+      // Case-insensitive string comparison for string values
+      if (typeof valueA === 'string' && typeof valueB === 'string') {
+        return sortDirection === 'asc' 
+          ? valueA.toLowerCase().localeCompare(valueB.toLowerCase())
+          : valueB.toLowerCase().localeCompare(valueA.toLowerCase());
+      }
+      
+      // For non-string values, use regular comparison
+      return sortDirection === 'asc' 
+        ? valueA > valueB ? 1 : -1
+        : valueA < valueB ? 1 : -1;
+    });
+  };
+
+  const sortedData = sortData(filteredData, sortConfig.key, sortConfig.direction);
+
   return (
     <div className="w-full flex flex-col" ref={tableRef}>
       {/* Main table container with fixed header */}
@@ -209,7 +238,7 @@ export function DataTableBase({
                   </th>
                   {columns.map((column) => (
                     <th
-                      key={column.accessor}
+                      key={column.accessor || column.id || `column-${columns.indexOf(column)}`}
                       onClick={(e) => e.stopPropagation()}
                       className={cn(
                         "text-[#84a98c] select-none whitespace-nowrap relative p-3 text-left font-normal text-sm",
@@ -252,7 +281,7 @@ export function DataTableBase({
 
               {/* Table body */}
               <tbody>
-                {displayedData.length === 0 ? (
+                {sortedData.length === 0 ? (
                   <tr>
                     <td
                       colSpan={columns.length + 1}
@@ -262,9 +291,9 @@ export function DataTableBase({
                     </td>
                   </tr>
                 ) : (
-                  displayedData.map((row, index) => (
+                  sortedData.map((row, index) => (
                     <tr
-                      key={index}
+                      key={row.id || `row-${index}`}
                       onClick={() => onRowClick?.(row)}
                       className={cn(
                         rowClassName,
@@ -277,7 +306,7 @@ export function DataTableBase({
                       </td>
                       {columns.map((column) => (
                         <td
-                          key={column.accessor}
+                          key={`${row.id || index}-${column.accessor || column.id || columns.indexOf(column)}`}
                           className={cn(
                             "text-[#cad2c5] whitespace-nowrap group-hover:underline py-1 px-3 text-sm",
                             column.type === "status" && "whitespace-nowrap",
@@ -293,7 +322,7 @@ export function DataTableBase({
                 )}
 
                 {/* Loader for infinite scrolling */}
-                {displayedData.length < filteredData.length && (
+                {sortedData.length < filteredData.length && (
                   <tr>
                     <td colSpan={columns.length + 1}>
                       <div

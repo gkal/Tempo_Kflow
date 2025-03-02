@@ -28,6 +28,11 @@
   --app-error: #e63946;
   --app-warning: #ee9b00;
   --app-info: #219ebc;
+
+  /* Override browser validation messages */
+  --webkit-validation-bubble-message-color: #cad2c5;
+  --webkit-validation-bubble-background-color: #2f3e46;
+  --webkit-validation-bubble-border-color: #52796f;
 }
 
 @layer base {
@@ -44,8 +49,7 @@
 input, textarea, select,
 .input, .textarea, .select,
 [role="combobox"],
-[data-state="open"] > button,
-[data-state="closed"] > button {
+[data-state] > button {
   background-color: var(--app-bg-primary) !important;
   color: var(--app-text-primary) !important;
   border-color: var(--app-border-primary) !important;
@@ -55,8 +59,7 @@ input, textarea, select,
 input:focus, textarea:focus, select:focus,
 .input:focus, .textarea:focus, .select:focus,
 [role="combobox"]:focus,
-[data-state]:focus > button,
-[data-state="open"] > button {
+[data-state]:focus > button {
   border-color: var(--app-text-muted) !important;
   box-shadow: 0 0 0 2px var(--app-focus-ring) !important;
   outline: none !important;
@@ -67,13 +70,17 @@ input:focus, textarea:focus, select:focus,
 [data-radix-popper-content-wrapper] div,
 .SelectContent {
   background-color: var(--app-bg-primary) !important;
-  border-color: var(--app-border-primary) !important;
+  border: 1px solid var(--app-border-primary) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
 [role="option"],
 [data-radix-popper-content-wrapper] div > *,
 .SelectItem {
   color: var(--app-text-primary) !important;
+  pointer-events: auto !important;
+  transition: background-color 0.1s ease-in-out !important;
 }
 
 /* Restore hover effects for dropdown options but remove from triggers */
@@ -89,23 +96,38 @@ input:focus, textarea:focus, select:focus,
 [role="option"]:hover,
 .SelectItem:hover,
 [data-radix-popper-content-wrapper] div > *:hover {
-  background-color: var(--app-bg-secondary) !important;
+  background-color: var(--app-bg-tertiary) !important;
   color: var(--app-text-primary) !important;
 }
 
 /* Clean up conflicting dropdown trigger styles */
 .SelectTrigger,
 [role="combobox"],
-[data-state="open"] > button,
-[data-state="closed"] > button,
+[data-state] > button,
 select,
-.select {
+.select,
+button[aria-haspopup="listbox"],
+button[aria-expanded],
+.DataSelectTrigger,
+.data-select-trigger,
+.DataSelectValue,
+.data-select-value,
+.SelectValue,
+.select-value,
+[class*="select-trigger"],
+[class*="SelectTrigger"],
+[class*="select-value"],
+[class*="SelectValue"] {
   background-color: var(--app-bg-primary) !important;
   color: var(--app-text-muted) !important;
   border: none !important;
   box-shadow: none !important;
   outline: none !important;
   transition: none !important;
+  text-align: left !important;
+  padding-right: 30px !important;
+  background-position: calc(100% - 8px) center !important;
+  position: relative !important;
 }
 
 /* Ensure no border on hover/focus/active states */
@@ -115,18 +137,21 @@ select,
 [role="combobox"]:hover,
 [role="combobox"]:focus,
 [role="combobox"]:active,
-[data-state="open"] > button:hover,
-[data-state="open"] > button:focus,
-[data-state="open"] > button:active,
-[data-state="closed"] > button:hover,
-[data-state="closed"] > button:focus,
-[data-state="closed"] > button:active,
+[data-state] > button:hover,
+[data-state] > button:focus,
+[data-state] > button:active,
 select:hover,
 select:focus,
 select:active,
-.select:hover,
-.select:focus,
-.select:active {
+button[aria-haspopup="listbox"]:hover,
+button[aria-haspopup="listbox"]:focus,
+button[aria-haspopup="listbox"]:active,
+button[aria-expanded]:hover,
+button[aria-expanded]:focus,
+button[aria-expanded]:active,
+[data-state] > button:hover,
+[data-state] > button:focus,
+[data-state] > button:active {
   background-color: var(--app-bg-primary) !important;
   color: var(--app-text-muted) !important;
   border: none !important;
@@ -139,14 +164,20 @@ select:active,
 .SelectTrigger::after,
 [role="combobox"]::before,
 [role="combobox"]::after,
-[data-state="open"] > button::before,
-[data-state="open"] > button::after,
-[data-state="closed"] > button::before,
-[data-state="closed"] > button::after,
+[data-state] > button::before,
+[data-state] > button::after,
 select::before,
 select::after,
 .select::before,
-.select::after {
+.select::after,
+button[aria-haspopup="listbox"]::before,
+button[aria-haspopup="listbox"]::after,
+button[aria-expanded]::before,
+button[aria-expanded]::after,
+.DataSelectTrigger::before,
+.data-select-trigger::before,
+.DataSelectValue::before,
+.data-select-value::before {
   display: none !important;
   content: none !important;
 }
@@ -287,7 +318,7 @@ div[role="dialog"] button[data-state]:hover {
 [class*="Dialog"] .select:focus,
 [class*="Dialog"] [role="combobox"]:focus,
 [class*="Dialog"] button[data-state]:focus,
-[class*="Dialog"] [data-state="open"] > button,
+[class*="Dialog"] [data-state] > button,
 div[role="dialog"] input:focus,
 div[role="dialog"] textarea:focus,
 div[role="dialog"] select:focus,
@@ -296,7 +327,7 @@ div[role="dialog"] .textarea:focus,
 div[role="dialog"] .select:focus,
 div[role="dialog"] [role="combobox"]:focus,
 div[role="dialog"] button[data-state]:focus,
-div[role="dialog"] [data-state="open"] > button {
+div[role="dialog"] [data-state] > button {
   border-color: var(--app-text-muted) !important;
   box-shadow: 0 0 0 2px var(--app-focus-ring) !important;
   outline: none !important;
@@ -342,20 +373,123 @@ div[class*="search"] input:focus,
   outline: none !important;
 }
 
-/* Replace up/down arrow with just down arrow */
-select {
+/* Completely remove all default browser arrows from select elements */
+select,
+.select,
+[role="combobox"],
+button[aria-haspopup="listbox"],
+button[aria-expanded],
+.SelectTrigger,
+.select-trigger,
+.DataSelectTrigger,
+.data-select-trigger {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
   appearance: none !important;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2384a98c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-image: none !important;
   background-repeat: no-repeat !important;
   background-position: right 0.5rem center !important;
-  padding-right: 2.5rem !important;
+  background-color: transparent !important;
+}
+
+/* Target the specific arrow element that might be causing the issue */
+.SelectTrigger > svg,
+.select-trigger > svg,
+[role="combobox"] > svg,
+button[aria-haspopup="listbox"] > svg,
+button[aria-expanded] > svg,
+.DataSelectTrigger > svg,
+.data-select-trigger > svg,
+select + svg,
+.select + svg,
+[role="combobox"] + svg,
+button[aria-haspopup="listbox"] + svg,
+button[aria-expanded] + svg {
+  display: none !important;
+}
+
+/* Hide any SVG that might be an arrow */
+svg[data-icon="chevron-down"],
+svg.chevron-down,
+svg.arrow-down,
+svg[class*="arrow"],
+svg[class*="chevron"],
+svg[class*="caret"] {
+  display: none !important;
+}
+
+/* For IE10+ */
+select::-ms-expand,
+.select::-ms-expand {
+  display: none !important;
+}
+
+/* For Firefox */
+select {
+  text-indent: 0.01px;
+  text-overflow: '';
+}
+
+/* For WebKit browsers */
+select::-webkit-inner-spin-button,
+select::-webkit-outer-spin-button,
+select::-webkit-search-decoration,
+select::-webkit-search-cancel-button,
+select::-webkit-search-results-button,
+select::-webkit-search-results-decoration {
+  display: none !important;
+}
+
+/* Add the custom arrow to select elements too */
+select::after,
+.select::after {
+  content: "" !important;
+  position: absolute !important;
+  right: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 10px !important;
+  height: 10px !important;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2384a98c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+  pointer-events: none !important;
+  display: block !important;
+}
+
+/* Override the previous rule that hides ::before and ::after for select elements */
+select::after,
+.select::after {
+  display: block !important;
+}
+
+/* For browsers that don't support ::after on select elements, use a wrapper */
+.select-wrapper {
+  position: relative !important;
+  display: inline-block !important;
+  width: 100% !important;
+}
+
+.select-wrapper::after {
+  content: "" !important;
+  position: absolute !important;
+  right: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 10px !important;
+  height: 10px !important;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2384a98c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+  pointer-events: none !important;
+  display: block !important;
 }
 
 /* Remove focus effect from dropdown headers when an item is selected */
 [role="combobox"]:focus-within,
-[data-state="open"]:focus-within > button,
-[data-state="closed"]:focus-within > button,
-.SelectTrigger:focus-within,
+[data-state] > button:focus-within,
 select:focus-within {
   border-color: var(--app-border-primary) !important;
   box-shadow: none !important;
@@ -382,24 +516,54 @@ div[class*="search"] svg,
   color: var(--app-text-muted) !important;
 }
 
-/* Match dropdown header text exactly with search placeholder */
+/* Ensure dropdown text color stays consistent in all states */
 .SelectTrigger,
 .SelectValue,
 [role="combobox"],
-[data-state="open"] > button,
-[data-state="closed"] > button,
-select {
-  color: rgba(132, 169, 140, 0.7) !important; /* #84a98c with 0.7 opacity */
+[data-state] > button,
+select,
+.select-value,
+[class*="selectValue"],
+[class*="SelectValue"],
+.SelectTrigger:hover,
+.SelectTrigger:focus,
+.SelectTrigger:active,
+[role="combobox"]:hover,
+[role="combobox"]:focus,
+[role="combobox"]:active,
+[data-state] > button:hover,
+[data-state] > button:focus,
+[data-state] > button:active,
+select:hover,
+select:focus,
+select:active {
+  color: var(--app-text-primary) !important; /* Keep text color consistent */
   border: none !important;
 }
 
-/* Ensure all text inside dropdown headers matches */
+/* Ensure all text inside dropdown headers matches in all states */
 .SelectTrigger *,
 [role="combobox"] *,
-[data-state="open"] > button *,
-[data-state="closed"] > button *,
-select option:checked {
-  color: rgba(132, 169, 140, 0.7) !important; /* #84a98c with 0.7 opacity */
+[data-state] > button *,
+select option:checked,
+.select-value *,
+[class*="selectValue"] *,
+[class*="SelectValue"] *,
+.SelectTrigger:hover *,
+.SelectTrigger:focus *,
+.SelectTrigger:active *,
+[role="combobox"]:hover *,
+[role="combobox"]:focus *,
+[role="combobox"]:active *,
+[data-state] > button:hover *,
+[data-state] > button:focus *,
+[data-state] > button:active * {
+  color: var(--app-text-primary) !important;
+  text-align: left !important;
+  display: inline-block !important;
+  width: 100% !important;
+  padding-right: 20px !important;
+  max-width: calc(100% - 30px) !important;
 }
 
 /* Target dropdown items specifically */
@@ -439,5 +603,844 @@ div[role="listbox"] {
 /* Disable pointer events on borders */
 *::before,
 *::after {
+  pointer-events: none !important;
+}
+
+/* Hide browser validation messages */
+input:invalid,
+select:invalid,
+textarea:invalid {
+  /* Remove box-shadow: none !important; */
+}
+
+/* Disable browser validation tooltips */
+:invalid {
+  box-shadow: none !important;
+}
+
+/* Custom validation error styling */
+.validation-error {
+  color: var(--app-error) !important;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* These pseudo-elements don't exist in standard browsers */
+::-webkit-validation-bubble-message {
+  display: none !important;
+}
+
+/* These selectors don't exist in standard browsers */
+input:user-invalid::before,
+select:user-invalid::before,
+textarea:user-invalid::before {
+  /* Remove this content */
+}
+
+/* Restore the hover effect for required fields while keeping Greek validation messages */
+
+/* Restore hover effects for required fields */
+
+/* Add hover effects for required fields */
+input:required:hover,
+select:required:hover,
+textarea:required:hover {
+  border-color: var(--app-text-muted) !important;
+  box-shadow: 0 0 0 1px var(--app-focus-ring) !important;
+}
+
+/* Remove the previous tooltip approach that wasn't working */
+input:required:hover::after,
+select:required:hover::after,
+textarea:required:hover::after {
+  /* Remove this content */
+}
+
+/* Add a more compatible tooltip approach using data attributes */
+input:required,
+select:required,
+textarea:required {
+  position: relative;
+}
+
+input:required:hover::before,
+select:required:hover::before,
+textarea:required:hover::before {
+  content: "Υποχρεωτικό πεδίο";
+  position: absolute;
+  top: -30px;
+  left: 0;
+  background: var(--app-bg-tertiary);
+  color: var(--app-text-primary);
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  z-index: 1000;
+  border: 1px solid var(--app-border-primary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Tooltip styling */
+.tooltip-container {
+  /* Remove this */
+}
+
+.tooltip {
+  /* Remove this */
+}
+
+.tooltip-container:hover .tooltip {
+  /* Remove this */
+}
+
+/* Simple approach to translate validation messages */
+input:invalid:user-invalid,
+select:invalid:user-invalid,
+textarea:invalid:user-invalid {
+  border-color: var(--app-error) !important;
+}
+
+/* Override browser validation messages with Greek text */
+input:invalid,
+select:invalid,
+textarea:invalid {
+  /* Allow browser validation styling */
+}
+
+/* Add custom validation message in Greek */
+form:invalid input:invalid:focus,
+form:invalid select:invalid:focus,
+form:invalid textarea:invalid:focus {
+  outline: 2px solid var(--app-error);
+}
+
+/* Update dropdown header color to match the search bar placeholder */
+.search-column-select .dropdown-header,
+.search-column-select .select-trigger,
+.search-column-select .select-value {
+  color: var(--app-text-muted) !important; /* Match the placeholder color */
+}
+
+/* Ensure this applies to any UI library components that might be used */
+[role="combobox"] .select-value,
+[role="listbox"] .select-label {
+  color: var(--app-text-muted) !important;
+}
+
+/* Ensure dropdown selected text matches placeholder color */
+.select-content .select-item[data-state="checked"] {
+  color: var(--app-text-muted) !important;
+}
+
+/* Target specific search bar dropdown elements */
+.SearchBar select,
+.SearchBar [role="combobox"],
+.search-bar select,
+.search-bar [role="combobox"],
+div[class*="search"] select,
+div[class*="search"] [role="combobox"],
+[role="search"] select,
+[role="search"] [role="combobox"],
+.DataTableBase select,
+.data-table-base select,
+.DataTableBase [role="combobox"],
+.data-table-base [role="combobox"] {
+  color: var(--app-text-muted) !important;
+}
+
+/* Target the select text specifically */
+.SearchBar select *,
+.SearchBar [role="combobox"] *,
+.search-bar select *,
+.search-bar [role="combobox"] *,
+div[class*="search"] select *,
+div[class*="search"] [role="combobox"] *,
+[role="search"] select *,
+[role="search"] [role="combobox"] *,
+.DataTableBase select *,
+.data-table-base select *,
+.DataTableBase [role="combobox"] *,
+.data-table-base [role="combobox"] * {
+  color: var(--app-text-muted) !important;
+}
+
+/* Override any shadow UI components */
+.select-trigger, 
+.SelectTrigger, 
+[data-state] > button,
+select,
+.select-value, 
+.SelectValue,
+button:has(.select-value),
+button:has(.SelectValue) {
+  color: var(--app-text-muted) !important;
+}
+
+/* Force all placeholder-like text to be the same color */
+::placeholder,
+.placeholder,
+[placeholder],
+option:checked,
+.selected-option,
+.selected-value,
+button[aria-expanded] span,
+button[aria-haspopup] span {
+  color: var(--app-text-muted) !important;
+}
+
+/* Ensure dropdown header text color remains consistent */
+.SearchBar .select-trigger,
+.SearchBar .SelectTrigger,
+.search-bar .select-trigger,
+.search-bar .SelectTrigger,
+div[class*="search"] .select-trigger,
+div[class*="search"] .SelectTrigger,
+.SearchBar [role="combobox"],
+.search-bar [role="combobox"],
+div[class*="search"] [role="combobox"],
+.SearchBar .select-value,
+.SearchBar .SelectValue,
+.search-bar .select-value,
+.search-bar .SelectValue,
+div[class*="search"] .select-value,
+div[class*="search"] .SelectValue,
+.SearchBar [data-value],
+.search-bar [data-value],
+div[class*="search"] [data-value] {
+  color: var(--app-text-muted) !important;
+}
+
+/* Ensure the color remains consistent in all states */
+.SearchBar .select-trigger:hover,
+.SearchBar .SelectTrigger:hover,
+.search-bar .select-trigger:hover,
+.search-bar .SelectTrigger:hover,
+div[class*="search"] .select-trigger:hover,
+div[class*="search"] .SelectTrigger:hover,
+.SearchBar [role="combobox"]:hover,
+.search-bar [role="combobox"]:hover,
+div[class*="search"] [role="combobox"]:hover,
+.SearchBar .select-trigger:focus,
+.SearchBar .SelectTrigger:focus,
+.search-bar .select-trigger:focus,
+.search-bar .SelectTrigger:focus,
+div[class*="search"] .select-trigger:focus,
+div[class*="search"] .SelectTrigger:focus,
+.SearchBar [role="combobox"]:focus,
+.search-bar [role="combobox"]:focus,
+div[class*="search"] [role="combobox"]:focus,
+.SearchBar .select-trigger:active,
+.SearchBar .SelectTrigger:active,
+.search-bar .select-trigger:active,
+.search-bar .SelectTrigger:active,
+div[class*="search"] .select-trigger:active,
+div[class*="search"] .SelectTrigger:active,
+.SearchBar [role="combobox"]:active,
+.search-bar [role="combobox"]:active,
+div[class*="search"] [role="combobox"]:active {
+  color: var(--app-text-muted) !important;
+}
+
+/* Target all text inside the dropdown trigger */
+.SearchBar .select-trigger *,
+.SearchBar .SelectTrigger *,
+.search-bar .select-trigger *,
+.search-bar .SelectTrigger *,
+div[class*="search"] .select-trigger *,
+div[class*="search"] .SelectTrigger *,
+.SearchBar [role="combobox"] *,
+.search-bar [role="combobox"] *,
+div[class*="search"] [role="combobox"] *,
+.SearchBar .select-value *,
+.SearchBar .SelectValue *,
+.search-bar .select-value *,
+.search-bar .SelectValue *,
+div[class*="search"] .select-value *,
+div[class*="search"] .SelectValue * {
+  color: var(--app-text-muted) !important;
+}
+
+/* Force all dropdown text to be the same color */
+.select-content .select-item,
+.SelectContent .SelectItem,
+[role="listbox"] [role="option"] {
+  color: var(--app-text-muted) !important;
+}
+
+/* FINAL OVERRIDE - Force consistent color for dropdown headers in ALL states */
+.SearchBar button,
+.search-bar button,
+div[class*="search"] button,
+[role="search"] button,
+.DataTableBase button,
+.data-table-base button,
+button[aria-haspopup="listbox"],
+button[aria-expanded],
+button[data-state],
+.select-trigger,
+.SelectTrigger,
+[data-radix-select-trigger],
+.select-value,
+.SelectValue,
+[data-value],
+.data-select-trigger,
+.DataSelectTrigger,
+.data-select-value,
+.DataSelectValue {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Ensure no borders on hover/focus/active states */
+.SearchBar button:hover, .SearchBar button:focus, .SearchBar button:active,
+.search-bar button:hover, .search-bar button:focus, .search-bar button:active,
+div[class*="search"] button:hover, div[class*="search"] button:focus, div[class*="search"] button:active,
+[role="search"] button:hover, [role="search"] button:focus, [role="search"] button:active,
+.DataTableBase button:hover, .DataTableBase button:focus, .DataTableBase button:active,
+.data-table-base button:hover, .data-table-base button:focus, .data-table-base button:active,
+button[aria-haspopup="listbox"]:hover, button[aria-haspopup="listbox"]:focus, button[aria-haspopup="listbox"]:active,
+button[aria-expanded]:hover, button[aria-expanded]:focus, button[aria-expanded]:active,
+button[data-state]:hover, button[data-state]:focus, button[data-state]:active,
+.select-trigger:hover, .select-trigger:focus, .select-trigger:active,
+.SelectTrigger:hover, .SelectTrigger:focus, .SelectTrigger:active,
+[data-radix-select-trigger]:hover, [data-radix-select-trigger]:focus, [data-radix-select-trigger]:active,
+.data-select-trigger:hover, .data-select-trigger:focus, .data-select-trigger:active,
+.DataSelectTrigger:hover, .DataSelectTrigger:focus, .DataSelectTrigger:active,
+.DataSelectValue:hover, .DataSelectValue:focus, .DataSelectValue:active,
+.data-select-value:hover, .data-select-value:focus, .data-select-value:active {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Fix dropdown content border and prevent it from changing */
+.SelectContent,
+.select-content,
+.DataSelectContent,
+.data-select-content,
+[data-radix-popper-content-wrapper] > div,
+[role="listbox"],
+div[class*="select-content"],
+div[class*="SelectContent"] {
+  border: 1px solid var(--app-border-primary) !important;
+  border-radius: 4px !important;
+  background-color: var(--app-bg-primary) !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+  transition: none !important;
+  pointer-events: auto !important;
+}
+
+/* Prevent dropdown content border from changing on ANY hover */
+.SelectContent *:hover,
+.select-content *:hover,
+.DataSelectContent *:hover,
+.data-select-content *:hover,
+[data-radix-popper-content-wrapper] > div *:hover,
+[role="listbox"] *:hover,
+div[class*="select-content"] *:hover,
+div[class*="SelectContent"] *:hover {
+  border-color: var(--app-border-primary) !important;
+}
+
+/* Isolate hover effects to dropdown items only */
+.SelectItem,
+.select-item,
+.DataSelectItem,
+.data-select-item,
+[role="option"] {
+  transition: background-color 0.1s ease-in-out !important;
+  color: var(--app-text-primary) !important;
+  pointer-events: auto !important;
+}
+
+.SelectItem:hover,
+.select-item:hover,
+.DataSelectItem:hover,
+.data-select-item:hover,
+[role="option"]:hover {
+  background-color: var(--app-bg-tertiary) !important;
+  color: var(--app-text-primary) !important;
+}
+
+/* FIX SYNTAX ERROR AND SIMPLIFY */
+
+/* 1. Fix dropdown header color to always be #84a98c */
+.SelectTrigger,
+.select-trigger,
+[role="combobox"],
+button[aria-haspopup="listbox"],
+button[aria-expanded],
+.DataSelectTrigger,
+.data-select-trigger {
+  color: var(--app-text-muted) !important;
+}
+
+/* 2. Fix dropdown header color for all child elements */
+.SelectTrigger *,
+.select-trigger *,
+[role="combobox"] *,
+button[aria-haspopup="listbox"] *,
+button[aria-expanded] *,
+.DataSelectTrigger *,
+.data-select-trigger * {
+  color: var(--app-text-muted) !important;
+}
+
+/* 3. Remove hover effect from dropdown header */
+.SelectTrigger:hover,
+.select-trigger:hover,
+[role="combobox"]:hover,
+button[aria-haspopup="listbox"]:hover,
+button[aria-expanded]:hover,
+.DataSelectTrigger:hover,
+.data-select-trigger:hover {
+  background-color: transparent !important;
+  color: var(--app-text-muted) !important;
+}
+
+/* 4. Fix dropdown border to be consistent */
+.SelectContent,
+.select-content,
+[role="listbox"],
+.DataSelectContent,
+.data-select-content {
+  border: 1px solid var(--app-border-primary) !important;
+}
+
+/* 5. Prevent dropdown border from changing on hover */
+.SelectContent:hover,
+.select-content:hover,
+[role="listbox"]:hover,
+.DataSelectContent:hover,
+.data-select-content:hover {
+  border: 1px solid var(--app-border-primary) !important;
+}
+
+/* ABSOLUTE FINAL COLOR FIX - NO EXCEPTIONS */
+.SelectTrigger,
+.select-trigger,
+[role="combobox"],
+button[aria-haspopup="listbox"],
+button[aria-expanded],
+.DataSelectTrigger,
+.data-select-trigger,
+.DataSelectValue,
+.data-select-value,
+.SelectValue,
+.select-value,
+/* Target by direct class names */
+[class*="select-trigger"],
+[class*="SelectTrigger"],
+[class*="select-value"],
+[class*="SelectValue"],
+/* Target by content */
+button:has(span:contains("Email")),
+button:has(span:contains("Επωνυμία")),
+button:has(span:contains("Τύπος")),
+button:has(span:contains("ΑΦΜ")),
+button:has(span:contains("Τηλέφωνο")),
+button:has(span:contains("Διεύθυνση")),
+/* Include all states */
+.SelectTrigger:hover,
+.select-trigger:hover,
+[role="combobox"]:hover,
+button[aria-haspopup="listbox"]:hover,
+button[aria-expanded]:hover,
+.DataSelectTrigger:hover,
+.data-select-trigger:hover,
+.DataSelectValue:hover,
+.data-select-value:hover,
+.SelectValue:hover,
+.select-value:hover,
+.SelectTrigger:focus,
+.select-trigger:focus,
+[role="combobox"]:focus,
+button[aria-haspopup="listbox"]:focus,
+button[aria-expanded]:focus,
+.DataSelectTrigger:focus,
+.data-select-trigger:focus,
+.DataSelectValue:focus,
+.data-select-value:focus,
+.SelectValue:focus,
+.select-value:focus,
+.SelectTrigger:active,
+.select-trigger:active,
+[role="combobox"]:active,
+button[aria-haspopup="listbox"]:active,
+button[aria-expanded]:active,
+.DataSelectTrigger:active,
+.data-select-trigger:active,
+.DataSelectValue:active,
+.data-select-value:active,
+.SelectValue:active,
+.select-value:active,
+/* Target selected state */
+.SelectTrigger[data-state="open"],
+.select-trigger[data-state="open"],
+[role="combobox"][aria-expanded="true"],
+button[aria-haspopup="listbox"][aria-expanded="true"],
+button[aria-expanded="true"],
+.DataSelectTrigger[data-state="open"],
+.data-select-trigger[data-state="open"] {
+  color: var(--app-text-muted) !important;
+  background-color: transparent !important;
+  transition: none !important;
+}
+
+/* Target all child elements to ensure consistent color */
+.SelectTrigger *,
+.select-trigger *,
+[role="combobox"] *,
+button[aria-haspopup="listbox"] *,
+button[aria-expanded] *,
+.DataSelectTrigger *,
+.data-select-trigger *,
+.DataSelectValue *,
+.data-select-value *,
+.SelectValue *,
+.select-value *,
+/* Target by direct class names */
+[class*="select-trigger"] *,
+[class*="SelectTrigger"] *,
+[class*="select-value"] *,
+[class*="SelectValue"] *,
+/* Include all states for child elements */
+.SelectTrigger:hover *,
+.select-trigger:hover *,
+[role="combobox"]:hover *,
+button[aria-haspopup="listbox"]:hover *,
+button[aria-expanded]:hover *,
+.DataSelectTrigger:hover *,
+.data-select-trigger:hover *,
+.DataSelectValue:hover *,
+.data-select-value:hover *,
+.SelectValue:hover *,
+.select-value:hover *,
+.SelectTrigger:focus *,
+.select-trigger:focus *,
+[role="combobox"]:focus *,
+button[aria-haspopup="listbox"]:focus *,
+button[aria-expanded]:focus *,
+.DataSelectTrigger:focus *,
+.data-select-trigger:focus *,
+.DataSelectValue:focus *,
+.data-select-value:focus *,
+.SelectValue:focus *,
+.select-value:focus *,
+.SelectTrigger:active *,
+.select-trigger:active *,
+[role="combobox"]:active *,
+button[aria-haspopup="listbox"]:active *,
+button[aria-expanded]:active *,
+.DataSelectTrigger:active *,
+.data-select-trigger:active *,
+.DataSelectValue:active *,
+.data-select-value:active *,
+.SelectValue:active *,
+.select-value:active *,
+/* Target selected state for child elements */
+.SelectTrigger[data-state="open"] *,
+.select-trigger[data-state="open"] *,
+[role="combobox"][aria-expanded="true"] *,
+button[aria-haspopup="listbox"][aria-expanded="true"] *,
+button[aria-expanded="true"] *,
+.DataSelectTrigger[data-state="open"] *,
+.data-select-trigger[data-state="open"] * {
+  color: var(--app-text-muted) !important;
+}
+
+/* Align dropdown header text to the left */
+.SelectTrigger,
+.select-trigger,
+[role="combobox"],
+button[aria-haspopup="listbox"],
+button[aria-expanded],
+.DataSelectTrigger,
+.data-select-trigger,
+.DataSelectValue,
+.data-select-value,
+.SelectValue,
+.select-value,
+[class*="select-trigger"],
+[class*="SelectTrigger"],
+[class*="select-value"],
+[class*="SelectValue"],
+button:has(span:contains("Email")),
+button:has(span:contains("Επωνυμία")),
+button:has(span:contains("Τύπος")),
+button:has(span:contains("ΑΦΜ")),
+button:has(span:contains("Τηλέφωνο")),
+button:has(span:contains("Διεύθυνση")) {
+  text-align: left !important;
+  padding-right: 2rem !important;
+}
+
+/* Ensure the text inside the dropdown header is also left-aligned */
+.SelectTrigger span,
+.select-trigger span,
+[role="combobox"] span,
+button[aria-haspopup="listbox"] span,
+button[aria-expanded] span,
+.DataSelectTrigger span,
+.data-select-trigger span,
+.DataSelectValue span,
+.data-select-value span,
+.SelectValue span,
+.select-value span,
+[class*="select-trigger"] span,
+[class*="SelectTrigger"] span,
+[class*="select-value"] span,
+[class*="SelectValue"] span {
+  text-align: left !important;
+  display: inline-block !important;
+  width: 100% !important;
+  padding-right: 0.5rem !important;
+}
+
+/* Fix dropdown items alignment - keep them left-aligned */
+.SelectContent .SelectItem,
+.select-content .select-item,
+.DataSelectContent .DataSelectItem,
+.data-select-content .data-select-item,
+[role="listbox"] [role="option"],
+.SelectContent [role="option"],
+.select-content [role="option"],
+.DataSelectContent [role="option"],
+.data-select-content [role="option"],
+div[class*="select-content"] [role="option"],
+div[class*="SelectContent"] [role="option"] {
+  text-align: left !important;
+  padding-right: initial !important;
+  padding-left: 0.75rem !important;
+}
+
+/* Ensure dropdown item text is left-aligned */
+.SelectContent .SelectItem span,
+.select-content .select-item span,
+.DataSelectContent .DataSelectItem span,
+.data-select-content .data-select-item span,
+[role="listbox"] [role="option"] span,
+.SelectContent [role="option"] span,
+.select-content [role="option"] span,
+.DataSelectContent [role="option"] span,
+.data-select-content [role="option"] span,
+div[class*="select-content"] [role="option"] span,
+div[class*="SelectContent"] [role="option"] span {
+  text-align: left !important;
+  display: inline-block !important;
+  width: auto !important;
+  padding-right: initial !important;
+}
+
+/* Custom arrow for dropdowns that don't use the select element */
+.SelectTrigger::after,
+[role="combobox"]::after,
+[data-state] > button::after,
+button[aria-haspopup="listbox"]::after,
+button[aria-expanded]::after,
+.DataSelectTrigger::after,
+.data-select-trigger::after {
+  display: block !important;
+  content: "" !important;
+  position: absolute !important;
+  right: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 10px !important;
+  height: 10px !important;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2384a98c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+  pointer-events: none !important;
+  z-index: 11 !important;
+}
+
+/* Ensure the arrow doesn't disappear on hover */
+.SelectTrigger:hover::after,
+.select-trigger:hover::after,
+[role="combobox"]:hover::after,
+button[aria-haspopup="listbox"]:hover::after,
+button[aria-expanded]:hover::after,
+.DataSelectTrigger:hover::after,
+.data-select-trigger:hover::after,
+.SelectTrigger:hover svg,
+.select-trigger:hover svg,
+[role="combobox"]:hover svg,
+button[aria-haspopup="listbox"]:hover svg,
+button[aria-expanded]:hover svg,
+.DataSelectTrigger:hover svg,
+.data-select-trigger:hover svg {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Prevent dropdown arrow from appearing on hover */
+.SelectTrigger,
+.select-trigger,
+[role="combobox"],
+button[aria-haspopup="listbox"],
+button[aria-expanded],
+.DataSelectTrigger,
+.data-select-trigger,
+.SelectTrigger:hover,
+.select-trigger:hover,
+[role="combobox"]:hover,
+button[aria-haspopup="listbox"]:hover,
+button[aria-expanded]:hover,
+.DataSelectTrigger:hover,
+.data-select-trigger:hover {
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Ensure content doesn't shift on hover */
+.SelectTrigger *,
+.select-trigger *,
+[role="combobox"] *,
+button[aria-haspopup="listbox"] *,
+button[aria-expanded] *,
+.DataSelectTrigger *,
+.data-select-trigger *,
+.SelectTrigger:hover *,
+.select-trigger:hover *,
+[role="combobox"]:hover *,
+button[aria-haspopup="listbox"]:hover *,
+button[aria-expanded]:hover *,
+.DataSelectTrigger:hover *,
+.data-select-trigger:hover * {
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Target the specific dropdown component */
+.SelectTrigger,
+.select-trigger,
+[role="combobox"],
+button[aria-haspopup="listbox"],
+button[aria-expanded],
+.DataSelectTrigger,
+.data-select-trigger {
+  position: relative !important;
+  overflow: hidden !important; /* Hide any overflowing content */
+}
+
+/* Create an overlay to block any arrows */
+.SelectTrigger::before,
+.select-trigger::before,
+[role="combobox"]::before,
+button[aria-haspopup="listbox"]::before,
+button[aria-expanded]::before,
+.DataSelectTrigger::before,
+.data-select-trigger::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 30px !important;
+  height: 100% !important;
+  background-color: inherit !important;
+  z-index: 10 !important;
+  pointer-events: none !important;
+  display: block !important;
+}
+
+/* Position our custom arrow on top of the overlay */
+.SelectTrigger::after,
+.select-trigger::after,
+[role="combobox"]::after,
+button[aria-haspopup="listbox"]::after,
+button[aria-expanded]::after,
+.DataSelectTrigger::after,
+.data-select-trigger::after {
+  display: block !important;
+  content: "" !important;
+  position: absolute !important;
+  right: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 10px !important;
+  height: 10px !important;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2384a98c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+  pointer-events: none !important;
+  z-index: 11 !important;
+}
+
+/* Fix for dropdown text truncation and spacing */
+.SelectTrigger span,
+.select-trigger span,
+[role="combobox"] span,
+button[aria-haspopup="listbox"] span,
+button[aria-expanded] span,
+.SelectValue,
+.select-value {
+  max-width: 100% !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  padding-right: 0 !important;
+}
+
+/* Remove any phantom elements that might be causing gaps */
+.SelectTrigger::after,
+.select-trigger::after,
+[role="combobox"]::after,
+button[aria-haspopup="listbox"]::after,
+button[aria-expanded]::after {
+  display: none !important;
+}
+
+/* Fix for the checkmark in dropdown items */
+.SelectItem .SelectItemIndicator,
+.select-item .select-item-indicator,
+[role="option"] [role="presentation"],
+.SelectContent [role="option"] span:last-child,
+.select-content [role="option"] span:last-child {
+  position: absolute !important;
+  right: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+  z-index: 2 !important;
+}
+
+/* Ensure the checkmark icon is visible */
+.SelectItem .SelectItemIndicator svg,
+.select-item .select-item-indicator svg,
+[role="option"] [role="presentation"] svg,
+.SelectContent [role="option"] span:last-child svg,
+.select-content [role="option"] span:last-child svg {
+  color: var(--app-text-primary) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Fix hover effect to not cover the checkmark */
+.SelectItem:hover,
+.select-item:hover,
+[role="option"]:hover {
+  position: relative !important;
+}
+
+.SelectItem:hover::after,
+.select-item:hover::after,
+[role="option"]:hover::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: calc(100% - 24px) !important; /* Leave space for the checkmark */
+  height: 100% !important;
+  background-color: var(--app-bg-tertiary) !important;
+  z-index: 1 !important;
   pointer-events: none !important;
 }

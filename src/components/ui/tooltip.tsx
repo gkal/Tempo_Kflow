@@ -1,13 +1,11 @@
-import * as React from "react"
-import * as TooltipPrimitive from "@radix-ui/react-tooltip"
+import React, { useRef, useEffect } from 'react';
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { cn } from "@/lib/utils";
 
-import { cn } from "@/lib/utils"
-
-const TooltipProvider = TooltipPrimitive.Provider
-
-const Tooltip = TooltipPrimitive.Root
-
-const TooltipTrigger = TooltipPrimitive.Trigger
+// Original Tooltip components
+const TooltipProvider = TooltipPrimitive.Provider;
+const TooltipRoot = TooltipPrimitive.Root;
+const TooltipTrigger = TooltipPrimitive.Trigger;
 
 const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
@@ -22,7 +20,53 @@ const TooltipContent = React.forwardRef<
     )}
     {...props}
   />
-))
-TooltipContent.displayName = TooltipPrimitive.Content.displayName
+));
+TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
+// Our custom Tooltip component
+interface CustomTooltipProps {
+  children: React.ReactNode;
+  showTooltip?: boolean;
+  value?: string;
+  message?: string;
+}
+
+const CustomTooltip = ({ 
+  children, 
+  showTooltip = false, 
+  value = "",
+  message = "Υποχρεωτικό πεδίο"
+}: CustomTooltipProps) => {
+  // Use a ref to track if the tooltip should be shown
+  const shouldShowRef = useRef(showTooltip && value.trim() === "");
+  
+  // Only update the ref when the component mounts or when value changes completely (not during typing)
+  useEffect(() => {
+    // Only update on mount or when field is cleared or filled completely
+    if (value.trim() === "" || value.trim().length > 3) {
+      shouldShowRef.current = showTooltip && value.trim() === "";
+    }
+  }, [showTooltip, value]);
+  
+  // Don't show tooltip if not required
+  if (!showTooltip) return <>{children}</>;
+  
+  return (
+    <div className="tooltip-container">
+      {children}
+      {shouldShowRef.current && <span className="tooltip">{message}</span>}
+    </div>
+  );
+};
+
+// Export the original components
+export { 
+  TooltipProvider, 
+  TooltipRoot as Tooltip, 
+  TooltipTrigger, 
+  TooltipContent,
+  CustomTooltip
+};
+
+// Export our custom tooltip as default
+export default CustomTooltip;

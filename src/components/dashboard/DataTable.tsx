@@ -62,7 +62,7 @@ const DataTable = ({
         <SearchBar
           onChange={handleSearch}
           value={searchTerm}
-          columns={columns}
+          options={columns.map(col => ({ value: col.accessor, label: col.header }))}
           selectedColumn={selectedColumn}
           onColumnChange={handleColumnChange}
         />

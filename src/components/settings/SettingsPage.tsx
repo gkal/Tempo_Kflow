@@ -29,6 +29,73 @@ export default function SettingsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchColumn, setSearchColumn] = useState("fullname");
 
+  const isAdmin = user?.role?.toLowerCase() === "admin";
+  const isSuperUser = user?.role?.toLowerCase() === "moderator";
+
+  // Define the full columns array for the admin view
+  const columns = [
+    { header: "Όνομα Χρήστη", accessor: "username" },
+    { header: "Ονοματεπώνυμο", accessor: "fullname" },
+    { header: "Email", accessor: "email" },
+    { header: "Τμήμα", accessor: "department" },
+    { header: "Ρόλος", accessor: "role" },
+    {
+      header: "Ημ/νία Δημιουργίας",
+      accessor: "created_at",
+      cell: (value) =>
+        value
+          ? new Date(value).toLocaleDateString("el-GR", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }) +
+            " " +
+            new Date(value).toLocaleTimeString("el-GR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })
+          : "-",
+    },
+    {
+      header: "Τελευταία Σύνδεση",
+      accessor: "last_login_at",
+      cell: (value) =>
+        value
+          ? new Date(value).toLocaleDateString("el-GR", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            }) +
+            " " +
+            new Date(value).toLocaleTimeString("el-GR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })
+          : "-",
+    },
+    {
+      header: "Κατάσταση",
+      accessor: "status",
+      cell: (value) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs ${value === "active" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}
+        >
+          {value === "active" ? "Ενεργός" : "Ανενεργός"}
+        </span>
+      ),
+    }
+  ];
+
+  const handleRowClick = (row) => {
+    // Super users can't edit admin users
+    if (isSuperUser && row.role === "Admin") return;
+
+    setSelectedUser(row);
+    setShowUserDialog(true);
+  };
+
   const fetchUsers = async () => {
     try {
       const { data, error } = await supabase
@@ -90,10 +157,7 @@ export default function SettingsPage() {
     }
   };
 
-  const isAdmin = user?.role === "Admin";
-  const isSuperUser = user?.role === "Super User";
-
-  // For regular users and readonly, show only their own data
+  // For regular users, show only their own data
   if (!isAdmin && !isSuperUser) {
     const currentUser = users.find((u) => u.id === user.id);
     return (
@@ -103,12 +167,12 @@ export default function SettingsPage() {
         </h1>
         {currentUser && (
           <div className="mt-4">
-            <UserManagementDialog
-              open={true}
-              onClose={() => {}}
-              user={currentUser}
-              currentUserRole={user?.role}
-              fetchUsers={fetchUsers}
+            <DataTableBase
+              columns={columns}
+              data={[currentUser]}
+              onRowClick={handleRowClick}
+              containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
+              rowClassName="hover:bg-[#354f52]/50"
             />
           </div>
         )}
@@ -116,22 +180,7 @@ export default function SettingsPage() {
     );
   }
 
-  const handleRowClick = (row) => {
-    // Super users can't edit admin users
-    if (isSuperUser && row.role === "Admin") return;
-
-    setSelectedUser(row);
-    setShowUserDialog(true);
-  };
-
-  const searchColumns = [
-    { header: "Όνομα Χρήστη", accessor: "username" },
-    { header: "Ονοματεπώνυμο", accessor: "fullname" },
-    { header: "Email", accessor: "email" },
-    { header: "Τμήμα", accessor: "department" },
-    { header: "Ρόλος", accessor: "role" },
-  ];
-
+  // Admin view
   return (
     <div className="p-4">
       <div className="mb-2">
@@ -152,70 +201,19 @@ export default function SettingsPage() {
         )}
       </div>
 
-      <div className="flex justify-center mb-4">
+      <div className="flex justify-between mb-4">
         <SearchBar
-          onChange={(value) => setSearchTerm(value)}
+          onChange={setSearchTerm}
           value={searchTerm}
-          columns={searchColumns}
+          options={columns.map(col => ({ value: col.accessor, label: col.header }))}
           selectedColumn={searchColumn}
-          onColumnChange={(column) => setSearchColumn(column)}
+          onColumnChange={setSearchColumn}
         />
       </div>
 
       <DataTableBase
         columns={[
-          { header: "Όνομα Χρήστη", accessor: "username" },
-          { header: "Ονοματεπώνυμο", accessor: "fullname" },
-          { header: "Email", accessor: "email" },
-          { header: "Τμήμα", accessor: "department" },
-          { header: "Ρόλος", accessor: "role" },
-          {
-            header: "Ημ/νία Δημιουργίας",
-            accessor: "created_at",
-            cell: (value) =>
-              value
-                ? new Date(value).toLocaleDateString("el-GR", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  }) +
-                  " " +
-                  new Date(value).toLocaleTimeString("el-GR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                  })
-                : "-",
-          },
-          {
-            header: "Τελευταία Σύνδεση",
-            accessor: "last_login_at",
-            cell: (value) =>
-              value
-                ? new Date(value).toLocaleDateString("el-GR", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  }) +
-                  " " +
-                  new Date(value).toLocaleTimeString("el-GR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                  })
-                : "-",
-          },
-          {
-            header: "Κατάσταση",
-            accessor: "status",
-            cell: (value) => (
-              <span
-                className={`px-2 py-1 rounded-full text-xs ${value === "active" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}
-              >
-                {value === "active" ? "Ενεργός" : "Ανενεργός"}
-              </span>
-            ),
-          },
+          ...columns,
           isAdmin && {
             header: "",
             accessor: "actions",

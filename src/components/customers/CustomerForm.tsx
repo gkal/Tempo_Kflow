@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Search, Plus } from "lucide-react";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import ContactDialog from "../contacts/ContactDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ContactList } from "@/components/contacts/ContactList";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 interface CustomerFormProps {
   customerId?: string;
@@ -180,13 +181,38 @@ const CustomerForm = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid() || saveDisabled) return;
-
+    
+    // Get all required inputs
+    const form = e.currentTarget as HTMLFormElement;
+    const requiredInputs = form.querySelectorAll('input[required], select[required], textarea[required]');
+    
+    // Check if any required fields are empty
+    let isValid = true;
+    requiredInputs.forEach(input => {
+      const element = input as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+      if (!element.value) {
+        isValid = false;
+        
+        // Show custom Greek validation message
+        alert('Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία');
+        
+        // Focus the first empty required field
+        element.focus();
+        
+        // Stop checking after finding the first empty field
+        return;
+      }
+    });
+    
+    if (!isValid) {
+      return;
+    }
+    
+    // Continue with form submission
     setLoading(true);
     setError("");
     setSuccess(false);
-    setSaveDisabled(true);
-
+    
     try {
       if (customerId) {
         // Update existing customer
@@ -205,15 +231,13 @@ const CustomerForm = ({
         // Create new customer
         const { data, error } = await supabase
           .from("customers")
-          .insert([
-            {
-              ...formData,
-              created_by: user?.id,
-              modified_by: user?.id,
-              status: "active",
-              primary_contact_id: null, // Explicitly set to null for new customers
-            },
-          ])
+          .insert([{
+            ...formData,
+            created_by: user?.id,
+            modified_by: user?.id,
+            status: "active",
+            primary_contact_id: null, // Explicitly set to null for new customers
+          }])
           .select();
 
         if (error) throw error;
@@ -226,16 +250,13 @@ const CustomerForm = ({
       }
 
       setSuccess(true);
-      setSaveDisabled(true);
       setTimeout(() => {
         setSuccess(false);
+        if (onSave) onSave(); // Call onSave to refresh the customer list
       }, 1000);
-      // Don't navigate away after saving - allow user to add contacts
-      // if (onSave) onSave();
     } catch (error: any) {
       console.error("Error saving customer:", error);
       setError(error.message || "Σφάλμα κατά την αποθήκευση");
-      setSaveDisabled(false); // Re-enable save button on error
     } finally {
       setLoading(false);
     }
@@ -259,9 +280,9 @@ const CustomerForm = ({
                   ΣΤΟΙΧΕΙΑ ΠΕΛΑΤΗ
                 </h2>
               </div>
-              <div className="p-3 space-y-1">
-                <div className="flex items-center mb-1">
-                  <div className="w-1/3 text-[#a8c5b5] text-sm">
+              <div className="p-3">
+                <div className="flex items-center" style={{ marginBottom: '16px' }}>
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">
                     Επωνυμία <span className="text-red-500">*</span>
                   </div>
                   <div className="w-2/3">
@@ -273,12 +294,14 @@ const CustomerForm = ({
                       className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                       required
+                      onInvalid={(e) => e.currentTarget.setCustomValidity('Παρακαλώ συμπληρώστε αυτό το πεδίο')}
+                      onInput={(e) => e.currentTarget.setCustomValidity('')}
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center mb-1">
-                  <div className="w-1/3 text-[#a8c5b5] text-sm">
+                <div className="flex items-center" style={{ marginBottom: '16px' }}>
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">
                     Τηλέφωνο <span className="text-red-500">*</span>
                   </div>
                   <div className="w-2/3">
@@ -290,12 +313,14 @@ const CustomerForm = ({
                       className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                       required
+                      onInvalid={(e) => e.currentTarget.setCustomValidity('Παρακαλώ συμπληρώστε αυτό το πεδίο')}
+                      onInput={(e) => e.currentTarget.setCustomValidity('')}
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center mb-1">
-                  <div className="w-1/3 text-[#a8c5b5] text-sm">ΑΦΜ</div>
+                <div className="flex items-center" style={{ marginBottom: '16px' }}>
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">ΑΦΜ</div>
                   <div className="w-2/3">
                     <input
                       id="afm"
@@ -308,8 +333,8 @@ const CustomerForm = ({
                   </div>
                 </div>
 
-                <div className="flex items-center mb-1">
-                  <div className="w-1/3 text-[#a8c5b5] text-sm">Δ.Ο.Υ.</div>
+                <div className="flex items-center" style={{ marginBottom: '16px' }}>
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Δ.Ο.Υ.</div>
                   <div className="w-2/3">
                     <input
                       id="doy"
@@ -322,28 +347,26 @@ const CustomerForm = ({
                   </div>
                 </div>
 
-                <div className="flex items-center mb-1">
-                  <div className="w-1/3 text-[#a8c5b5] text-sm">
+                <div className="flex items-center" style={{ marginBottom: '16px' }}>
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">
                     Τύπος Πελάτη
                   </div>
                   <div className="w-2/3">
-                    <select
-                      id="customer_type"
-                      name="customer_type"
+                    <CustomDropdown
+                      options={[
+                        { value: "company", label: "Εταιρεία" },
+                        { value: "individual", label: "Ιδιώτης" }
+                      ]}
                       value={formData.customer_type}
-                      onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
-                      disabled={viewOnly}
-                    >
-                      <option value="Ιδιώτης">Ιδιώτης</option>
-                      <option value="Εταιρεία">Εταιρεία</option>
-                      <option value="Δημόσιο">Δημόσιο</option>
-                    </select>
+                      onChange={(value) => handleInputChange("customer_type", value)}
+                      placeholder="Επιλέξτε τύπο πελάτη"
+                      className="w-full"
+                    />
                   </div>
                 </div>
 
-                <div className="flex items-center mb-1">
-                  <div className="w-1/3 text-[#a8c5b5] text-sm">Email</div>
+                <div className="flex items-center" style={{ marginBottom: '0' }}>
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Email</div>
                   <div className="w-2/3">
                     <input
                       id="email"
@@ -422,8 +445,8 @@ const CustomerForm = ({
                   ΣΤΟΙΧΕΙΑ ΔΙΕΥΘΥΝΣΕΩΣ
                 </h2>
               </div>
-              <div className="p-3 space-y-1">
-                <div className="flex items-center mb-1">
+              <div className="p-3">
+                <div className="flex items-center" style={{ marginBottom: '16px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Οδός</div>
                   <div className="w-3/4">
                     <input
@@ -437,7 +460,7 @@ const CustomerForm = ({
                   </div>
                 </div>
 
-                <div className="flex items-center mb-1">
+                <div className="flex items-center" style={{ marginBottom: '16px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Πόλη</div>
                   <div className="w-3/4">
                     <input
@@ -451,7 +474,7 @@ const CustomerForm = ({
                   </div>
                 </div>
 
-                <div className="flex items-center mb-1">
+                <div className="flex items-center" style={{ marginBottom: '0' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Τ.Κ.</div>
                   <div className="w-3/4">
                     <input
@@ -480,7 +503,7 @@ const CustomerForm = ({
                   name="notes"
                   value={formData.notes}
                   onChange={handleInputChange}
-                  className="bg-[#2f3e46] border-0 text-[#cad2c5] placeholder:text-[#a8c5b5] h-[100px] max-h-[100px] resize-none focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all"
+                  className="bg-[#2f3e46] border-0 text-[#cad2c5] placeholder:text-[#a8c5b5] h-[115px] max-h-[120px] resize-none focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all"
                   placeholder="Προσθέστε σημειώσεις για αυτόν τον πελάτη..."
                   disabled={viewOnly}
                 />

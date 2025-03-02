@@ -25,6 +25,8 @@ import ContactDialog from "../contacts/ContactDialog";
 import CustomerForm from "./CustomerForm";
 import { ContactList } from "@/components/contacts/ContactList";
 import { ContactCard } from "@/components/contacts/ContactCard";
+import { toast } from "@/components/ui/use-toast";
+import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
@@ -55,6 +57,7 @@ export default function CustomerDetailPage() {
       assignedTo: "Lisa Crosbie",
     },
   ]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -141,6 +144,73 @@ export default function CustomerDetailPage() {
     }, 0);
     const hue = Math.abs(hash % 360);
     return `hsl(${hue}, 70%, 50%)`;
+  };
+
+  const handleDelete = async () => {
+    if (!id) return;
+    
+    try {
+      setIsDeleting(true);
+      
+      // Check if user is admin or super user
+      const isAdminOrSuperUser = user?.role === 'admin' || 
+                                user?.role === 'super_user';
+      
+      if (isAdminOrSuperUser) {
+        // For admin/super users: Perform actual deletion
+        // First delete all contacts associated with this customer
+        const { error: contactsError } = await supabase
+          .from('contacts')
+          .delete()
+          .eq('customer_id', id);
+        
+        if (contactsError) throw contactsError;
+        
+        // Then delete the customer record
+        const { error: customerError } = await supabase
+          .from('customers')
+          .delete()
+          .eq('id', id);
+        
+        if (customerError) throw customerError;
+        
+        toast({
+          title: "Επιτυχής διαγραφή",
+          description: "Ο πελάτης και όλες οι επαφές του διαγράφηκαν οριστικά.",
+          variant: "default",
+        });
+      } else {
+        // For regular users: Just mark as inactive
+        const { error } = await supabase
+          .from('customers')
+          .update({ 
+            status: 'inactive',
+            modified_by: user?.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Επιτυχής απενεργοποίηση",
+          description: "Ο πελάτης έχει απενεργοποιηθεί.",
+          variant: "default",
+        });
+      }
+      
+      // Redirect to customers list
+      navigate('/customers');
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      toast({
+        title: "Σφάλμα",
+        description: "Υπήρξε πρόβλημα κατά τη διαγραφή του πελάτη.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (loading) {
