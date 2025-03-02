@@ -270,7 +270,7 @@ const CustomerForm = ({
                       name="company_name"
                       value={formData.company_name}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                       required
                     />
@@ -287,7 +287,7 @@ const CustomerForm = ({
                       name="telephone"
                       value={formData.telephone}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                       required
                     />
@@ -302,7 +302,7 @@ const CustomerForm = ({
                       name="afm"
                       value={formData.afm}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                     />
                   </div>
@@ -316,7 +316,7 @@ const CustomerForm = ({
                       name="doy"
                       value={formData.doy}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                     />
                   </div>
@@ -332,7 +332,7 @@ const CustomerForm = ({
                       name="customer_type"
                       value={formData.customer_type}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                     >
                       <option value="Ιδιώτης">Ιδιώτης</option>
@@ -351,7 +351,7 @@ const CustomerForm = ({
                       type="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                     />
                   </div>
@@ -431,7 +431,7 @@ const CustomerForm = ({
                       name="address"
                       value={formData.address}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                     />
                   </div>
@@ -445,7 +445,7 @@ const CustomerForm = ({
                       name="town"
                       value={formData.town}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                     />
                   </div>
@@ -459,7 +459,7 @@ const CustomerForm = ({
                       name="postal_code"
                       value={formData.postal_code}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
                       disabled={viewOnly}
                     />
                   </div>
@@ -480,7 +480,7 @@ const CustomerForm = ({
                   name="notes"
                   value={formData.notes}
                   onChange={handleInputChange}
-                  className="bg-[#2f3e46] border-0 text-[#cad2c5] placeholder:text-[#a8c5b5] h-[100px] max-h-[100px] resize-none focus:ring-0 hover:ring-1 hover:ring-[#52796f] transition-all"
+                  className="bg-[#2f3e46] border-0 text-[#cad2c5] placeholder:text-[#a8c5b5] h-[100px] max-h-[100px] resize-none focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all"
                   placeholder="Προσθέστε σημειώσεις για αυτόν τον πελάτη..."
                   disabled={viewOnly}
                 />
