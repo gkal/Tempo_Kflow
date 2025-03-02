@@ -2,68 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
+/* Application Color System */
+:root {
+  /* Primary palette */
+  --app-bg-primary: #2f3e46;
+  --app-bg-secondary: #354f52;
+  --app-bg-tertiary: #3a5258;
+  
+  /* Text colors */
+  --app-text-primary: #cad2c5;
+  --app-text-secondary: #a8c5b5;
+  --app-text-muted: #84a98c;
+  
+  /* Border colors */
+  --app-border-primary: #52796f;
+  --app-border-secondary: #52796f80; /* 50% opacity */
+  
+  /* Interactive states */
+  --app-hover-bg: #354f5280;
+  --app-focus-ring: #52796f;
+  --app-active-bg: #52796f40;
+  
+  /* Status colors */
+  --app-success: #84a98c;
+  --app-error: #e63946;
+  --app-warning: #ee9b00;
+  --app-info: #219ebc;
 }
 
 @layer base {
@@ -71,8 +35,141 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--app-bg-primary);
+    color: var(--app-text-primary);
   }
+}
+
+/* Global form styles */
+input, textarea, select,
+.input, .textarea, .select,
+[role="combobox"],
+[data-state="open"] > button,
+[data-state="closed"] > button {
+  background-color: var(--app-bg-primary) !important;
+  color: var(--app-text-primary) !important;
+  border-color: var(--app-border-primary) !important;
+  transition: all 0.2s ease-in-out;
+}
+
+input:focus, textarea:focus, select:focus,
+.input:focus, .textarea:focus, .select:focus,
+[role="combobox"]:focus,
+[data-state]:focus > button,
+[data-state="open"] > button {
+  border-color: var(--app-text-muted) !important;
+  box-shadow: 0 0 0 2px var(--app-focus-ring) !important;
+  outline: none !important;
+}
+
+/* Dropdown content styling */
+[role="listbox"],
+[data-radix-popper-content-wrapper] div,
+.SelectContent {
+  background-color: var(--app-bg-primary) !important;
+  border-color: var(--app-border-primary) !important;
+}
+
+[role="option"],
+[data-radix-popper-content-wrapper] div > *,
+.SelectItem {
+  color: var(--app-text-primary) !important;
+}
+
+/* Restore hover effects for dropdown options but remove from triggers */
+[role="listbox"] [role="option"],
+[role="option"],
+.SelectItem,
+[data-radix-popper-content-wrapper] div > * {
+  pointer-events: auto !important; /* Re-enable hover interactions */
+}
+
+/* Keep hover effects for dropdown items */
+[role="listbox"] [role="option"]:hover,
+[role="option"]:hover,
+.SelectItem:hover,
+[data-radix-popper-content-wrapper] div > *:hover {
+  background-color: var(--app-bg-secondary) !important;
+  color: var(--app-text-primary) !important;
+}
+
+/* Clean up conflicting dropdown trigger styles */
+.SelectTrigger,
+[role="combobox"],
+[data-state="open"] > button,
+[data-state="closed"] > button,
+select,
+.select {
+  background-color: var(--app-bg-primary) !important;
+  color: var(--app-text-muted) !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  transition: none !important;
+}
+
+/* Ensure no border on hover/focus/active states */
+.SelectTrigger:hover,
+.SelectTrigger:focus,
+.SelectTrigger:active,
+[role="combobox"]:hover,
+[role="combobox"]:focus,
+[role="combobox"]:active,
+[data-state="open"] > button:hover,
+[data-state="open"] > button:focus,
+[data-state="open"] > button:active,
+[data-state="closed"] > button:hover,
+[data-state="closed"] > button:focus,
+[data-state="closed"] > button:active,
+select:hover,
+select:focus,
+select:active,
+.select:hover,
+.select:focus,
+.select:active {
+  background-color: var(--app-bg-primary) !important;
+  color: var(--app-text-muted) !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Override any possible hover styles from component libraries */
+.SelectTrigger::before,
+.SelectTrigger::after,
+[role="combobox"]::before,
+[role="combobox"]::after,
+[data-state="open"] > button::before,
+[data-state="open"] > button::after,
+[data-state="closed"] > button::before,
+[data-state="closed"] > button::after,
+select::before,
+select::after,
+.select::before,
+.select::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Ensure placeholder text is consistent */
+input::placeholder, 
+textarea::placeholder,
+.input::placeholder, 
+.textarea::placeholder {
+  color: var(--app-text-muted) !important;
+  opacity: 0.7;
+}
+
+/* Select element styling */
+select option {
+  background-color: var(--app-bg-primary);
+  color: var(--app-text-primary);
+}
+
+/* Ensure labels have consistent styling */
+label,
+.Label {
+  color: var(--app-text-muted) !important;
 }
 
 /* Custom scrollbar styles */
@@ -123,4 +220,224 @@
 .scrollbar-visible {
   scrollbar-width: thin;
   scrollbar-color: rgba(82, 121, 111, 0.8) rgba(53, 79, 82, 0.3);
+}
+
+/* User Management specific styling */
+[class*="Dialog"],
+[class*="Dialog"] > div,
+[class*="DialogContent"],
+.DialogContent,
+div[role="dialog"],
+div[role="dialog"] > div {
+  background-color: var(--app-bg-tertiary) !important;
+  color: var(--app-text-primary) !important;
+  border-color: var(--app-border-primary) !important;
+}
+
+/* Force consistent form element styling */
+[class*="Dialog"] input,
+[class*="Dialog"] textarea,
+[class*="Dialog"] select,
+[class*="Dialog"] .input,
+[class*="Dialog"] .textarea,
+[class*="Dialog"] .select,
+[class*="Dialog"] [role="combobox"],
+[class*="Dialog"] button[data-state],
+div[role="dialog"] input,
+div[role="dialog"] textarea,
+div[role="dialog"] select,
+div[role="dialog"] .input,
+div[role="dialog"] .textarea,
+div[role="dialog"] .select,
+div[role="dialog"] [role="combobox"],
+div[role="dialog"] button[data-state] {
+  background-color: var(--app-bg-primary) !important;
+  color: var(--app-text-primary) !important;
+  border-color: var(--app-border-primary) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+/* Force consistent hover effects */
+[class*="Dialog"] input:hover,
+[class*="Dialog"] textarea:hover,
+[class*="Dialog"] select:hover,
+[class*="Dialog"] .input:hover,
+[class*="Dialog"] .textarea:hover,
+[class*="Dialog"] .select:hover,
+[class*="Dialog"] [role="combobox"]:hover,
+[class*="Dialog"] button[data-state]:hover,
+div[role="dialog"] input:hover,
+div[role="dialog"] textarea:hover,
+div[role="dialog"] select:hover,
+div[role="dialog"] .input:hover,
+div[role="dialog"] .textarea:hover,
+div[role="dialog"] .select:hover,
+div[role="dialog"] [role="combobox"]:hover,
+div[role="dialog"] button[data-state]:hover {
+  border-color: var(--app-text-muted) !important;
+  box-shadow: 0 0 0 1px var(--app-focus-ring) !important;
+}
+
+/* Force consistent focus effects */
+[class*="Dialog"] input:focus,
+[class*="Dialog"] textarea:focus,
+[class*="Dialog"] select:focus,
+[class*="Dialog"] .input:focus,
+[class*="Dialog"] .textarea:focus,
+[class*="Dialog"] .select:focus,
+[class*="Dialog"] [role="combobox"]:focus,
+[class*="Dialog"] button[data-state]:focus,
+[class*="Dialog"] [data-state="open"] > button,
+div[role="dialog"] input:focus,
+div[role="dialog"] textarea:focus,
+div[role="dialog"] select:focus,
+div[role="dialog"] .input:focus,
+div[role="dialog"] .textarea:focus,
+div[role="dialog"] .select:focus,
+div[role="dialog"] [role="combobox"]:focus,
+div[role="dialog"] button[data-state]:focus,
+div[role="dialog"] [data-state="open"] > button {
+  border-color: var(--app-text-muted) !important;
+  box-shadow: 0 0 0 2px var(--app-focus-ring) !important;
+  outline: none !important;
+}
+
+/* Search bar specific styling - final fixes */
+.SearchBar input,
+input[placeholder*="Search"],
+input[placeholder*="Αναζήτηση"],
+div[class*="search"] input,
+[class*="SearchBar"] input,
+[class*="search-bar"] input,
+[class*="searchBar"] input,
+[class*="data-table"] input,
+[class*="dataTable"] input {
+  background-color: var(--app-bg-primary) !important; /* Restore original background */
+  color: var(--app-text-primary) !important; /* Make text visible again */
+  border: none !important; /* Remove border completely */
+  box-shadow: none !important; /* Remove any box shadow */
+}
+
+/* Remove hover and focus effects from search inputs */
+.SearchBar input:hover,
+input[placeholder*="Search"]:hover,
+input[placeholder*="Αναζήτηση"]:hover,
+div[class*="search"] input:hover,
+[class*="SearchBar"] input:hover,
+[class*="search-bar"] input:hover,
+[class*="searchBar"] input:hover,
+[class*="data-table"] input:hover,
+[class*="dataTable"] input:hover,
+.SearchBar input:focus,
+input[placeholder*="Search"]:focus,
+input[placeholder*="Αναζήτηση"]:focus,
+div[class*="search"] input:focus,
+[class*="SearchBar"] input:focus,
+[class*="search-bar"] input:focus,
+[class*="searchBar"] input:focus,
+[class*="data-table"] input:focus,
+[class*="dataTable"] input:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Replace up/down arrow with just down arrow */
+select {
+  appearance: none !important;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2384a98c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.5rem center !important;
+  padding-right: 2.5rem !important;
+}
+
+/* Remove focus effect from dropdown headers when an item is selected */
+[role="combobox"]:focus-within,
+[data-state="open"]:focus-within > button,
+[data-state="closed"]:focus-within > button,
+.SelectTrigger:focus-within,
+select:focus-within {
+  border-color: var(--app-border-primary) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Fix search icon background */
+.SearchBar div,
+div[class*="search"],
+[class*="SearchBar"] div,
+[class*="search-bar"] div,
+[class*="searchBar"] div,
+div:has(> input[placeholder*="Search"]),
+div:has(> input[placeholder*="Αναζήτηση"]) {
+  background-color: var(--app-bg-primary) !important;
+}
+
+/* Fix search icon color */
+.SearchBar svg,
+div[class*="search"] svg,
+[class*="SearchBar"] svg,
+[class*="search-bar"] svg,
+[class*="searchBar"] svg {
+  color: var(--app-text-muted) !important;
+}
+
+/* Match dropdown header text exactly with search placeholder */
+.SelectTrigger,
+.SelectValue,
+[role="combobox"],
+[data-state="open"] > button,
+[data-state="closed"] > button,
+select {
+  color: rgba(132, 169, 140, 0.7) !important; /* #84a98c with 0.7 opacity */
+  border: none !important;
+}
+
+/* Ensure all text inside dropdown headers matches */
+.SelectTrigger *,
+[role="combobox"] *,
+[data-state="open"] > button *,
+[data-state="closed"] > button *,
+select option:checked {
+  color: rgba(132, 169, 140, 0.7) !important; /* #84a98c with 0.7 opacity */
+}
+
+/* Target dropdown items specifically */
+[role="option"],
+.SelectItem,
+[data-radix-select-item],
+li[role="option"],
+div[role="option"],
+[data-value] {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+[role="option"]:hover,
+.SelectItem:hover,
+[data-radix-select-item]:hover,
+li[role="option"]:hover,
+div[role="option"]:hover,
+[data-value]:hover {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Target the dropdown container */
+[role="listbox"],
+.SelectContent,
+[data-radix-select-content],
+ul[role="listbox"],
+div[role="listbox"] {
+  border: 1px solid var(--app-border-primary) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Disable pointer events on borders */
+*::before,
+*::after {
+  pointer-events: none !important;
 }
