@@ -1,0 +1,16 @@
+Κατέβασε και εγκατάστησε το Node.js από https://nodejs.org/en
+
+Go to c:\
+
+git clone https://github.com/gkal/Tempo_Kflow
+cd Tempo_Kflow
+
+npm ci
+
+δημιούργησε ένα νέο αρχείο .env στην ίδια τοποθεσία και πρόσθεσε τις απαραίτητες μεταβλητές.
+
+VITE_SUPABASE_URL=https://upbxwrjsxkiyqgqzihei.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwYnh3cmpzeGtpeXFncXppaGVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxOTg4MzMsImV4cCI6MjA1NTc3NDgzM30.n3ROVGXoZRGD8yqppwOnvoSrpI6NK-6CqyDQg9bAmfU
+
+
+npm run dev
