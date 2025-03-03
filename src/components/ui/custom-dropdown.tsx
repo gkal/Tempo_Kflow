@@ -305,11 +305,11 @@ const SearchBarCustomDropdown: React.FC<SearchBarDropdownProps> = ({
       <button
         ref={triggerRef}
         type="button"
-        className="w-full px-3 py-1.5 text-sm flex justify-between items-center bg-[#2f3e46] text-[#84a98c]"
+        className="w-full h-full px-3 flex justify-between items-center bg-[#2f3e46] text-[#84a98c]"
         onClick={toggleDropdown}
         disabled={disabled}
       >
-        <div className="flex-grow text-right mr-2">
+        <div className="flex-grow text-right mr-2 text-sm">
           {selectedOption ? selectedOption.label : "Select..."}
         </div>
         <div 
