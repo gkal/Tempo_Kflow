@@ -271,6 +271,15 @@ const CustomerForm = ({
   return (
     <div className="h-full overflow-auto bg-[#2f3e46] text-[#cad2c5]">
       <form id="customer-form" onSubmit={handleSubmit} className="p-4">
+        {/* Hidden save button that can be triggered from parent */}
+        <button 
+          id="save-customer-form" 
+          type="submit" 
+          style={{ display: 'none' }}
+        >
+          Save
+        </button>
+        
         {/* Form Sections */}
         <div className="space-y-4 max-w-5xl mx-auto">
           <div className="flex flex-col md:flex-row gap-4">

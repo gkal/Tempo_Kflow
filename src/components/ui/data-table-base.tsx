@@ -18,6 +18,7 @@ import {
 import { Search, ChevronUp, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchBarStyles } from "@/lib/styles/search-bar";
+import { formatDate, formatDateTime } from "@/lib/utils";
 
 type SortDirection = "asc" | "desc";
 
@@ -52,6 +53,7 @@ interface DataTableBaseProps {
   pageSize?: number;
   tableId?: string;
   isLoading?: boolean;
+  highlightedRowId?: string;
 }
 
 export function DataTableBase({
@@ -68,6 +70,7 @@ export function DataTableBase({
   pageSize = 50,
   tableId = "default-table",
   isLoading = false,
+  highlightedRowId,
 }: DataTableBaseProps) {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -80,8 +83,80 @@ export function DataTableBase({
   const [filteredData, setFilteredData] = useState([]);
   const [displayedData, setDisplayedData] = useState([]);
   const [page, setPage] = useState(1);
+  const [transformedData, setTransformedData] = useState([]);
   const loader = useRef(null);
   const tableRef = useRef<HTMLDivElement>(null);
+
+  // Helper function to safely format dates
+  const safeFormatDateTime = (dateStr: string | Date): string => {
+    try {
+      // Handle null or undefined
+      if (!dateStr) {
+        return "-";
+      }
+      
+      // Handle already formatted dates to prevent double formatting
+      if (typeof dateStr === 'string') {
+        // Check if it's already in Greek format (DD/MM/YYYY HH:MM:SS [π.μ./μ.μ.])
+        // This regex matches dates like "22/02/2025 05:23:45 μ.μ."
+        const greekDateRegex = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}( [πμ]\.[μ]\.)?$/;
+        if (greekDateRegex.test(dateStr)) {
+          return dateStr;
+        }
+        
+        // Fix lowercase 't' in ISO format
+        if (dateStr.includes('t')) {
+          dateStr = dateStr.replace(/t/g, 'T');
+        }
+      }
+      
+      const date = new Date(dateStr);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return "-";
+      }
+      
+      // Format using the utility function
+      const formatted = formatDateTime(date);
+      return formatted;
+    } catch (error) {
+      return "-";
+    }
+  };
+
+  // Transform the data when it's first received
+  useEffect(() => {
+    if (!data || data.length === 0) {
+      setTransformedData([]);
+      return;
+    }
+    
+    // Create a deep copy of the data but don't transform date fields yet
+    const transformed = data.map(item => {
+      const newItem = { ...item };
+      
+      // Find date columns
+      columns.forEach(column => {
+        const columnType = column.type || inferColumnType(column.accessor);
+        if (columnType === 'date') {
+          // Just validate the date is parseable, but don't format it yet
+          try {
+            const date = new Date(newItem[column.accessor]);
+            if (isNaN(date.getTime())) {
+              // Invalid date - no action needed
+            }
+          } catch (error) {
+            // Error parsing date - no action needed
+          }
+        }
+      });
+      
+      return newItem;
+    });
+    
+    setTransformedData(transformed);
+  }, [data, columns]);
 
   // Handle sorting
   const handleSort = (key: string) => {
@@ -94,9 +169,43 @@ export function DataTableBase({
     });
   };
 
-  // Update filtered data
+  // Function to extract date parts from ISO date string or formatted date string
+  const extractDateParts = (dateStr: string): { year: string, month: string, day: string, full: string } => {
+    try {
+      // Check if it's already in Greek format (DD/MM/YYYY HH:MM:SS [π.μ./μ.μ.])
+      const greekDateRegex = /^(\d{2})\/(\d{2})\/(\d{4}) \d{2}:\d{2}:\d{2}( [πμ]\.[μ]\.)?$/;
+      const greekMatch = typeof dateStr === 'string' ? dateStr.match(greekDateRegex) : null;
+      
+      if (greekMatch) {
+        // Extract parts from Greek format
+        const day = greekMatch[1];
+        const month = greekMatch[2];
+        const year = greekMatch[3];
+        const full = `${day}/${month}/${year}`;
+        
+        return { year, month, day, full };
+      }
+      
+      // Handle ISO format
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) {
+        return { year: "", month: "", day: "", full: dateStr };
+      }
+      
+      const year = date.getFullYear().toString();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const full = `${day}/${month}/${year}`;
+      
+      return { year, month, day, full };
+    } catch (e) {
+      return { year: "", month: "", day: "", full: dateStr };
+    }
+  };
+
+  // Update filtered data - now using transformedData instead of data
   useEffect(() => {
-    let result = [...data];
+    let result = [...transformedData];
 
     if (searchTerm && searchColumn) {
       const searchLower = searchTerm.toLowerCase().trim();
@@ -105,9 +214,17 @@ export function DataTableBase({
       if (searchLower === "") {
         // Don't filter - return all data
       } else {
+        // Get column type for logging
+        const columnType = columns.find(col => col.accessor === searchColumn)?.type || 
+                          inferColumnType(searchColumn);
+        
+        const beforeCount = result.length;
         result = result.filter((item) => {
           const value = item[searchColumn];
           if (!value) return false;
+          
+          // Skip "-" values when searching
+          if (value === "-") return false;
           
           const valueStr = value.toString().toLowerCase();
           
@@ -115,16 +232,43 @@ export function DataTableBase({
           const columnType = columns.find(col => col.accessor === searchColumn)?.type || 
                             inferColumnType(searchColumn);
           
-          // Special handling for date columns
-          if (columnType === "date") {
-            // Debug: Log the date value and search term
-            console.log(`Date value: "${valueStr}", Search term: "${searchLower}"`);
+          // For date columns, remove the Greek time suffix (π.μ. or μ.μ.) for search purposes
+          if (columnType === 'date') {
+            // Format the date for display in logs
+            const formattedForLog = safeFormatDateTime(value);
+            const cleanedValue = valueStr.replace(/ [πμ]\.[μ]\.$/i, '');
             
-            // For date columns, just do a simple string include check
-            return valueStr.includes(searchLower);
+            // Special handling for search terms with slashes or other date separators
+            let isMatch = false;
+            
+            // Check if search term contains special characters like slashes
+            if (searchLower.includes('/') || searchLower.includes('-') || searchLower.includes('.')) {
+              // For search terms with separators, we need to be more exact
+              // Extract date parts for more precise matching
+              const dateParts = extractDateParts(value);
+              
+              // Try different date formats that might match the search pattern
+              const possibleFormats = [
+                `${dateParts.day}/${dateParts.month}/${dateParts.year}`, // DD/MM/YYYY
+                `${dateParts.day}/${dateParts.month}`, // DD/MM
+                `${dateParts.month}/${dateParts.year}`, // MM/YYYY
+                `${dateParts.day}-${dateParts.month}-${dateParts.year}`, // DD-MM-YYYY
+                `${dateParts.year}-${dateParts.month}-${dateParts.day}`, // YYYY-MM-DD
+              ];
+              
+              // Check if any format starts with the search term
+              isMatch = possibleFormats.some(format => 
+                format.toLowerCase().startsWith(searchLower)
+              );
+            } else {
+              // For simple search terms without separators, use the existing includes logic
+              isMatch = cleanedValue.includes(searchLower);
+            }
+            
+            return isMatch;
           }
           
-          // Default case for non-date columns - match anywhere
+          // For non-date columns, use the original logic
           return valueStr.includes(searchLower);
         });
       }
@@ -136,7 +280,7 @@ export function DataTableBase({
     setFilteredData(result);
     setPage(1);
     setDisplayedData(result.slice(0, pageSize));
-  }, [data, searchTerm, searchColumn, sortConfig, pageSize, columns]);
+  }, [transformedData, searchTerm, searchColumn, sortConfig, pageSize, columns]);
 
   // Handle intersection observer for infinite scroll
   const handleObserver = useCallback(
@@ -229,6 +373,40 @@ export function DataTableBase({
       if (valueA == null) return 1;
       if (valueB == null) return -1;
       
+      // Get column type
+      const columnType = columns.find(col => col.accessor === sortColumn)?.type || 
+                         inferColumnType(sortColumn);
+      
+      // For date columns, use the original ISO date for sorting if available
+      if (columnType === 'date') {
+        // Try to use the original ISO date values stored during transformation
+        const originalA = a[`_original_${sortColumn}`] || valueA;
+        const originalB = b[`_original_${sortColumn}`] || valueB;
+        
+        // Parse dates for comparison
+        const dateA = new Date(originalA);
+        const dateB = new Date(originalB);
+        
+        // Check if dates are valid
+        const isValidA = !isNaN(dateA.getTime());
+        const isValidB = !isNaN(dateB.getTime());
+        
+        // Handle invalid dates
+        if (!isValidA && isValidB) return 1;
+        if (isValidA && !isValidB) return -1;
+        if (!isValidA && !isValidB) {
+          // Fall back to string comparison if both dates are invalid
+          return sortDirection === 'asc' 
+            ? String(valueA).localeCompare(String(valueB))
+            : String(valueB).localeCompare(String(valueA));
+        }
+        
+        // Compare valid dates
+        return sortDirection === 'asc' 
+          ? dateA.getTime() - dateB.getTime()
+          : dateB.getTime() - dateA.getTime();
+      }
+      
       // Case-insensitive string comparison for string values
       if (typeof valueA === 'string' && typeof valueB === 'string') {
         return sortDirection === 'asc' 
@@ -275,46 +453,75 @@ export function DataTableBase({
       return text;
     }
     
-    // For date columns, format the date first
-    if (columnType === "date") {
-      const formattedDate = formatDate(text.toString());
-      const formattedLower = formattedDate.toLowerCase();
-      
-      // Check if the formatted date includes the search term
-      if (formattedLower.includes(searchLower)) {
-        const parts = formattedDate.split(new RegExp(`(${searchTerm})`, 'i'));
-        
-        if (parts.length > 1) {
-          return (
-            <>
-              {parts.map((part, i) => 
-                part.toLowerCase() === searchLower
-                  ? <span key={i} className="bg-[#52796f] text-white px-0.5 rounded">{part}</span> 
-                  : part
-              )}
-            </>
-          );
-        }
-      }
-      
-      // If no match or no parts, just return the formatted date
-      return formattedDate;
+    // Skip highlighting for "-"
+    if (text === "-") {
+      return text;
     }
     
-    // For non-date columns - highlight anywhere
+    // For all columns including dates - highlight anywhere since we've already formatted the dates
     const textStr = text.toString();
     const textLower = textStr.toLowerCase();
     
+    // For date columns, we need to handle the Greek locale format
+    if (columnType === 'date') {
+      // Remove the Greek time suffix (π.μ. or μ.μ.) for search purposes
+      const cleanedText = textLower.replace(/ [πμ]\.[μ]\.$/i, '');
+      
+      // Special handling for search terms with slashes or other date separators
+      if (searchLower.includes('/') || searchLower.includes('-') || searchLower.includes('.')) {
+        // For search terms with separators, try to find an exact match
+        if (cleanedText.includes(searchLower)) {
+          const index = cleanedText.indexOf(searchLower);
+          
+          return (
+            <>
+              {textStr.substring(0, index)}
+              <span className="bg-[#52796f]/30 text-[#cad2c5] dark:bg-[#52796f]/50 dark:text-[#cad2c5]">
+                {textStr.substring(index, index + searchTerm.length)}
+              </span>
+              {textStr.substring(index + searchTerm.length)}
+            </>
+          );
+        }
+        return text;
+      }
+      
+      // For simple search terms without separators
+      if (cleanedText.includes(searchLower)) {
+        const index = cleanedText.indexOf(searchLower);
+        // Adjust the index if we removed the suffix but the match is after where it would have been
+        const adjustedIndex = index >= cleanedText.length - searchLower.length && 
+                             cleanedText.length !== textLower.length ? 
+                             textLower.indexOf(searchLower) : index;
+        
+        if (adjustedIndex === -1) {
+          return text; // If we can't find it in the original, just return the text
+        }
+        
+        return (
+          <>
+            {textStr.substring(0, adjustedIndex)}
+            <span className="bg-[#52796f]/30 text-[#cad2c5] dark:bg-[#52796f]/50 dark:text-[#cad2c5]">
+              {textStr.substring(adjustedIndex, adjustedIndex + searchTerm.length)}
+            </span>
+            {textStr.substring(adjustedIndex + searchTerm.length)}
+          </>
+        );
+      }
+      return text;
+    }
+    
+    // For non-date columns, use the original logic
     if (textLower.includes(searchLower)) {
-      const parts = textStr.split(new RegExp(`(${searchTerm})`, 'i'));
+      const index = textLower.indexOf(searchLower);
       
       return (
         <>
-          {parts.map((part, i) => 
-            part.toLowerCase() === searchLower
-              ? <span key={i} className="bg-[#52796f] text-white px-0.5 rounded">{part}</span> 
-              : part
-          )}
+          {textStr.substring(0, index)}
+          <span className="bg-[#52796f]/30 text-[#cad2c5] dark:bg-[#52796f]/50 dark:text-[#cad2c5]">
+            {textStr.substring(index, index + searchTerm.length)}
+          </span>
+          {textStr.substring(index + searchTerm.length)}
         </>
       );
     }
@@ -408,9 +615,11 @@ export function DataTableBase({
                       onClick={() => onRowClick?.(row)}
                       className={cn(
                         rowClassName,
+                        row.id === highlightedRowId && "bg-[#52796f]/20 hover:bg-[#52796f]/30",
                         "group cursor-pointer transition-colors duration-150 h-8",
                       )}
                       data-role={row.role}
+                      data-highlighted={row.id === highlightedRowId ? "true" : "false"}
                     >
                       <td className="text-[#cad2c5] whitespace-nowrap w-10 text-center py-1 px-3">
                         {index + 1}
@@ -425,13 +634,21 @@ export function DataTableBase({
                         >
                           {column.cell
                             ? column.cell(row[column.accessor], row)
-                            : searchColumn === column.accessor && searchTerm
-                              ? highlightMatch(
-                                  row[column.accessor], 
-                                  searchTerm, 
-                                  column.type || inferColumnType(column.accessor)
-                                )
-                              : row[column.accessor]}
+                            : (column.type === 'date' || inferColumnType(column.accessor) === 'date')
+                              ? searchColumn === column.accessor && searchTerm
+                                ? highlightMatch(
+                                    safeFormatDateTime(row[column.accessor]), 
+                                    searchTerm, 
+                                    'date'
+                                  )
+                                : safeFormatDateTime(row[column.accessor])
+                              : searchColumn === column.accessor && searchTerm
+                                ? highlightMatch(
+                                    row[column.accessor], 
+                                    searchTerm, 
+                                    column.type || inferColumnType(column.accessor)
+                                  )
+                                : row[column.accessor]}
                         </td>
                       ))}
                     </tr>
@@ -455,6 +672,31 @@ export function DataTableBase({
             </table>
           </div>
         </div>
+      </div>
+      
+      {/* Total records count */}
+      <div className="mt-3 mb-1 text-sm text-[#84a98c] px-2 text-center font-medium border-t border-[#52796f]/30 pt-2">
+        {isLoading ? (
+          <div className="flex items-center justify-center space-x-2">
+            <span>Φόρτωση δεδομένων</span>
+            <div className="flex items-center space-x-1">
+              <div className="w-1 h-1 rounded-full bg-[#84a98c] animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-1 h-1 rounded-full bg-[#84a98c] animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-1 h-1 rounded-full bg-[#84a98c] animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
+          </div>
+        ) : filteredData.length === 0 ? (
+          <span>Δεν βρέθηκαν εγγραφές</span>
+        ) : filteredData.length === 1 ? (
+          <span>Βρέθηκε 1 εγγραφή</span>
+        ) : displayedData.length < filteredData.length ? (
+          <span>Εμφανίζονται <strong className="text-[#cad2c5]">{displayedData.length}</strong> από <strong className="text-[#cad2c5]">{filteredData.length}</strong> εγγραφές</span>
+        ) : (
+          <span>Βρέθηκαν <strong className="text-[#cad2c5]">{filteredData.length}</strong> εγγραφές</span>
+        )}
+        {!isLoading && searchTerm && (
+          <span> για την αναζήτηση "<strong className="text-[#cad2c5]">{searchTerm}</strong>"</span>
+        )}
       </div>
     </div>
   );

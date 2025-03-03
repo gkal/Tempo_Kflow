@@ -63,13 +63,6 @@ const Home = () => {
         <div className="mb-8">
           <MetricCards />
         </div>
-
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-[#cad2c5] mb-4">
-            Πρόσφατη Δραστηριότητα
-          </h2>
-          <DataTable />
-        </div>
       </div>
     );
   };

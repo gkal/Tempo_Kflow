@@ -173,6 +173,7 @@ export default function SettingsPage() {
               onRowClick={handleRowClick}
               containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
               rowClassName="hover:bg-[#354f52]/50"
+              isLoading={loading}
             />
           </div>
         )}
@@ -202,13 +203,23 @@ export default function SettingsPage() {
       </div>
 
       <div className="flex justify-between mb-4">
-        <SearchBar
-          onChange={setSearchTerm}
-          value={searchTerm}
-          options={columns.map(col => ({ value: col.accessor, label: col.header }))}
-          selectedColumn={searchColumn}
-          onColumnChange={setSearchColumn}
-        />
+        <div className="w-1/4">
+          {/* Empty div to maintain layout */}
+        </div>
+        
+        <div className="flex-1 flex justify-center">
+          <SearchBar
+            onChange={setSearchTerm}
+            value={searchTerm}
+            options={columns.map(col => ({ value: col.accessor, label: col.header }))}
+            selectedColumn={searchColumn}
+            onColumnChange={setSearchColumn}
+          />
+        </div>
+        
+        <div className="w-1/4">
+          {/* Empty div to maintain layout */}
+        </div>
       </div>
 
       <DataTableBase
@@ -247,6 +258,7 @@ export default function SettingsPage() {
         onRowClick={handleRowClick}
         containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
         rowClassName={`hover:bg-[#354f52]/50 ${isSuperUser ? 'cursor-pointer [&[data-role="Admin"]]:cursor-not-allowed [&[data-role="Admin"]]:opacity-50' : ""}`}
+        isLoading={loading}
       />
 
       <UserManagementDialog

@@ -11,8 +11,6 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { SearchBar } from "@/components/ui/search-bar";
 import { DataTableBase } from "@/components/ui/data-table-base";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
 
 interface DataTableProps {
   columns?: Array<{
@@ -40,10 +38,10 @@ const defaultData = [
   { id: 3, name: "Sample Item 3", status: "Inactive", date: "2024-03-22" },
 ];
 
-// Format date to ISO string for searching
-const formatDateForSearch = (date: Date | null): string => {
-  if (!date) return "";
-  return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+// Format date for searching
+const formatDateForSearch = (dateString: string): string => {
+  if (!dateString) return "";
+  return dateString; // Just return the date string as is
 };
 
 const DataTable = ({
@@ -54,106 +52,85 @@ const DataTable = ({
   defaultSortColumn = "name",
   isLoading = false,
 }: DataTableProps) => {
+  // Simple state for testing
+  const [dateValue, setDateValue] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedColumn, setSelectedColumn] = useState(defaultSortColumn);
-  const [isDateColumn, setIsDateColumn] = useState(false);
-  const [forceShowDatePicker, setForceShowDatePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(true);
 
-  // Check if selected column is a date column
-  useEffect(() => {
-    const column = columns.find(col => col.accessor === selectedColumn);
-    const isDate = column?.type === "date";
-    console.log("Column changed:", selectedColumn, "Column type:", column?.type, "Is date column:", isDate);
-    setIsDateColumn(isDate);
+  // Simple handler for date changes
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value;
+    console.log("Date selected:", newDate);
+    setDateValue(newDate);
     
-    // Reset search terms when switching columns
+    const formattedDate = formatDateForSearch(newDate);
+    setSearchTerm(formattedDate);
+    onFilter(formattedDate);
+  };
+
+  // Clear date
+  const clearDate = () => {
+    setDateValue("");
     setSearchTerm("");
-    setSelectedDate(null);
-  }, [selectedColumn, columns]);
+    onFilter("");
+  };
 
-  // Update search term based on selected date for date columns
-  useEffect(() => {
-    if (isDateColumn || forceShowDatePicker) {
-      const formattedDate = formatDateForSearch(selectedDate);
-      setSearchTerm(formattedDate);
-      onFilter(formattedDate);
-    }
-  }, [selectedDate, isDateColumn, forceShowDatePicker, onFilter]);
-
-  const handleSearch = (value: string) => {
-    if (!isDateColumn && !forceShowDatePicker) {
-      setSearchTerm(value);
-      onFilter(value);
+  // Toggle between date picker and search
+  const toggleSearch = () => {
+    setShowDatePicker(!showDatePicker);
+    if (!showDatePicker) {
+      setSearchTerm("");
+      onFilter("");
     }
   };
 
-  const handleColumnChange = (column: string) => {
-    setSelectedColumn(column);
-    setForceShowDatePicker(false);
-  };
-
-  const handleDateChange = (date: Date | null) => {
-    console.log("Date selected:", date);
-    setSelectedDate(date);
-  };
-
-  const toggleDatePicker = () => {
-    setForceShowDatePicker(!forceShowDatePicker);
-  };
-
-  console.log("Rendering search section, isDateColumn:", isDateColumn, "forceShowDatePicker:", forceShowDatePicker);
-  
-  // Determine if we should show the date picker
-  const shouldShowDatePicker = isDateColumn || forceShowDatePicker;
-  
   return (
     <div className="w-full bg-[#354f52] p-4 rounded-lg border border-[#52796f] overflow-hidden">
-      {/* Debug Info */}
-      <div className="mb-2 text-xs text-white bg-black/30 p-1 rounded">
-        <div>Selected Column: {selectedColumn}</div>
-        <div>Column Type: {columns.find(col => col.accessor === selectedColumn)?.type}</div>
-        <div>Is Date Column: {isDateColumn ? "Yes" : "No"}</div>
-        <div>Force Show DatePicker: {forceShowDatePicker ? "Yes" : "No"}</div>
-        <div>Should Show DatePicker: {shouldShowDatePicker ? "Yes" : "No"}</div>
+      {/* Simple toggle button */}
+      <div className="mb-4 flex justify-center">
+        <Button 
+          variant="outline"
+          className="border-[#52796f] text-[#84a98c] hover:bg-[#354f52]/50 hover:text-[#cad2c5]"
+          onClick={toggleSearch}
+        >
+          {showDatePicker ? "Switch to Text Search" : "Switch to Date Picker"}
+        </Button>
       </div>
-      
+
       {/* Search and Filter Section */}
       <div className="flex items-center justify-center mb-4">
-        <div className="flex items-center">
-          {shouldShowDatePicker ? (
-            <div className="flex items-center border border-[#52796f] rounded-lg overflow-hidden bg-[#2f3e46] p-2">
-              <span className="text-[#cad2c5] mr-2">Select Date:</span>
-              <DatePicker
-                selected={selectedDate}
-                onChange={handleDateChange}
-                dateFormat="dd/MM/yyyy"
-                placeholderText="Select a date"
-                className="bg-transparent text-[#cad2c5] border-0 focus:outline-none"
-                calendarClassName="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5]"
-                isClearable
-              />
-            </div>
-          ) : (
-            <SearchBar
-              onChange={handleSearch}
-              value={searchTerm}
-              options={columns.map(col => ({ value: col.accessor, label: col.header }))}
-              selectedColumn={selectedColumn}
-              onColumnChange={handleColumnChange}
+        {showDatePicker ? (
+          <div className="flex items-center border border-[#52796f] rounded-lg overflow-hidden bg-[#2f3e46] p-2">
+            <span className="text-[#cad2c5] mr-2">Select Date:</span>
+            <input
+              type="date"
+              value={dateValue}
+              onChange={handleDateChange}
+              className="bg-transparent text-[#cad2c5] border-0 focus:outline-none"
             />
-          )}
-          
-          <Button 
-            variant="outline" 
-            size="icon" 
-            className="ml-2 border-[#52796f] text-[#84a98c] hover:bg-[#354f52]/50 hover:text-[#cad2c5]"
-            onClick={toggleDatePicker}
-            title={forceShowDatePicker ? "Switch to text search" : "Switch to date picker"}
-          >
-            <Calendar className="h-4 w-4" />
-          </Button>
-        </div>
+            {dateValue && (
+              <button 
+                onClick={clearDate}
+                className="ml-2 text-[#cad2c5] hover:text-white"
+              >
+                ✕
+              </button>
+            )}
+            <span className="ml-2 text-xs text-yellow-300">Date Input is here!</span>
+          </div>
+        ) : (
+          <SearchBar
+            onChange={(value) => {
+              console.log("Search value:", value);
+              setSearchTerm(value);
+              onFilter(value);
+            }}
+            value={searchTerm}
+            options={columns.map(col => ({ value: col.accessor, label: col.header }))}
+            selectedColumn={defaultSortColumn}
+            onColumnChange={() => {}}
+          />
+        )}
       </div>
 
       {/* Loading State */}
@@ -172,10 +149,11 @@ const DataTable = ({
             columns={columns}
             data={data}
             searchTerm={searchTerm}
-            searchColumn={selectedColumn}
+            searchColumn={defaultSortColumn}
             defaultSortColumn={defaultSortColumn}
             rowClassName="hover:bg-[#354f52]/50 group"
             containerClassName="border border-[#52796f] rounded-md overflow-hidden"
+            isLoading={isLoading}
           />
 
           {/* Pagination Section */}
