@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabase";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { formatDateTime } from "@/lib/utils";
 import { CloseButton } from "@/components/ui/close-button";
+import { createPortal } from "react-dom";
 
 interface MetricCardProps {
   title: string;
@@ -345,8 +346,12 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
 
   return (
     <div>
-      <h2 className="text-3xl font-bold mb-4 text-[#cad2c5]">Στατιστικά</h2>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-4">
+        <h2 className="text-3xl font-bold text-[#cad2c5]">Στατιστικά</h2>
+      </div>
+      
+      {/* Metrics section with first card clickable */}
+      <div className="grid grid-cols-4 gap-4">
         <MetricCard
           key={0}
           title={displayMetrics[0].title}
@@ -367,48 +372,52 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
         ))}
       </div>
 
-      {showCustomerTable && (
-        <div className="mt-8 bg-[#2f3e46] p-4 rounded-lg border border-[#52796f]">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-[#cad2c5]">
-              Νέοι Πελάτες ({filteredCustomers.length})
-            </h2>
-            
-            <div className="flex-1 flex justify-center mx-4">
-              <SearchBar
-                onChange={handleSearch}
-                value={searchTerm}
-                options={[
-                  { value: 'company_name', label: 'Επωνυμία' },
-                  { value: 'telephone', label: 'Τηλέφωνο' },
-                  { value: 'email', label: 'Email' },
-                  { value: 'address', label: 'Διεύθυνση' },
-                  { value: 'postal_code', label: 'ΤΚ' },
-                  { value: 'primary_contact_id', label: 'Κύρια Επαφή' }
-                ]}
-                selectedColumn={searchColumn}
-                onColumnChange={(column) => setSearchColumn(column)}
+      {/* Customer table - rendered in a portal to prevent affecting metrics layout */}
+      {showCustomerTable && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-auto">
+          <div className="bg-[#2f3e46] p-4 rounded-lg border border-[#52796f] w-full max-w-6xl max-h-[90vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-[#cad2c5]">
+                Νέοι Πελάτες ({filteredCustomers.length})
+              </h2>
+              
+              <div className="flex-1 flex justify-center mx-4">
+                <SearchBar
+                  onChange={handleSearch}
+                  value={searchTerm}
+                  options={[
+                    { value: 'company_name', label: 'Επωνυμία' },
+                    { value: 'telephone', label: 'Τηλέφωνο' },
+                    { value: 'email', label: 'Email' },
+                    { value: 'address', label: 'Διεύθυνση' },
+                    { value: 'postal_code', label: 'ΤΚ' },
+                    { value: 'primary_contact_id', label: 'Κύρια Επαφή' }
+                  ]}
+                  selectedColumn={searchColumn}
+                  onColumnChange={(column) => setSearchColumn(column)}
+                />
+              </div>
+              
+              <CloseButton 
+                size="md"
+                onClick={toggleCustomerTable}
               />
             </div>
             
-            <CloseButton 
-              size="md"
-              onClick={toggleCustomerTable}
+            <DataTableBase
+              columns={columns}
+              data={filteredCustomers}
+              isLoading={loading}
+              defaultSortColumn="created_at"
+              defaultSortDirection="desc"
+              searchTerm={searchTerm}
+              searchColumn={searchColumn}
+              containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
+              rowClassName="hover:bg-[#354f52]/50 cursor-pointer group"
             />
           </div>
-          
-          <DataTableBase
-            columns={columns}
-            data={filteredCustomers}
-            isLoading={loading}
-            defaultSortColumn="created_at"
-            defaultSortDirection="desc"
-            searchTerm={searchTerm}
-            searchColumn={searchColumn}
-            containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
-            rowClassName="hover:bg-[#354f52]/50 cursor-pointer group"
-          />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

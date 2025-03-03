@@ -9,7 +9,7 @@ export interface VersionEntry {
 export const VERSION_HISTORY: VersionEntry[] = [
   {
     version: "1.0.1",
-    date: "2023-10-01", // Estimated date
+    date: "2025-10-01", // Estimated date
     description: "Initial release",
     changes: [
       "Basic application structure",
@@ -19,7 +19,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
   },
   {
     version: "1.1.0",
-    date: "2023-11-15", // Estimated date
+    date: "2025-11-15", // Estimated date
     description: "Customer and Contact Management",
     changes: [
       "Added Customers and Contacts tables with relationship",
@@ -29,7 +29,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
   },
   {
     version: "1.1.1",
-    date: "2023-12-10", // Estimated date
+    date: "2025-12-10", // Estimated date
     description: "Customer Type Enhancement",
     changes: [
       "Added customer_type field with values: Ιδιώτης, Εταιρεία, Δημόσιο"
@@ -37,7 +37,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
   },
   {
     version: "1.2.0",
-    date: "2024-01-15", // Previous date
+    date: "2025-01-15", // Previous date
     description: "UI Improvements and Bug Fixes",
     changes: [
       "Fixed DataTable loading state to show proper animation",
