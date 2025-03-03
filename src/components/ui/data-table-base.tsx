@@ -15,8 +15,7 @@ import {
   DataSelectTrigger,
   DataSelectValue,
 } from "@/components/ui/data-select";
-import { Search } from "lucide-react";
-import { ArrowUp } from "lucide-react";
+import { Search, ChevronUp, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchBarStyles } from "@/lib/styles/search-bar";
 
@@ -36,6 +35,7 @@ interface Column {
     | "numeric"
     | "default";
   priority?: "high" | "medium" | "low";
+  id?: string;
 }
 
 interface DataTableBaseProps {
@@ -51,6 +51,7 @@ interface DataTableBaseProps {
   showSearch?: boolean;
   pageSize?: number;
   tableId?: string;
+  isLoading?: boolean;
 }
 
 export function DataTableBase({
@@ -66,6 +67,7 @@ export function DataTableBase({
   showSearch = false, // Default to false since search is now external
   pageSize = 50,
   tableId = "default-table",
+  isLoading = false,
 }: DataTableBaseProps) {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -97,31 +99,44 @@ export function DataTableBase({
     let result = [...data];
 
     if (searchTerm && searchColumn) {
-      result = result.filter((item) => {
-        const value = item[searchColumn];
-        return (
-          value &&
-          value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      });
+      const searchLower = searchTerm.toLowerCase().trim();
+      
+      // Skip filtering if search term is empty after trimming
+      if (searchLower === "") {
+        // Don't filter - return all data
+      } else {
+        result = result.filter((item) => {
+          const value = item[searchColumn];
+          if (!value) return false;
+          
+          const valueStr = value.toString().toLowerCase();
+          
+          // Get column type
+          const columnType = columns.find(col => col.accessor === searchColumn)?.type || 
+                            inferColumnType(searchColumn);
+          
+          // Special handling for date columns
+          if (columnType === "date") {
+            // Debug: Log the date value and search term
+            console.log(`Date value: "${valueStr}", Search term: "${searchLower}"`);
+            
+            // For date columns, just do a simple string include check
+            return valueStr.includes(searchLower);
+          }
+          
+          // Default case for non-date columns - match anywhere
+          return valueStr.includes(searchLower);
+        });
+      }
     }
 
-    result.sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
-
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
-
-      if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
+    // Use the sortData function for consistent case-insensitive sorting
+    result = sortData(result, sortConfig.key, sortConfig.direction);
 
     setFilteredData(result);
     setPage(1);
     setDisplayedData(result.slice(0, pageSize));
-  }, [data, searchTerm, searchColumn, sortConfig, pageSize]);
+  }, [data, searchTerm, searchColumn, sortConfig, pageSize, columns]);
 
   // Handle intersection observer for infinite scroll
   const handleObserver = useCallback(
@@ -168,23 +183,37 @@ export function DataTableBase({
   // Get column width based on type
   const getColumnWidth = (column: Column) => {
     const type = column.type || inferColumnType(column.accessor);
+    let baseWidth = "";
 
     switch (type) {
       case "id":
-        return "w-16";
+        baseWidth = "w-16";
+        break;
       case "status":
-        return "w-32";
+        baseWidth = "w-32";
+        break;
       case "date":
-        return "w-40";
+        baseWidth = "w-40";
+        break;
       case "name":
-        return "w-1/4";
+        baseWidth = "w-1/4";
+        break;
       case "numeric":
-        return "w-24";
+        baseWidth = "w-24";
+        break;
       case "description":
-        return ""; // flexible width
+        baseWidth = ""; // flexible width
+        break;
       default:
-        return "w-auto";
+        baseWidth = "w-auto";
     }
+
+    // Add extra width for sortable columns to account for arrow space
+    if (column.sortable !== false) {
+      return `${baseWidth} min-w-[100px]`;
+    }
+
+    return baseWidth;
   };
 
   // Update the sorting function in the DataTableBase component
@@ -216,6 +245,83 @@ export function DataTableBase({
 
   const sortedData = sortData(filteredData, sortConfig.key, sortConfig.direction);
 
+  // Function to format and display dates nicely
+  const formatDate = (dateStr: string): string => {
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      
+      return `${day}/${month}/${year}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  // Function to highlight matched text
+  const highlightMatch = (text: any, searchTerm: string, columnType: string): React.ReactNode => {
+    if (!searchTerm || !text) return text;
+    
+    // Don't highlight if not searching or if the column isn't the one being searched
+    if (!searchColumn) return text;
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    
+    // Skip highlighting if search term is empty after trimming
+    if (searchLower === "") {
+      return text;
+    }
+    
+    // For date columns, format the date first
+    if (columnType === "date") {
+      const formattedDate = formatDate(text.toString());
+      const formattedLower = formattedDate.toLowerCase();
+      
+      // Check if the formatted date includes the search term
+      if (formattedLower.includes(searchLower)) {
+        const parts = formattedDate.split(new RegExp(`(${searchTerm})`, 'i'));
+        
+        if (parts.length > 1) {
+          return (
+            <>
+              {parts.map((part, i) => 
+                part.toLowerCase() === searchLower
+                  ? <span key={i} className="bg-[#52796f] text-white px-0.5 rounded">{part}</span> 
+                  : part
+              )}
+            </>
+          );
+        }
+      }
+      
+      // If no match or no parts, just return the formatted date
+      return formattedDate;
+    }
+    
+    // For non-date columns - highlight anywhere
+    const textStr = text.toString();
+    const textLower = textStr.toLowerCase();
+    
+    if (textLower.includes(searchLower)) {
+      const parts = textStr.split(new RegExp(`(${searchTerm})`, 'i'));
+      
+      return (
+        <>
+          {parts.map((part, i) => 
+            part.toLowerCase() === searchLower
+              ? <span key={i} className="bg-[#52796f] text-white px-0.5 rounded">{part}</span> 
+              : part
+          )}
+        </>
+      );
+    }
+    
+    return text;
+  };
+
   return (
     <div className="w-full flex flex-col" ref={tableRef}>
       {/* Main table container with fixed header */}
@@ -239,40 +345,32 @@ export function DataTableBase({
                   {columns.map((column) => (
                     <th
                       key={column.accessor || column.id || `column-${columns.indexOf(column)}`}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        column.sortable !== false && handleSort(column.accessor);
+                      }}
                       className={cn(
                         "text-[#84a98c] select-none whitespace-nowrap relative p-3 text-left font-normal text-sm",
                         getColumnWidth(column),
                         column.sortable !== false
                           ? "cursor-pointer"
                           : "cursor-default",
+                        sortConfig.key === column.accessor && "text-[#cad2c5] font-semibold"
                       )}
                     >
-                      <div className="flex items-center space-x-2 pr-4 overflow-hidden">
+                      <div className="flex items-center">
+                        <span>{column.header}</span>
                         {column.sortable !== false && (
-                          <ArrowUp
-                            className={cn(
-                              "h-4 w-4 flex-shrink-0",
-                              sortConfig.key !== column.accessor && "opacity-0",
-                              sortConfig.direction === "desc" && "rotate-180",
+                          <span className="ml-1 inline-block w-3 text-center">
+                            {sortConfig.key === column.accessor ? (
+                              <span className="text-white" style={{ fontSize: '10px' }}>
+                                {sortConfig.direction === "asc" ? "↑" : "↓"}
+                              </span>
+                            ) : (
+                              <span className="invisible" style={{ fontSize: '10px' }}>↓</span>
                             )}
-                          />
+                          </span>
                         )}
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            column.sortable !== false &&
-                              handleSort(column.accessor);
-                          }}
-                          className={cn(
-                            "truncate",
-                            column.sortable !== false
-                              ? "cursor-pointer hover:text-[#cad2c5]"
-                              : "",
-                          )}
-                        >
-                          {column.header}
-                        </span>
                       </div>
                     </th>
                   ))}
@@ -281,17 +379,30 @@ export function DataTableBase({
 
               {/* Table body */}
               <tbody>
-                {sortedData.length === 0 ? (
+                {isLoading ? (
                   <tr>
                     <td
                       colSpan={columns.length + 1}
                       className="text-center py-8 text-[#84a98c] p-3"
                     >
-                      Δεν βρέθηκαν αποτελέσματα
+                      <div className="flex justify-center items-center space-x-2">
+                        <div className="w-2 h-2 rounded-full bg-[#84a98c] animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 rounded-full bg-[#84a98c] animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 rounded-full bg-[#84a98c] animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : displayedData.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={columns.length + 1}
+                      className="text-center py-8 text-[#84a98c] p-3"
+                    >
+                      {searchTerm ? "Δεν βρέθηκαν αποτελέσματα για την αναζήτησή σας" : "Δεν βρέθηκαν αποτελέσματα"}
                     </td>
                   </tr>
                 ) : (
-                  sortedData.map((row, index) => (
+                  displayedData.map((row, index) => (
                     <tr
                       key={row.id || `row-${index}`}
                       onClick={() => onRowClick?.(row)}
@@ -314,7 +425,13 @@ export function DataTableBase({
                         >
                           {column.cell
                             ? column.cell(row[column.accessor], row)
-                            : row[column.accessor]}
+                            : searchColumn === column.accessor && searchTerm
+                              ? highlightMatch(
+                                  row[column.accessor], 
+                                  searchTerm, 
+                                  column.type || inferColumnType(column.accessor)
+                                )
+                              : row[column.accessor]}
                         </td>
                       ))}
                     </tr>
@@ -322,8 +439,8 @@ export function DataTableBase({
                 )}
 
                 {/* Loader for infinite scrolling */}
-                {sortedData.length < filteredData.length && (
-                  <tr>
+                {!isLoading && !searchTerm && filteredData.length > 0 && displayedData.length < filteredData.length && (
+                  <tr key="infinite-scroll-loader">
                     <td colSpan={columns.length + 1}>
                       <div
                         ref={loader}

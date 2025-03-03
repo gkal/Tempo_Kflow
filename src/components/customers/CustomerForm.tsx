@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import ContactDialog from "../contacts/ContactDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ContactList } from "@/components/contacts/ContactList";
-import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import GlobalDropdown from "@/components/ui/GlobalDropdown";
+import { Label } from "@/components/ui/label";
 
 interface CustomerFormProps {
   customerId?: string;
@@ -352,15 +353,17 @@ const CustomerForm = ({
                     Τύπος Πελάτη
                   </div>
                   <div className="w-2/3">
-                    <CustomDropdown
+                    <GlobalDropdown
                       options={[
                         { value: "company", label: "Εταιρεία" },
-                        { value: "individual", label: "Ιδιώτης" }
+                        { value: "individual", label: "Ιδιώτης" },
+                        { value: "freelancer", label: "Ελεύθερος Επαγγελματίας" }
                       ]}
-                      value={formData.customer_type}
-                      onChange={(value) => handleInputChange("customer_type", value)}
+                      selectedValue={formData.customer_type}
+                      onChange={(value) => handleInputChange({
+                        target: { name: "customer_type", value }
+                      } as any)}
                       placeholder="Επιλέξτε τύπο πελάτη"
-                      className="w-full"
                     />
                   </div>
                 </div>

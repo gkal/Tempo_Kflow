@@ -2,14 +2,9 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { VERSION } from "@/lib/version";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Settings, LogOut } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { CustomMenu, CustomMenuItem } from "@/components/ui/custom-menu";
 
 const getPageTitle = (pathname: string) => {
   switch (pathname) {
@@ -106,8 +101,8 @@ export default function TopBar() {
           <div className="px-3 py-1 border border-[#84a98c]/50 rounded-full text-[#84a98c] text-xs mr-1 bg-[#354f52] -mt-8">
             {formatGreekDate(currentDate)}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <CustomMenu
+            trigger={
               <Avatar className="h-12 w-12 cursor-pointer">
                 <AvatarFallback
                   className="text-[#2f3e46] text-lg font-medium"
@@ -118,27 +113,18 @@ export default function TopBar() {
                   {getInitials(user?.fullname)}
                 </AvatarFallback>
               </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-48 bg-[#2f3e46] border-[#52796f]"
-            >
-              <DropdownMenuItem
-                className="cursor-pointer hover:bg-[#324249] text-[#cad2c5] transition-colors"
-                onClick={() => navigate("/dashboard/settings")}
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                Ρυθμίσεις
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="cursor-pointer hover:bg-[#324249] text-[#cad2c5] transition-colors"
-                onClick={handleLogout}
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Αποσύνδεση
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+            align="end"
+          >
+            <CustomMenuItem onClick={() => navigate("/dashboard/settings")}>
+              <Settings className="h-4 w-4" />
+              Ρυθμίσεις
+            </CustomMenuItem>
+            <CustomMenuItem onClick={handleLogout}>
+              <LogOut className="h-4 w-4" />
+              Αποσύνδεση
+            </CustomMenuItem>
+          </CustomMenu>
         </div>
       </div>
     </>

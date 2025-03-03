@@ -8,10 +8,9 @@ import {
 } from "@/components/ui/dialog";
 import CustomerForm from "./CustomerForm";
 import { CloseButton } from "@/components/ui/close-button";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 interface CustomerDialogProps {
   open: boolean;

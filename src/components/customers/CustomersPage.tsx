@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import GlobalDropdown from "@/components/ui/GlobalDropdown";
 
 // Add a custom sorting function
 const customSort = (a, b) => {
@@ -415,17 +415,16 @@ export default function CustomersPage() {
           />
         </div>
         
-        <div className="flex justify-end">
-          <CustomDropdown
+        <div className="flex items-center gap-2">
+          <GlobalDropdown
             options={[
+              { value: "all", label: "Όλοι" },
               { value: "active", label: "Ενεργοί" },
-              { value: "inactive", label: "Ανενεργοί" },
-              { value: "all", label: "Όλοι" }
+              { value: "inactive", label: "Ανενεργοί" }
             ]}
-            value={statusFilter}
-            onChange={setStatusFilter}
-            placeholder="Επιλέξτε κατάσταση"
-            className="w-[180px]"
+            selectedValue={statusFilter}
+            onChange={(value) => setStatusFilter(value)}
+            className="w-[150px]"
           />
         </div>
       </div>

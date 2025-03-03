@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import GlobalDropdown from "@/components/ui/GlobalDropdown";
 
 interface UserManagementDialogProps {
   open: boolean;
@@ -305,27 +306,15 @@ export default function UserManagementDialog({
           {(isAdmin || isSuperUser) && (
             <div className="space-y-2">
               <Label htmlFor="department">Τμήμα</Label>
-              <Select
-                value={formData.department_id}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, department_id: value })
-                }
-              >
-                <SelectTrigger className="bg-[#354f52] border-[#52796f] text-[#cad2c5]">
-                  <SelectValue placeholder="Επιλέξτε τμήμα" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#2f3e46] border-[#52796f]">
-                  {departments.map((dept: any) => (
-                    <SelectItem
-                      key={dept.id}
-                      value={dept.id}
-                      className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
-                    >
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <GlobalDropdown
+                options={departments.map(dept => ({
+                  value: dept.id,
+                  label: dept.name
+                }))}
+                selectedValue={formData.department_id || ""}
+                onChange={(value) => setFormData(prev => ({ ...prev, department_id: value }))}
+                placeholder="Επιλέξτε τμήμα"
+              />
             </div>
           )}
 
@@ -333,72 +322,30 @@ export default function UserManagementDialog({
             <>
               <div className="space-y-2">
                 <Label htmlFor="role">Ρόλος</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, role: value })
-                  }
-                >
-                  <SelectTrigger className="bg-[#354f52] border-[#52796f] text-[#cad2c5]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#2f3e46] border-[#52796f]">
-                    {isAdmin && (
-                      <SelectItem
-                        value="Admin"
-                        className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
-                      >
-                        Admin
-                      </SelectItem>
-                    )}
-                    <SelectItem
-                      value="Super User"
-                      className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
-                    >
-                      Super User
-                    </SelectItem>
-                    <SelectItem
-                      value="User"
-                      className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
-                    >
-                      User
-                    </SelectItem>
-                    <SelectItem
-                      value="Μόνο ανάγνωση"
-                      className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
-                    >
-                      Μόνο ανάγνωση
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <GlobalDropdown
+                  options={[
+                    { value: "user", label: "Χρήστης" },
+                    { value: "moderator", label: "Διαχειριστής" },
+                    { value: "readonly", label: "Μόνο ανάγνωση" },
+                    { value: "admin", label: "Διαχειριστής Συστήματος" }
+                  ]}
+                  selectedValue={formData.role || ""}
+                  onChange={(value) => setFormData(prev => ({ ...prev, role: value }))}
+                  placeholder="Επιλέξτε ρόλο"
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="status">Κατάσταση</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, status: value })
-                  }
-                >
-                  <SelectTrigger className="bg-[#354f52] border-[#52796f] text-[#cad2c5]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#2f3e46] border-[#52796f]">
-                    <SelectItem
-                      value="active"
-                      className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
-                    >
-                      Ενεργός
-                    </SelectItem>
-                    <SelectItem
-                      value="inactive"
-                      className="text-[#cad2c5] focus:bg-[#354f52] focus:text-[#cad2c5]"
-                    >
-                      Ανενεργός
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <GlobalDropdown
+                  options={[
+                    { value: "active", label: "Ενεργός" },
+                    { value: "inactive", label: "Ανενεργός" }
+                  ]}
+                  selectedValue={formData.status || ""}
+                  onChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+                  placeholder="Επιλέξτε κατάσταση"
+                />
               </div>
             </>
           )}
