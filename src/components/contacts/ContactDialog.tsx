@@ -22,6 +22,7 @@ interface ContactDialogProps {
   onSave: () => void;
   onSetPrimary?: (contactId: string) => void;
   isPrimary?: boolean;
+  viewOnly?: boolean;
 }
 
 export default function ContactDialog({
@@ -32,9 +33,12 @@ export default function ContactDialog({
   onSave,
   onSetPrimary,
   isPrimary = false,
+  viewOnly = false,
 }: ContactDialogProps) {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
+    first_name: "",
+    last_name: "",
     full_name: "",
     telephone: "",
     internal_telephone: "",
@@ -42,6 +46,7 @@ export default function ContactDialog({
     email: "",
     position: "",
     position_id: "",
+    phone: "",
     notes: "",
   });
 
@@ -88,17 +93,22 @@ export default function ContactDialog({
   useEffect(() => {
     if (contact) {
       setFormData({
+        first_name: contact.first_name || "",
+        last_name: contact.last_name || "",
         full_name: contact.full_name || "",
-        telephone: contact.telephone || "",
+        telephone: contact.telephone || contact.phone || "",
         internal_telephone: contact.internal_telephone || "",
         mobile: contact.mobile || "",
         email: contact.email || "",
         position: contact.position || "",
         position_id: contact.position_id || "",
+        phone: contact.phone || "",
         notes: contact.notes || "",
       });
     } else {
       setFormData({
+        first_name: "",
+        last_name: "",
         full_name: "",
         telephone: "",
         internal_telephone: "",
@@ -106,6 +116,7 @@ export default function ContactDialog({
         email: "",
         position: "",
         position_id: "",
+        phone: "",
         notes: "",
       });
     }
@@ -125,7 +136,7 @@ export default function ContactDialog({
 
   const isFormValid = () => {
     // Check mandatory fields - at minimum, full name is required
-    return formData.full_name.trim() !== "";
+    return formData.first_name.trim() !== "" && formData.last_name.trim() !== "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -262,7 +273,7 @@ export default function ContactDialog({
           <DialogDescription className="text-[#84a98c]">
             {contact ? (
               <>
-                <span className="font-bold text-lg">{contact.full_name}</span>
+                <span className="font-bold text-lg">{contact.first_name} {contact.last_name}</span>
                 {isPrimary && (
                   <span className="ml-2 text-xs bg-[#52796f]/30 text-[#84a98c] px-1.5 py-0.5 rounded-full">
                     Κύρια επαφή
@@ -275,76 +286,78 @@ export default function ContactDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           <div className="space-y-2">
-            <Label htmlFor="full_name" className="text-[#84a98c]">
-              Ονοματεπώνυμο <span className="text-red-500">*</span>
+            <Label htmlFor="first_name" className="text-[#84a98c]">
+              Όνομα <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="full_name"
-              name="full_name"
-              value={formData.full_name}
+              id="first_name"
+              name="first_name"
+              value={formData.first_name}
               onChange={handleInputChange}
-              className="h-8 bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+              className="app-input"
               required
+              autoComplete="off"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="telephone" className="text-[#84a98c]">
-                Τηλέφωνο
-              </Label>
-              <Input
-                id="telephone"
-                name="telephone"
-                value={formData.telephone}
-                onChange={handleInputChange}
-                className="h-8 bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="internal_telephone" className="text-[#84a98c]">
-                Εσωτερικό Τηλέφωνο
-              </Label>
-              <Input
-                id="internal_telephone"
-                name="internal_telephone"
-                value={formData.internal_telephone}
-                onChange={handleInputChange}
-                className="h-8 bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="last_name" className="text-[#84a98c]">
+              Επώνυμο <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="last_name"
+              name="last_name"
+              value={formData.last_name}
+              onChange={handleInputChange}
+              className="app-input"
+              required
+              autoComplete="off"
+            />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="mobile" className="text-[#84a98c]">
-                Κινητό
-              </Label>
-              <Input
-                id="mobile"
-                name="mobile"
-                value={formData.mobile}
-                onChange={handleInputChange}
-                className="h-8 bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-[#84a98c]">
+              Email
+            </Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              className="app-input"
+              autoComplete="off"
+            />
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#84a98c]">
-                Email
-              </Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className="h-8 bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone" className="text-[#84a98c]">
+              Τηλέφωνο
+            </Label>
+            <Input
+              id="phone"
+              name="phone"
+              value={formData.phone}
+              onChange={handleInputChange}
+              className="app-input"
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="mobile" className="text-[#84a98c]">
+              Κινητό
+            </Label>
+            <Input
+              id="mobile"
+              name="mobile"
+              value={formData.mobile}
+              onChange={handleInputChange}
+              className="app-input"
+              autoComplete="off"
+            />
           </div>
 
           <div className="space-y-2">
@@ -395,8 +408,18 @@ export default function ContactDialog({
               id="notes"
               name="notes"
               value={formData.notes}
-              onChange={handleInputChange}
-              className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c] h-[80px] max-h-[80px] resize-none"
+              style={{
+                minHeight: '124px !important',
+                height: '124px !important',
+                maxHeight: '124px !important'
+              }}
+              data-notes-textarea="true"
+              onChange={(e) => {
+                handleInputChange(e);
+              }}
+              disabled={viewOnly}
+              className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]/50"
+              placeholder="Προσθέστε σημειώσεις για την επαφή..."
             />
           </div>
 

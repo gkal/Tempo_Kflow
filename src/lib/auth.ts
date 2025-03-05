@@ -10,7 +10,7 @@ export async function checkIfFirstUser() {
 }
 
 export async function createFirstAdmin(
-  userData: Omit<User, "id" | "created_at" | "updated_at" | "last_login_at">,
+  userData: Omit<User, "id" | "created_at" | "updated_at" | "last_login_at"> & { rememberMe?: boolean },
 ) {
   const { data, error } = await supabase
     .from("users")
@@ -35,16 +35,24 @@ export async function createFirstAdmin(
   }
 
   if (userData.rememberMe) {
-    localStorage.setItem(
-      "rememberedUser",
-      JSON.stringify({
-        username: userData.username,
-        password: userData.password,
-      }),
-    );
+    try {
+      localStorage.setItem(
+        "rememberedUser",
+        JSON.stringify({
+          username: userData.username,
+          password: userData.password,
+        }),
+      );
+    } catch (storageError) {
+      console.error("Local storage access error:", storageError);
+    }
   }
 
-  sessionStorage.setItem("userId", data.id);
+  try {
+    sessionStorage.setItem("userId", data.id);
+  } catch (storageError) {
+    console.error("Session storage access error:", storageError);
+  }
   return data;
 }
 
@@ -96,25 +104,41 @@ export async function loginUser(
 
   // Handle remember me
   if (rememberMe) {
-    localStorage.setItem(
-      "rememberedUser",
-      JSON.stringify({
-        username,
-        password,
-      }),
-    );
+    try {
+      localStorage.setItem(
+        "rememberedUser",
+        JSON.stringify({
+          username,
+          password,
+        }),
+      );
+    } catch (storageError) {
+      console.error("Local storage access error:", storageError);
+    }
   } else {
-    localStorage.removeItem("rememberedUser");
+    try {
+      localStorage.removeItem("rememberedUser");
+    } catch (storageError) {
+      console.error("Local storage access error:", storageError);
+    }
   }
 
-  sessionStorage.setItem("userId", data.id);
+  try {
+    sessionStorage.setItem("userId", data.id);
+  } catch (storageError) {
+    console.error("Session storage access error:", storageError);
+  }
   return data;
 }
 
 export function getRememberedUser() {
-  const remembered = localStorage.getItem("rememberedUser");
-  if (remembered) {
-    return JSON.parse(remembered);
+  try {
+    const remembered = localStorage.getItem("rememberedUser");
+    if (remembered) {
+      return JSON.parse(remembered);
+    }
+  } catch (storageError) {
+    console.error("Local storage access error:", storageError);
   }
   return null;
 }

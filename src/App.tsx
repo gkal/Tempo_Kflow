@@ -5,7 +5,8 @@ import LoginForm from "./components/auth/LoginForm";
 import SettingsPage from "./components/settings/SettingsPage";
 import { useAuth } from "./lib/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { fixDropdowns } from './lib/fixDropdowns';
+import "./components/ui/dropdown.css";
+// import { fixDropdowns } from './lib/fixDropdowns';
 
 function App() {
   const { user, loading } = useAuth();
@@ -52,42 +53,32 @@ function App() {
               return 'Παρακαλώ συμπληρώστε αυτό το πεδίο';
             }
           }
-          return originalValidationMessage?.get?.call(this) || '';
-        },
-        configurable: true
-      });
-
-      Object.defineProperty(HTMLSelectElement.prototype, 'validationMessage', {
-        get: function() {
-          if (!this.validity.valid) {
-            if (this.validity.valueMissing) {
-              return 'Παρακαλώ επιλέξτε μια επιλογή';
-            }
-          }
-          return originalValidationMessage?.get?.call(this) || '';
+          return '';
         },
         configurable: true
       });
     } catch (e) {
-      console.error('Failed to override validationMessage for textarea/select', e);
+      console.error('Failed to override validationMessage for textarea', e);
     }
 
-    // Fix dropdown arrows when the app loads
-    fixDropdowns();
+    try {
+      Object.defineProperty(HTMLSelectElement.prototype, 'validationMessage', {
+        get: function() {
+          if (!this.validity.valid) {
+            if (this.validity.valueMissing) {
+              return 'Παρακαλώ επιλέξτε μια τιμή';
+            }
+          }
+          return '';
+        },
+        configurable: true
+      });
+    } catch (e) {
+      console.error('Failed to override validationMessage for select', e);
+    }
 
-    // Return cleanup function
-    return () => {
-      // Restore original validation message property if possible
-      if (originalValidationMessage) {
-        try {
-          Object.defineProperty(HTMLInputElement.prototype, 'validationMessage', originalValidationMessage);
-          Object.defineProperty(HTMLTextAreaElement.prototype, 'validationMessage', originalValidationMessage);
-          Object.defineProperty(HTMLSelectElement.prototype, 'validationMessage', originalValidationMessage);
-        } catch (e) {
-          console.error('Failed to restore original validationMessage', e);
-        }
-      }
-    };
+    // Fix dropdown styling issues
+    // fixDropdowns();
   }, []);
 
   if (loading) {

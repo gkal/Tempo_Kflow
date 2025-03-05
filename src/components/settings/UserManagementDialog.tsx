@@ -18,7 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import GlobalDropdown from "@/components/ui/GlobalDropdown";
+import { Checkbox } from "@/components/ui/checkbox";
+import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 
 interface UserManagementDialogProps {
   open: boolean;
@@ -214,7 +215,7 @@ export default function UserManagementDialog({
         }
       }}
     >
-      <DialogContent className="max-w-md bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
+      <DialogContent className="max-w-md bg-[#354f52] rounded-lg border border-[#52796f] text-[#cad2c5] z-[9999] shadow-lg">
         <DialogHeader>
           <DialogTitle className="text-[#cad2c5]">
             {user ? "Επεξεργασία" : "Νέος Χρήστης"}
@@ -231,7 +232,7 @@ export default function UserManagementDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           <div className="space-y-2">
             <Label htmlFor="username">Όνομα Χρήστη</Label>
             <Input
@@ -241,8 +242,9 @@ export default function UserManagementDialog({
                 setFormData({ ...formData, username: e.target.value })
               }
               disabled={user && (isSuperUser || !isAdmin)}
-              className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+              className="app-input"
               required
+              autoComplete="off"
             />
           </div>
 
@@ -259,8 +261,9 @@ export default function UserManagementDialog({
               onChange={(e) =>
                 setFormData({ ...formData, password: e.target.value })
               }
-              className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+              className="app-input"
               required={!user}
+              autoComplete="new-password"
             />
           </div>
 
@@ -272,8 +275,9 @@ export default function UserManagementDialog({
               onChange={(e) =>
                 setFormData({ ...formData, fullname: e.target.value })
               }
-              className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+              className="app-input"
               required
+              autoComplete="off"
             />
           </div>
 
@@ -281,12 +285,14 @@ export default function UserManagementDialog({
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
-              type="text"
+              type="email"
               value={formData.email}
               onChange={(e) =>
                 setFormData({ ...formData, email: e.target.value })
               }
-              className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+              className="app-input"
+              required
+              autoComplete="off"
             />
           </div>
 
@@ -294,12 +300,12 @@ export default function UserManagementDialog({
             <Label htmlFor="phone">Τηλέφωνο</Label>
             <Input
               id="phone"
-              type="tel"
               value={formData.phone}
               onChange={(e) =>
                 setFormData({ ...formData, phone: e.target.value })
               }
-              className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+              className="app-input"
+              autoComplete="off"
             />
           </div>
 
@@ -307,12 +313,12 @@ export default function UserManagementDialog({
             <div className="space-y-2">
               <Label htmlFor="department">Τμήμα</Label>
               <GlobalDropdown
-                options={departments.map(dept => ({
-                  value: dept.id,
-                  label: dept.name
-                }))}
-                selectedValue={formData.department_id || ""}
-                onChange={(value) => setFormData(prev => ({ ...prev, department_id: value }))}
+                options={departments.map(dept => dept.name)}
+                value={departments.find(dept => dept.id === formData.department_id)?.name || ""}
+                onSelect={(value) => {
+                  const dept = departments.find(d => d.name === value);
+                  setFormData(prev => ({ ...prev, department_id: dept?.id || "" }));
+                }}
                 placeholder="Επιλέξτε τμήμα"
               />
             </div>
@@ -323,14 +329,21 @@ export default function UserManagementDialog({
               <div className="space-y-2">
                 <Label htmlFor="role">Ρόλος</Label>
                 <GlobalDropdown
-                  options={[
-                    { value: "user", label: "Χρήστης" },
-                    { value: "moderator", label: "Διαχειριστής" },
-                    { value: "readonly", label: "Μόνο ανάγνωση" },
-                    { value: "admin", label: "Διαχειριστής Συστήματος" }
-                  ]}
-                  selectedValue={formData.role || ""}
-                  onChange={(value) => setFormData(prev => ({ ...prev, role: value }))}
+                  options={["Χρήστης", "Διαχειριστής", "Μόνο ανάγνωση", "Διαχειριστής Συστήματος"]}
+                  value={
+                    formData.role === "user" ? "Χρήστης" :
+                    formData.role === "moderator" ? "Διαχειριστής" :
+                    formData.role === "readonly" ? "Μόνο ανάγνωση" :
+                    formData.role === "admin" ? "Διαχειριστής Συστήματος" : ""
+                  }
+                  onSelect={(value) => {
+                    const role = 
+                      value === "Χρήστης" ? "user" :
+                      value === "Διαχειριστής" ? "moderator" :
+                      value === "Μόνο ανάγνωση" ? "readonly" :
+                      value === "Διαχειριστής Συστήματος" ? "admin" : "";
+                    setFormData(prev => ({ ...prev, role }));
+                  }}
                   placeholder="Επιλέξτε ρόλο"
                 />
               </div>
@@ -338,12 +351,12 @@ export default function UserManagementDialog({
               <div className="space-y-2">
                 <Label htmlFor="status">Κατάσταση</Label>
                 <GlobalDropdown
-                  options={[
-                    { value: "active", label: "Ενεργός" },
-                    { value: "inactive", label: "Ανενεργός" }
-                  ]}
-                  selectedValue={formData.status || ""}
-                  onChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+                  options={["Ενεργός", "Ανενεργός"]}
+                  value={formData.status === "active" ? "Ενεργός" : formData.status === "inactive" ? "Ανενεργός" : ""}
+                  onSelect={(value) => {
+                    const status = value === "Ενεργός" ? "active" : "inactive";
+                    setFormData(prev => ({ ...prev, status }));
+                  }}
                   placeholder="Επιλέξτε κατάσταση"
                 />
               </div>

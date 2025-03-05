@@ -169,37 +169,13 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
     const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
     const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
     
-    console.log('Total customers:', customersData.length);
-    console.log('Current month/year:', currentMonth, currentYear);
-    
-    // Check for customers that might be on the edge of the date range
-    console.log('Checking for edge cases:');
-    customersData.forEach(customer => {
-      const customerDate = new Date(customer.created_at);
-      // Check if the customer is created on the last day of February or first day of March
-      const month = customerDate.getUTCMonth();
-      const day = customerDate.getUTCDate();
-      
-      if ((month === 1 && day >= 28) || (month === 2 && day <= 1)) {
-        console.log(`EDGE CASE: ${customer.company_name}, Date: ${customer.created_at}, Month: ${month}, Day: ${day}`);
-      }
-    });
-    
     // Simple approach: just check if the year and month match
     const currentMonthCustomers = customersData.filter(customer => {
       const customerDate = new Date(customer.created_at);
       const customerMonth = customerDate.getUTCMonth();
       const customerYear = customerDate.getUTCFullYear();
       
-      console.log(`Customer ${customer.company_name}: Month: ${customerMonth}, Year: ${customerYear}`);
-      
       const isCurrentMonth = customerMonth === currentMonth && customerYear === currentYear;
-      
-      if (isCurrentMonth) {
-        console.log(`✅ ${customer.company_name} is in current month (${currentMonth}/${currentYear})`);
-      } else {
-        console.log(`❌ ${customer.company_name} is NOT in current month (${customerMonth}/${customerYear} vs ${currentMonth}/${currentYear})`);
-      }
       
       return isCurrentMonth;
     });
@@ -215,9 +191,6 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
     
     const currentMonthCount = currentMonthCustomers.length;
     const previousMonthCount = previousMonthCustomers.length;
-    
-    console.log('Current month customers:', currentMonthCount);
-    console.log('Previous month customers:', previousMonthCount);
     
     // Calculate percentage change
     let percentChange = 0;

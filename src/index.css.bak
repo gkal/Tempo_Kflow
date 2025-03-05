@@ -306,6 +306,17 @@ label,
   backdrop-filter: blur(2px) !important;
 }
 
+/* Remove problematic CSS rules */
+body:has([role="dialog"]) .data-table-base,
+body:has([role="dialog"]) table,
+body:has([role="dialog"]) tr,
+body:has([role="dialog"]) td,
+body:has([role="dialog"]) th {
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+
 /* Ensure dialog content has no borders */
 .DialogContent,
 [class*="DialogContent"] {
@@ -314,16 +325,7 @@ label,
   background-color: var(--app-bg-tertiary);
 }
 
-/* Customer notes textarea specific styling */
-.customer-notes-textarea {
-  min-height: 124px !important;
-  height: 124px !important;
-  max-height: 124px !important;
-  resize: none !important;
-  border: none !important;
-}
-
-.customer-notes-textarea:hover, 
-.customer-notes-textarea:focus {
-  box-shadow: 0 0 0 1px #52796f !important;
-}
+/* Remove the dropdown menu portal styling that was causing issues */
+.dropdown-menu-portal {
+  display: none !important;
+} 

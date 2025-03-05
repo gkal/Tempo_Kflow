@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertCircle, CheckCircle } from "lucide-react";
+import type { User } from "@/types/auth";
 
 export default function LoginForm() {
   const navigate = useNavigate();
@@ -26,6 +27,8 @@ export default function LoginForm() {
     email: "",
     phone: "",
     department: "Administration",
+    role: "admin" as const,
+    status: "active" as const,
   });
 
   useEffect(() => {
@@ -144,7 +147,7 @@ export default function LoginForm() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           <div className="space-y-2">
             <Input
               type="text"
@@ -153,8 +156,9 @@ export default function LoginForm() {
               onChange={(e) =>
                 setFormData({ ...formData, username: e.target.value })
               }
-              className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+              className="app-input"
               required
+              autoComplete="off"
             />
           </div>
           {isFirstUser && (
@@ -167,8 +171,9 @@ export default function LoginForm() {
                   onChange={(e) =>
                     setFormData({ ...formData, fullname: e.target.value })
                   }
-                  className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+                  className="app-input"
                   required
+                  autoComplete="off"
                 />
               </div>
               <div className="space-y-2">
@@ -179,8 +184,9 @@ export default function LoginForm() {
                   onChange={(e) =>
                     setFormData({ ...formData, email: e.target.value })
                   }
-                  className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+                  className="app-input"
                   required
+                  autoComplete="off"
                 />
               </div>
               <div className="space-y-2">
@@ -191,8 +197,8 @@ export default function LoginForm() {
                   onChange={(e) =>
                     setFormData({ ...formData, phone: e.target.value })
                   }
-                  className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
-                  required
+                  className="app-input"
+                  autoComplete="off"
                 />
               </div>
             </>
@@ -205,20 +211,24 @@ export default function LoginForm() {
               onChange={(e) =>
                 setFormData({ ...formData, password: e.target.value })
               }
-              className="bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]"
+              className="app-input"
               required
+              autoComplete="new-password"
             />
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="rememberMe"
-              checked={formData.rememberMe}
-              onCheckedChange={(checked) =>
-                setFormData({ ...formData, rememberMe: checked as boolean })
-              }
-              className="border-[#84a98c] data-[state=checked]:bg-[#84a98c] data-[state=checked]:border-[#84a98c]"
-            />
+            <div className="h-5 w-5 rounded-md overflow-hidden bg-[#354f52] border border-[#52796f]">
+              <Checkbox
+                id="rememberMe"
+                checked={formData.rememberMe}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, rememberMe: checked as boolean })
+                }
+                className="h-full w-full bg-[#354f52] border-0 rounded-none text-[#cad2c5] data-[state=checked]:bg-[#52796f]"
+                style={{ backgroundColor: '#354f52' }}
+              />
+            </div>
             <label
               htmlFor="rememberMe"
               className="text-sm font-medium text-[#cad2c5] cursor-pointer"

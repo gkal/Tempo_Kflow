@@ -30,7 +30,7 @@ import { toast } from "@/components/ui/use-toast";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 
 export default function CustomerDetailPage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [customer, setCustomer] = useState<any>(null);

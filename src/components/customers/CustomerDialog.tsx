@@ -35,8 +35,8 @@ export default function CustomerDialog({
   };
 
   const { user } = useAuth();
-  const isAdminOrSuperUser = user?.user_metadata?.role === 'admin' || 
-                            user?.user_metadata?.role === 'super_user';
+  const isAdminOrSuperUser = (user as any)?.user_metadata?.role === 'admin' || 
+                            (user as any)?.user_metadata?.role === 'super_user';
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -71,18 +71,18 @@ export default function CustomerDialog({
 
 const DeleteConfirmation = ({ isOpen, onClose, onConfirm, isDeleting }) => {
   const { user } = useAuth();
-  const isAdminOrSuperUser = user?.user_metadata?.role === 'admin' || 
-                            user?.user_metadata?.role === 'super_user';
+  const canDelete = (user as any)?.user_metadata?.role === 'admin' || 
+                   (user as any)?.user_metadata?.role === 'super_user';
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="bg-[#3a5258] border border-[#52796f] text-[#cad2c5] p-6 max-w-md mx-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-[#cad2c5]">
-            {isAdminOrSuperUser ? "Οριστική Διαγραφή" : "Απενεργοποίηση Πελάτη"}
+            {canDelete ? "Οριστική Διαγραφή" : "Απενεργοποίηση Πελάτη"}
           </DialogTitle>
           <DialogDescription className="text-[#a8c5b5] mt-2">
-            {isAdminOrSuperUser 
+            {canDelete 
               ? "Είστε βέβαιοι ότι θέλετε να διαγράψετε οριστικά αυτόν τον πελάτη και όλες τις επαφές του; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί."
               : "Είστε βέβαιοι ότι θέλετε να απενεργοποιήσετε αυτόν τον πελάτη; Ο πελάτης θα παραμείνει στη βάση δεδομένων αλλά δεν θα εμφανίζεται στις αναζητήσεις."}
           </DialogDescription>
@@ -104,10 +104,10 @@ const DeleteConfirmation = ({ isOpen, onClose, onConfirm, isDeleting }) => {
             {isDeleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {isAdminOrSuperUser ? "Διαγραφή..." : "Απενεργοποίηση..."}
+                {canDelete ? "Διαγραφή..." : "Απενεργοποίηση..."}
               </>
             ) : (
-              isAdminOrSuperUser ? "Διαγραφή" : "Απενεργοποίηση"
+              canDelete ? "Διαγραφή" : "Απενεργοποίηση"
             )}
           </Button>
         </div>

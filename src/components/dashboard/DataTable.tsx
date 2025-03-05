@@ -58,11 +58,8 @@ const DataTable = ({
   const [showDatePicker, setShowDatePicker] = useState(true);
 
   // Simple handler for date changes
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDate = e.target.value;
-    console.log("Date selected:", newDate);
+  const handleDateChange = (newDate) => {
     setDateValue(newDate);
-    
     const formattedDate = formatDateForSearch(newDate);
     setSearchTerm(formattedDate);
     onFilter(formattedDate);
@@ -105,7 +102,7 @@ const DataTable = ({
             <input
               type="date"
               value={dateValue}
-              onChange={handleDateChange}
+              onChange={(e) => handleDateChange(e.target.value)}
               className="bg-transparent text-[#cad2c5] border-0 focus:outline-none"
             />
             {dateValue && (
@@ -121,7 +118,6 @@ const DataTable = ({
         ) : (
           <SearchBar
             onChange={(value) => {
-              console.log("Search value:", value);
               setSearchTerm(value);
               onFilter(value);
             }}

@@ -31,5 +31,14 @@ export default defineConfig({
   server: {
     // @ts-ignore
     allowedHosts: true,
+    hmr: {
+      // Reduce HMR logs in console
+      overlay: false,
+      clientPort: 5173,
+    },
+    logger: {
+      // Suppress server logs
+      transports: []
+    }
   }
 });

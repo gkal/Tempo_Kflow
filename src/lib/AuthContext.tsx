@@ -18,7 +18,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = async () => {
     setLoading(true);
     try {
-      const userId = sessionStorage.getItem("userId");
+      let userId = null;
+      try {
+        userId = sessionStorage.getItem("userId");
+      } catch (storageError) {
+        console.error("Session storage access error:", storageError);
+        setUser(null);
+        return;
+      }
+      
       if (!userId) {
         setUser(null);
         return;
@@ -33,7 +41,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error || !data) {
         setUser(null);
-        sessionStorage.removeItem("userId");
+        try {
+          sessionStorage.removeItem("userId");
+        } catch (storageError) {
+          console.error("Session storage access error:", storageError);
+        }
         return;
       }
 
@@ -41,15 +53,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Auth check error:", error);
       setUser(null);
-      sessionStorage.removeItem("userId");
+      try {
+        sessionStorage.removeItem("userId");
+      } catch (storageError) {
+        console.error("Session storage access error:", storageError);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const logout = async () => {
-    sessionStorage.removeItem("userId");
-    localStorage.removeItem("rememberedUser");
+    try {
+      sessionStorage.removeItem("userId");
+    } catch (storageError) {
+      console.error("Session storage access error:", storageError);
+    }
+    
+    try {
+      localStorage.removeItem("rememberedUser");
+    } catch (storageError) {
+      console.error("Local storage access error:", storageError);
+    }
+    
     setUser(null);
   };
 

@@ -16,7 +16,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 npm run dev
 
 -------------------
-how to psuh code to gitub
+how to push code to gitub
 
 check to see how many files have changed
 git status
@@ -25,3 +25,5 @@ to push the files that shown as changed
 git add .
 
 git commit -m "Updated README and dropdown components"
+
+git push

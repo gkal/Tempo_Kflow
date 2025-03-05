@@ -1,88 +1,78 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Menu, Transition } from "@headlessui/react";
-import { Check, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useState, useRef, useEffect } from "react";
+import { ChevronDown } from "lucide-react";
+import "../ui/dropdown.css";
 
 interface GlobalDropdownProps {
-  options: { value: string; label: string }[];
-  selectedValue: string;
-  onChange: (value: string) => void;
-  className?: string;
+  options: string[];
+  onSelect: (option: string) => void;
   placeholder?: string;
+  value?: string;
+  header?: string;
+  className?: string;
 }
 
-const GlobalDropdown: React.FC<GlobalDropdownProps> = ({ 
-  options = [], 
-  selectedValue, 
-  onChange, 
-  className = "", 
-  placeholder = "Select..." 
-}) => {
-  const selectedOption = options.find(option => option.value === selectedValue);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+export function GlobalDropdown({
+  options,
+  onSelect,
+  placeholder = "Select an option",
+  value,
+  header,
+  className = "",
+}: GlobalDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<string | undefined>(value);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSelectedOption(value);
+  }, [value]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleSelect = (option: string) => {
+    setSelectedOption(option);
+    onSelect(option);
+    setIsOpen(false);
+  };
 
   return (
-    <Menu as="div" className={cn("relative w-full", className)}>
-      {({ open }) => (
-        <>
-          <Menu.Button
-            ref={buttonRef}
-            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-[#cad2c5] bg-[#2f3e46] border border-[#52796f] rounded-md hover:bg-[#354f52] focus:outline-none"
-          >
-            <span className="truncate text-left flex-1">
-              {selectedOption?.label || placeholder}
-            </span>
-            <ChevronDown 
-              className={cn(
-                "h-4 w-4 text-[#84a98c] transition-transform duration-200",
-                open && "rotate-180"
-              )}
-            />
-          </Menu.Button>
-
-          <Transition
-            show={open}
-            as={React.Fragment}
-            enter="transition ease-out duration-100"
-            enterFrom="transform opacity-0 scale-95"
-            enterTo="transform opacity-100 scale-100"
-            leave="transition ease-in duration-75"
-            leaveFrom="transform opacity-100 scale-100"
-            leaveTo="transform opacity-0 scale-95"
-          >
-            <Menu.Items
-              static
-              className="absolute z-[60] w-full mt-1 bg-[#2f3e46] border border-[#52796f] rounded-md shadow-lg max-h-60 overflow-auto focus:outline-none"
+    <div className={`GlobalDropdown ${className}`} ref={dropdownRef}>
+      {header && <div className="text-sm font-medium mb-1">{header}</div>}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full px-3 py-2 text-sm bg-[#2f3e46] border border-[#52796f] rounded-md focus:outline-none focus:ring-2 focus:ring-[#84a98c]"
+      >
+        <span>{selectedOption || placeholder}</span>
+        <ChevronDown className="h-4 w-4 ml-2" />
+      </button>
+      
+      {isOpen && (
+        <div className="dropdown-menu">
+          {options.map((option) => (
+            <div
+              key={option}
+              className={`dropdown-item text-sm ${
+                option === selectedOption ? "bg-[#52796f] text-[#cad2c5]" : ""
+              }`}
+              onClick={() => handleSelect(option)}
             >
-              <div className="py-1">
-                {options.map((option) => (
-                  <Menu.Item key={option.value}>
-                    {({ active }) => (
-                      <button
-                        onClick={() => onChange(option.value)}
-                        className={cn(
-                          "w-full flex items-center px-3 py-2 text-sm text-[#cad2c5]",
-                          active && "bg-[#354f52]",
-                          option.value === selectedValue && "bg-[#52796f]"
-                        )}
-                      >
-                        <span className="w-4 h-4 mr-2 flex-shrink-0">
-                          {option.value === selectedValue && (
-                            <Check className="h-4 w-4" />
-                          )}
-                        </span>
-                        <span className="text-left flex-1">{option.label}</span>
-                      </button>
-                    )}
-                  </Menu.Item>
-                ))}
-              </div>
-            </Menu.Items>
-          </Transition>
-        </>
+              {option}
+            </div>
+          ))}
+        </div>
       )}
-    </Menu>
+    </div>
   );
-};
-
-export default GlobalDropdown; 
+} 

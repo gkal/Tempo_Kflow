@@ -675,7 +675,7 @@ export function DataTableBase({
       </div>
       
       {/* Total records count */}
-      <div className="mt-3 mb-1 text-sm text-[#84a98c] px-2 text-center font-medium border-t border-[#52796f]/30 pt-2">
+      <div className="mt-3 mb-1 text-sm text-[#84a98c] px-2 text-center font-medium pt-2">
         {isLoading ? (
           <div className="flex items-center justify-center space-x-2">
             <span>Φόρτωση δεδομένων</span>

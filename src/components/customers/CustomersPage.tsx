@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import GlobalDropdown from "@/components/ui/GlobalDropdown";
+import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 
 // Add Customer interface
 interface Customer {

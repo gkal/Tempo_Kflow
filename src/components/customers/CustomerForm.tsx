@@ -1,13 +1,56 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import ContactDialog from "../contacts/ContactDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ContactList } from "@/components/contacts/ContactList";
-import GlobalDropdown from "@/components/ui/GlobalDropdown";
 import { Label } from "@/components/ui/label";
+import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// Custom styles for select dropdown
+const selectStyles = `
+  select {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-color: #2f3e46 !important;
+    color: #cad2c5 !important;
+    border: none !important;
+    outline: none !important;
+  }
+  
+  select:focus {
+    box-shadow: 0 0 0 1px #52796f !important;
+    border: none !important;
+  }
+  
+  select:hover {
+    box-shadow: 0 0 0 1px #52796f !important;
+    border: none !important;
+  }
+  
+  select option {
+    background-color: #2f3e46 !important;
+    color: #cad2c5 !important;
+    border: none !important;
+  }
+  
+  select option:checked,
+  select option:hover,
+  select option:focus {
+    background-color: #52796f !important;
+    color: #cad2c5 !important;
+  }
+`;
 
 interface CustomerFormProps {
   customerId?: string;
@@ -27,6 +70,7 @@ const CustomerForm = ({
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [tempCustomerType, setTempCustomerType] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     company_name: "",
     afm: "",
@@ -158,10 +202,23 @@ const CustomerForm = ({
     >,
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    
+    // If this is a customer_type change from the dropdown, store it in temp state
+    if (name === "customer_type" && tempCustomerType !== null) {
+      // Use the temp value that was set by the dropdown
+      setFormData((prev) => ({
+        ...prev,
+        customer_type: tempCustomerType,
+      }));
+      // Reset the temp value
+      setTempCustomerType(null);
+    } else {
+      // For all other fields, update normally
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
   };
 
   const isFormValid = () => {
@@ -182,6 +239,15 @@ const CustomerForm = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // If there's a temporary customer type, apply it now
+    if (tempCustomerType !== null) {
+      setFormData(prev => ({
+        ...prev,
+        customer_type: tempCustomerType
+      }));
+      setTempCustomerType(null);
+    }
     
     // Get all required inputs
     const form = e.currentTarget as HTMLFormElement;
@@ -270,7 +336,13 @@ const CustomerForm = ({
 
   return (
     <div className="h-full overflow-auto bg-[#2f3e46] text-[#cad2c5]">
-      <form id="customer-form" onSubmit={handleSubmit} className="p-4">
+      <style>{selectStyles}</style>
+      <form
+        id="customer-form"
+        className="p-4 bg-[#2f3e46] text-[#cad2c5]"
+        onSubmit={handleSubmit}
+        autoComplete="off"
+      >
         {/* Hidden save button that can be triggered from parent */}
         <button 
           id="save-customer-form" 
@@ -296,14 +368,15 @@ const CustomerForm = ({
                     Επωνυμία <span className="text-red-500">*</span>
                   </div>
                   <div className="w-2/3">
-                    <input
+                    <Input
                       id="company_name"
                       name="company_name"
                       value={formData.company_name}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="app-input"
                       disabled={viewOnly}
                       required
+                      autoComplete="off"
                       onInvalid={(e) => e.currentTarget.setCustomValidity('Παρακαλώ συμπληρώστε αυτό το πεδίο')}
                       onInput={(e) => e.currentTarget.setCustomValidity('')}
                     />
@@ -315,14 +388,15 @@ const CustomerForm = ({
                     Τηλέφωνο <span className="text-red-500">*</span>
                   </div>
                   <div className="w-2/3">
-                    <input
+                    <Input
                       id="telephone"
                       name="telephone"
                       value={formData.telephone}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="app-input"
                       disabled={viewOnly}
                       required
+                      autoComplete="off"
                       onInvalid={(e) => e.currentTarget.setCustomValidity('Παρακαλώ συμπληρώστε αυτό το πεδίο')}
                       onInput={(e) => e.currentTarget.setCustomValidity('')}
                     />
@@ -332,13 +406,14 @@ const CustomerForm = ({
                 <div className="flex items-center" style={{ marginBottom: '16px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">ΑΦΜ</div>
                   <div className="w-2/3">
-                    <input
+                    <Input
                       id="afm"
                       name="afm"
                       value={formData.afm}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="app-input"
                       disabled={viewOnly}
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -346,13 +421,14 @@ const CustomerForm = ({
                 <div className="flex items-center" style={{ marginBottom: '16px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Δ.Ο.Υ.</div>
                   <div className="w-2/3">
-                    <input
+                    <Input
                       id="doy"
                       name="doy"
                       value={formData.doy}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="app-input"
                       disabled={viewOnly}
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -363,15 +439,11 @@ const CustomerForm = ({
                   </div>
                   <div className="w-2/3">
                     <GlobalDropdown
-                      options={[
-                        { value: "company", label: "Εταιρεία" },
-                        { value: "individual", label: "Ιδιώτης" },
-                        { value: "freelancer", label: "Ελεύθερος Επαγγελματίας" }
-                      ]}
-                      selectedValue={formData.customer_type}
-                      onChange={(value) => handleInputChange({
-                        target: { name: "customer_type", value }
-                      } as any)}
+                      options={["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές"]}
+                      value={formData.customer_type}
+                      onSelect={(value) => {
+                        setTempCustomerType(value);
+                      }}
                       placeholder="Επιλέξτε τύπο πελάτη"
                     />
                   </div>
@@ -380,14 +452,15 @@ const CustomerForm = ({
                 <div className="flex items-center" style={{ marginBottom: '0' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Email</div>
                   <div className="w-2/3">
-                    <input
+                    <Input
                       id="email"
                       name="email"
                       type="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="app-input"
                       disabled={viewOnly}
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -461,13 +534,14 @@ const CustomerForm = ({
                 <div className="flex items-center" style={{ marginBottom: '16px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Οδός</div>
                   <div className="w-3/4">
-                    <input
+                    <Input
                       id="address"
                       name="address"
                       value={formData.address}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="app-input"
                       disabled={viewOnly}
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -475,13 +549,14 @@ const CustomerForm = ({
                 <div className="flex items-center" style={{ marginBottom: '16px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Πόλη</div>
                   <div className="w-3/4">
-                    <input
+                    <Input
                       id="town"
                       name="town"
                       value={formData.town}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="app-input"
                       disabled={viewOnly}
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -489,13 +564,14 @@ const CustomerForm = ({
                 <div className="flex items-center" style={{ marginBottom: '0' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Τ.Κ.</div>
                   <div className="w-3/4">
-                    <input
+                    <Input
                       id="postal_code"
                       name="postal_code"
                       value={formData.postal_code}
                       onChange={handleInputChange}
-                      className="w-full h-7 bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c] px-3 py-1 rounded-sm border-0 focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all min-w-[300px]"
+                      className="app-input"
                       disabled={viewOnly}
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -514,10 +590,28 @@ const CustomerForm = ({
                   id="notes"
                   name="notes"
                   value={formData.notes}
-                  onChange={handleInputChange}
-                  className="bg-[#2f3e46] border-0 text-[#cad2c5] placeholder:text-[#a8c5b5] h-[115px] max-h-[120px] resize-none focus:ring-1 focus:ring-[#52796f] hover:ring-1 hover:ring-[#52796f] transition-all"
-                  placeholder="Προσθέστε σημειώσεις για αυτόν τον πελάτη..."
+                  className="customer-notes-textarea bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c]/50"
+                  style={{
+                    minHeight: '124px !important',
+                    height: '124px !important',
+                    maxHeight: '124px !important',
+                    resize: 'none',
+                    border: 'none'
+                  }}
+                  data-notes-textarea="true"
+                  onChange={(e) => {
+                    handleInputChange(e);
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.boxShadow = '0 0 0 1px #52796f';
+                  }}
+                  onMouseOut={(e) => {
+                    if (document.activeElement !== e.currentTarget) {
+                      e.currentTarget.style.boxShadow = 'none';
+                    }
+                  }}
                   disabled={viewOnly}
+                  placeholder="Προσθέστε σημειώσεις για τον πελάτη..."
                 />
               </div>
             </div>
@@ -559,3 +653,4 @@ const CustomerForm = ({
 };
 
 export default CustomerForm;
+
