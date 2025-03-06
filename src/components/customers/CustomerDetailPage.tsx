@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Clock,
   Edit,
+  User,
 } from "lucide-react";
 import { CloseButton } from "@/components/ui/close-button";
 import ContactDialog from "../contacts/ContactDialog";
@@ -284,7 +285,7 @@ export default function CustomerDetailPage() {
   }
 
   return (
-    <div className="p-4 bg-[#2f3e46] text-[#cad2c5]">
+    <div className="p-8">
       <div className="flex flex-col">
         {/* Customer Header - Fixed Position */}
         <div className="sticky top-0 z-10 bg-[#2f3e46]">
@@ -550,88 +551,128 @@ export default function CustomerDetailPage() {
                       Στοιχεία Πελάτη
                     </h2>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">
-                          Επωνυμία
-                        </div>
-                        <div className="font-medium">
-                          {customer.company_name}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                      <div className="bg-[#354f52] rounded-lg p-6 shadow-md h-full">
+                        <h2 className="text-xl font-bold text-[#cad2c5] mb-4 flex items-center">
+                          <User className="mr-2 h-5 w-5" />
+                          ΣΤΟΙΧΕΙΑ ΠΕΛΑΤΗ
+                        </h2>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">
+                              Επωνυμία
+                            </div>
+                            <div className="font-medium">
+                              {customer.company_name}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">
+                              Τύπος Πελάτη
+                            </div>
+                            <div className="font-medium">
+                              {customer.customer_type || "Εταιρεία"}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">ΑΦΜ</div>
+                            <div className="font-medium">{customer.afm || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">ΔΟΥ</div>
+                            <div className="font-medium">{customer.doy || "—"}</div>
+                          </div>
+
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">
+                              Διεύθυνση
+                            </div>
+                            <div className="font-medium">
+                              {customer.address || "—"}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">Τ.Κ.</div>
+                            <div className="font-medium">
+                              {customer.postal_code || "—"}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">Πόλη</div>
+                            <div className="font-medium">
+                              {customer.town || "—"}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">
+                              Τηλέφωνο
+                            </div>
+                            <div className="font-medium">
+                              {customer.telephone || "—"}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">Email</div>
+                            <div className="font-medium">
+                              {customer.email || "—"}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">
+                              Ιστοσελίδα
+                            </div>
+                            <div className="font-medium">
+                              {customer.webpage || "—"}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-[#84a98c] text-sm mb-1">Fax</div>
+                            <div className="font-medium">
+                              {customer.fax_number || "—"}
+                            </div>
+                          </div>
                         </div>
                       </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">
-                          Τύπος Πελάτη
+                      
+                      <div className="bg-[#354f52] rounded-lg p-6 shadow-md">
+                        <div className="flex justify-between items-center mb-4">
+                          <h2 className="text-xl font-bold text-[#cad2c5] flex items-center">
+                            <Phone className="mr-2 h-5 w-5" />
+                            ΕΠΑΦΕΣ ΕΤΑΙΡΕΙΑΣ
+                          </h2>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-[#52796f] text-[#cad2c5] hover:bg-[#52796f]/20"
+                          >
+                            <span className="h-4 w-4 mr-2">+</span>
+                            Νέα Επαφή
+                          </Button>
                         </div>
-                        <div className="font-medium">
-                          {customer.customer_type || "Εταιρεία"}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">ΑΦΜ</div>
-                        <div className="font-medium">{customer.afm || "—"}</div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">ΔΟΥ</div>
-                        <div className="font-medium">{customer.doy || "—"}</div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">
-                          Διεύθυνση
-                        </div>
-                        <div className="font-medium">
-                          {customer.address || "—"}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">Τ.Κ.</div>
-                        <div className="font-medium">
-                          {customer.postal_code || "—"}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">Πόλη</div>
-                        <div className="font-medium">
-                          {customer.town || "—"}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">
-                          Τηλέφωνο
-                        </div>
-                        <div className="font-medium">
-                          {customer.telephone || "—"}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">Email</div>
-                        <div className="font-medium">
-                          {customer.email || "—"}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">
-                          Ιστοσελίδα
-                        </div>
-                        <div className="font-medium">
-                          {customer.webpage || "—"}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">Fax</div>
-                        <div className="font-medium">
-                          {customer.fax_number || "—"}
-                        </div>
+                        
+                        <ContactList
+                          contacts={contacts}
+                          primaryContactId={customer?.primary_contact_id}
+                          onContactClick={(contact) => {
+                            setSelectedContact(contact);
+                            setShowContactDialog(true);
+                          }}
+                          onAddContact={() => {
+                            setSelectedContact(null);
+                            setShowContactDialog(true);
+                          }}
+                        />
                       </div>
                     </div>
 

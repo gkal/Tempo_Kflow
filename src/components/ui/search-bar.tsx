@@ -66,45 +66,49 @@ export function SearchBar({
     onColumnChange(column);
   };
 
-  return (
-    <div className="flex items-center gap-2">
-      {/* Hidden span for width calculation */}
-      <span 
-        ref={spanRef} 
-        className="absolute opacity-0 pointer-events-none" 
-        style={{ 
-          fontSize: '14px', 
-          fontFamily: 'inherit',
-          visibility: 'hidden',
-          position: 'absolute'
-        }}
-      />
+  // Custom CSS for the placeholder color and to ensure no borders
+  const customStyles = `
+    .search-input::placeholder {
+      color: #84a98c !important;
+    }
+    .search-input {
+      outline: none !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    .search-input:focus {
+      outline: none !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+  `;
 
-      <div className="flex border border-[#52796f] rounded-lg overflow-hidden bg-[#2f3e46]">
-        {/* Search input container - fixed width */}
-        <div className="w-[150px] lg:w-[200px] flex-shrink-0">
-          <Input
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="h-9 w-full bg-transparent text-[#cad2c5] border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-            placeholder="Αναζήτηση..."
-          />
+  return (
+    <>
+      <style>{customStyles}</style>
+      <div className={`flex items-center rounded-md border border-[#52796f] bg-[#2f3e46] ${className}`}>
+        <div className="flex items-center px-3 py-2">
+          <Search className="h-4 w-4 text-[#84a98c]" />
         </div>
-        
-        {/* Dropdown container - separate from input */}
-        <div className="h-9 flex-shrink-0 flex items-center" style={{ 
-          width: `${dropdownWidth + 40}px`, // Add more extra space
-          minWidth: "150px" // Ensure minimum width
-        }}>
-          <SearchBarCustomDropdown
-            options={options}
-            value={selectedColumn}
-            onChange={(e) => handleColumnChange(e.target.value)}
-            className="text-[#cad2c5] w-full h-full"
-          />
-        </div>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="search-input flex-grow bg-transparent py-2 text-sm"
+          style={{
+            outline: 'none',
+            border: 'none',
+            boxShadow: 'none'
+          }}
+        />
+        <SearchBarCustomDropdown
+          options={options}
+          value={selectedColumn}
+          onChange={(e) => handleColumnChange(e.target.value)}
+          className="min-w-[150px]"
+        />
       </div>
-    </div>
+    </>
   );
 }

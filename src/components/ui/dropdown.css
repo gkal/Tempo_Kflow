@@ -1,7 +1,23 @@
 /* Dropdown styling */
 .GlobalDropdown {
-  position: relative;
-  z-index: 50;
+  position: static;
+  z-index: auto;
+}
+
+.GlobalDropdown button {
+  background-color: #2f3e46; /* Standard input background color */
+  color: #cad2c5;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.GlobalDropdown button:hover {
+  box-shadow: 0 0 0 1px #84a98c; /* Only add box-shadow on hover, no background change */
+}
+
+.GlobalDropdown button:focus {
+  box-shadow: 0 0 0 1px #84a98c;
+  outline: none;
 }
 
 .GlobalDropdown button svg,
@@ -13,25 +29,30 @@
 }
 
 .dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: 50;
+  position: fixed;
+  z-index: 9999 !important;
   background-color: #2f3e46;
   border: 1px solid #52796f;
   border-radius: 4px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
   max-height: 300px;
   overflow-y: auto;
+  pointer-events: auto !important;
 }
 
 .dropdown-item {
   padding: 0.5rem 0.75rem;
   cursor: pointer;
+  pointer-events: auto !important;
+  color: #cad2c5;
 }
 
 .dropdown-item:hover {
+  background-color: #3a5d63; /* Lighter hover effect for dropdown items */
+  color: #cad2c5;
+}
+
+.dropdown-item.selected-item {
   background-color: #52796f;
   color: #cad2c5;
 }
