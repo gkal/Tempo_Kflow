@@ -21,6 +21,7 @@ import {
   Clock,
   Edit,
   User,
+  Plus,
 } from "lucide-react";
 import { CloseButton } from "@/components/ui/close-button";
 import ContactDialog from "../contacts/ContactDialog";
@@ -29,6 +30,16 @@ import { ContactList } from "@/components/contacts/ContactList";
 import { ContactCard } from "@/components/contacts/ContactCard";
 import { toast } from "@/components/ui/use-toast";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -41,6 +52,9 @@ export default function CustomerDetailPage() {
   const [selectedContact, setSelectedContact] = useState(null);
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [formValid, setFormValid] = useState(true);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [activities, setActivities] = useState([
     {
       id: 1,
@@ -59,7 +73,6 @@ export default function CustomerDetailPage() {
       assignedTo: "Lisa Crosbie",
     },
   ]);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -155,8 +168,9 @@ export default function CustomerDetailPage() {
       setIsDeleting(true);
       
       // Check if user is admin or super user
-      const isAdminOrSuperUser = user?.role === 'admin' || 
-                                user?.role === 'moderator';
+      const isAdminOrSuperUser = user?.role?.toLowerCase() === 'admin' || 
+                                user?.role?.toLowerCase() === 'moderator' ||
+                                user?.role?.toLowerCase() === 'super user';
       
       if (isAdminOrSuperUser) {
         // For admin/super users: Perform actual deletion
@@ -215,6 +229,53 @@ export default function CustomerDetailPage() {
     }
   };
 
+  const handleDeleteContact = async () => {
+    if (!contactToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      // Check if this is the primary contact
+      if (contactToDelete.id === customer?.primary_contact_id) {
+        // Update customer to remove primary contact reference
+        const { error: customerError } = await supabase
+          .from("customers")
+          .update({ primary_contact_id: null })
+          .eq("id", id);
+          
+        if (customerError) throw customerError;
+      }
+      
+      // Delete the contact (or mark as inactive)
+      const { error } = await supabase
+        .from("contacts")
+        .update({ status: "inactive" })
+        .eq("id", contactToDelete.id);
+        
+      if (error) throw error;
+      
+      // Refresh contacts list
+      await fetchContacts();
+      
+      // Show success message
+      toast({
+        title: "Επιτυχία",
+        description: "Η επαφή διαγράφηκε με επιτυχία.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      toast({
+        title: "Σφάλμα",
+        description: "Προέκυψε σφάλμα κατά τη διαγραφή της επαφής.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setContactToDelete(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#2f3e46]">
@@ -264,7 +325,11 @@ export default function CustomerDetailPage() {
               <Save className="h-4 w-4 mr-2" />
               Αποθήκευση
             </Button>
-            <CloseButton size="md" onClick={() => setShowCustomerForm(false)} />
+            <CloseButton size="md" onClick={() => {
+              fetchCustomerData();
+              fetchContacts();
+              setShowCustomerForm(false);
+            }} />
           </div>
         </div>
         <div className="flex-1 overflow-auto">
@@ -272,9 +337,12 @@ export default function CustomerDetailPage() {
             customerId={id}
             onSave={() => {
               fetchCustomerData();
+              fetchContacts();
               setShowCustomerForm(false);
             }}
             onCancel={() => {
+              fetchCustomerData();
+              fetchContacts();
               setShowCustomerForm(false);
             }}
             onValidityChange={setFormValid}
@@ -340,9 +408,22 @@ export default function CustomerDetailPage() {
           <div className="w-full lg:w-1/3">
             <Card className="bg-[#354f52] border-[#52796f] mb-6">
               <CardContent className="p-6">
-                <h2 className="text-lg font-semibold mb-4 text-[#a8c5b5]">
-                  Επαφές
-                </h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-[#a8c5b5]">
+                    Επαφές
+                  </h2>
+                  <button
+                    type="button"
+                    className="h-7 w-7 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-600 rounded-full flex items-center justify-center"
+                    onClick={() => {
+                      setSelectedContact(null);
+                      setShowContactDialog(true);
+                    }}
+                    title="Προσθήκη Επαφής"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
                 <ContactList
                   contacts={contacts}
                   primaryContactId={customer?.primary_contact_id}
@@ -353,6 +434,10 @@ export default function CustomerDetailPage() {
                   onAddContact={() => {
                     setSelectedContact(null);
                     setShowContactDialog(true);
+                  }}
+                  onDeleteContact={(contact) => {
+                    setContactToDelete(contact);
+                    setShowDeleteDialog(true);
                   }}
                 />
               </CardContent>
@@ -651,14 +736,17 @@ export default function CustomerDetailPage() {
                             ΕΠΑΦΕΣ ΕΤΑΙΡΕΙΑΣ
                           </h2>
                           
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#52796f] text-[#cad2c5] hover:bg-[#52796f]/20"
+                          <button
+                            type="button"
+                            className="h-7 w-7 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-600 rounded-full flex items-center justify-center"
+                            onClick={() => {
+                              setSelectedContact(null);
+                              setShowContactDialog(true);
+                            }}
+                            title="Προσθήκη Επαφής"
                           >
-                            <span className="h-4 w-4 mr-2">+</span>
-                            Νέα Επαφή
-                          </Button>
+                            <Plus className="h-4 w-4" />
+                          </button>
                         </div>
                         
                         <ContactList
@@ -671,6 +759,10 @@ export default function CustomerDetailPage() {
                           onAddContact={() => {
                             setSelectedContact(null);
                             setShowContactDialog(true);
+                          }}
+                          onDeleteContact={(contact) => {
+                            setContactToDelete(contact);
+                            setShowDeleteDialog(true);
                           }}
                         />
                       </div>
@@ -733,13 +825,46 @@ export default function CustomerDetailPage() {
         onClose={() => {
           setShowContactDialog(false);
           setSelectedContact(null);
+          // Refresh contacts when dialog closes
+          fetchContacts();
         }}
         contact={selectedContact}
         customerId={id}
+        customerName={customer?.company_name}
         isPrimary={selectedContact?.id === customer?.primary_contact_id}
         onSetPrimary={setPrimaryContact}
         onSave={fetchContacts}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#cad2c5]">
+              Διαγραφή Επαφής
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-[#a8c5b5]">
+              Είστε βέβαιοι ότι θέλετε να διαγράψετε την επαφή{" "}
+              <span className="font-medium text-[#cad2c5]">
+                {contactToDelete?.full_name}
+              </span>
+              ; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#52796f]/20">
+              Ακύρωση
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteContact}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Διαγραφή..." : "Διαγραφή"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

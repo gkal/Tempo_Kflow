@@ -10,6 +10,7 @@ interface GlobalDropdownProps {
   value?: string;
   header?: string;
   className?: string;
+  disabled?: boolean;
 }
 
 export function GlobalDropdown({
@@ -19,6 +20,7 @@ export function GlobalDropdown({
   value,
   header,
   className = "",
+  disabled = false,
 }: GlobalDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | undefined>(value);
@@ -68,6 +70,18 @@ export function GlobalDropdown({
     setIsOpen(false);
   };
 
+  // Handle wheel scrolling in the dropdown menu
+  const handleWheel = (e: React.WheelEvent) => {
+    // Prevent the default behavior to avoid page scrolling
+    e.stopPropagation();
+    
+    // Get the dropdown menu element
+    const dropdownMenu = e.currentTarget as HTMLDivElement;
+    
+    // Scroll the dropdown menu
+    dropdownMenu.scrollTop += e.deltaY;
+  };
+
   // Render the dropdown menu using a portal
   const renderDropdownMenu = () => {
     if (!isOpen) return null;
@@ -81,9 +95,12 @@ export function GlobalDropdown({
           width: `${buttonPosition.width}px`,
           minWidth: `${buttonPosition.width}px`,
           zIndex: 9999, // Explicitly set z-index here as well
-          pointerEvents: 'auto' // Ensure clicks are captured
+          pointerEvents: 'auto', // Ensure clicks are captured
+          maxHeight: '200px', // Set a max height
+          overflowY: 'auto' // Enable vertical scrolling
         }}
         onClick={(e) => e.stopPropagation()} // Prevent clicks from bubbling
+        onWheel={handleWheel} // Handle wheel events
       >
         {options.map((option) => (
           <div
@@ -111,6 +128,8 @@ export function GlobalDropdown({
     border: 'none',
     boxShadow: isHovered || isOpen ? '0 0 0 1px #84a98c' : 'none',
     transition: 'all 0.2s ease',
+    opacity: disabled ? 0.5 : 1,
+    cursor: disabled ? 'not-allowed' : 'pointer',
   };
 
   return (
@@ -121,12 +140,15 @@ export function GlobalDropdown({
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setIsOpen(!isOpen);
+          if (!disabled) {
+            setIsOpen(!isOpen);
+          }
         }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseEnter={() => !disabled && setIsHovered(true)}
+        onMouseLeave={() => !disabled && setIsHovered(false)}
         className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-md focus:outline-none text-[#cad2c5]"
         style={buttonStyle}
+        disabled={disabled}
       >
         <span>{selectedOption || placeholder}</span>
         <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />

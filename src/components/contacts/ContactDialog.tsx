@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +17,7 @@ interface ContactDialogProps {
   onSetPrimary?: (contactId: string) => void;
   isPrimary?: boolean;
   viewOnly?: boolean;
+  customerName?: string;
 }
 
 export default function ContactDialog({
@@ -28,6 +29,7 @@ export default function ContactDialog({
   onSetPrimary,
   isPrimary = false,
   viewOnly = false,
+  customerName = "",
 }: ContactDialogProps) {
   const [formData, setFormData] = useState({
     full_name: "",
@@ -37,12 +39,13 @@ export default function ContactDialog({
     email: "",
     internal_telephone: "",
     notes: "",
-    contact_type: "Επαγγελματική",
   });
 
-  const [isLoading, setIsLoading] = useState(false);
   const [positions, setPositions] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState("");
 
   useEffect(() => {
     if (contact) {
@@ -54,9 +57,9 @@ export default function ContactDialog({
         email: contact.email || "",
         internal_telephone: contact.internal_telephone || "",
         notes: contact.notes || "",
-        contact_type: contact.contact_type || "Επαγγελματική",
       });
     } else {
+      // Reset form when creating a new contact
       setFormData({
         full_name: "",
         position: "",
@@ -65,11 +68,35 @@ export default function ContactDialog({
         email: "",
         internal_telephone: "",
         notes: "",
-        contact_type: "Επαγγελματική",
       });
     }
     fetchPositions();
-  }, [contact]);
+    fetchCustomerInfo();
+    // Reset messages when dialog opens
+    setError("");
+    setSuccess(false);
+  }, [contact, open, customerId]);
+
+  const fetchCustomerInfo = async () => {
+    if (!customerName && customerId) {
+      try {
+        const { data, error } = await supabase
+          .from("customers")
+          .select("company_name")
+          .eq("id", customerId)
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setCustomerInfo(data.company_name);
+        }
+      } catch (error) {
+        console.error("Σφάλμα κατά τη φόρτωση στοιχείων πελάτη:", error);
+      }
+    } else {
+      setCustomerInfo(customerName);
+    }
+  };
 
   const fetchPositions = async () => {
     try {
@@ -86,13 +113,20 @@ export default function ContactDialog({
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [name]: value,
-    });
+    }));
+  };
+
+  const handlePositionChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      position: value,
+    }));
   };
 
   const isFormValid = () => {
@@ -104,6 +138,9 @@ export default function ContactDialog({
     if (!isFormValid() || viewOnly) return;
 
     setIsSubmitting(true);
+    setError("");
+    setSuccess(false);
+    
     try {
       if (contact?.id) {
         // Update existing contact
@@ -117,7 +154,6 @@ export default function ContactDialog({
             email: formData.email,
             internal_telephone: formData.internal_telephone,
             notes: formData.notes,
-            contact_type: formData.contact_type,
             updated_at: new Date(),
           })
           .eq("id", contact.id);
@@ -134,16 +170,24 @@ export default function ContactDialog({
           email: formData.email,
           internal_telephone: formData.internal_telephone,
           notes: formData.notes,
-          contact_type: formData.contact_type,
         });
 
         if (error) throw error;
       }
 
+      // Call onSave immediately to refresh the contacts list
       onSave();
-      onClose();
-    } catch (error) {
+      
+      // Show success message briefly
+      setSuccess(true);
+      
+      // Close the dialog after a short delay
+      setTimeout(() => {
+        onClose();
+      }, 800);
+    } catch (error: any) {
       console.error("Σφάλμα κατά την αποθήκευση επαφής:", error);
+      setError(error.message || "Προέκυψε σφάλμα κατά την αποθήκευση της επαφής.");
     } finally {
       setIsSubmitting(false);
     }
@@ -158,165 +202,172 @@ export default function ContactDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] p-0 max-w-4xl">
-        <DialogHeader className="p-4 pb-2">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-bold text-[#cad2c5]">
+      <DialogContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f] p-0 max-w-5xl">
+        <DialogHeader className="p-4 border-b border-[#52796f]">
+          <div className="flex justify-between items-center">
+            <DialogTitle className="text-lg font-semibold text-[#cad2c5]">
+              {customerInfo && (
+                <span className="text-[#84a98c] mr-2">{customerInfo} -</span>
+              )}
               {contact ? "Επεξεργασία Επαφής" : "Νέα Επαφή"}
+              {isPrimary && (
+                <span className="ml-2 text-[#84a98c] text-sm">
+                  (Κύρια Επαφή)
+                </span>
+              )}
+              {viewOnly && (
+                <span className="ml-2 text-[#84a98c] text-sm">(Προβολή)</span>
+              )}
             </DialogTitle>
             <Button
               variant="ghost"
+              className="h-8 w-8 p-0 text-[#cad2c5]"
               onClick={onClose}
-              className="h-8 w-8 p-0 rounded-full"
             >
-              <X className="h-4 w-4 text-[#84a98c]" />
-              <span className="sr-only">Κλείσιμο</span>
+              <X className="h-4 w-4" />
             </Button>
           </div>
+          <DialogDescription className="text-[#84a98c] text-sm mt-1">
+            {contact 
+              ? "Επεξεργαστείτε τα στοιχεία της επαφής" 
+              : "Συμπληρώστε τα στοιχεία της νέας επαφής"}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-0">
           {/* Two columns layout for the first two sections */}
-          <div className="grid grid-cols-2 gap-6 p-6 pt-2">
+          <div className="grid grid-cols-2 gap-10 p-8 pt-4">
             {/* Group 1: Basic Contact Information */}
             <div className="space-y-0">
-              <div className="bg-[#354f52] p-2 rounded-t-md">
-                <h3 className="text-sm font-medium text-[#cad2c5] uppercase tracking-wider">ΒΑΣΙΚΑ ΣΤΟΙΧΕΙΑ</h3>
+              <div className="bg-[#3a5258] p-2 rounded-t-md border border-[#52796f] border-b-0">
+                <h3 className="text-sm font-medium text-[#a8c5b5] uppercase tracking-wider border-b border-[#52796f] pb-1 -mx-2 px-2">ΒΑΣΙΚΑ ΣΤΟΙΧΕΙΑ</h3>
               </div>
               
-              <div className="bg-[#354f52]/50 p-4 rounded-b-md space-y-4">
-                <div className="grid grid-cols-[150px_1fr] items-center">
-                  <label
-                    htmlFor="full_name"
-                    className="text-sm font-medium text-[#cad2c5]"
-                  >
+              <div className="bg-[#3a5258] p-6 rounded-b-md space-y-4 border border-[#52796f] border-t-0">
+                <div className="flex items-center" style={{ marginBottom: '20px' }}>
+                  <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
                     Ονοματεπώνυμο <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    id="full_name"
-                    name="full_name"
-                    value={formData.full_name}
-                    onChange={handleInputChange}
-                    className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-                    disabled={viewOnly}
-                    required
-                  />
+                  </div>
+                  <div className="w-2/3">
+                    <Input
+                      id="full_name"
+                      name="full_name"
+                      value={formData.full_name}
+                      onChange={handleInputChange}
+                      className="app-input w-full"
+                      disabled={viewOnly}
+                      required
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-[150px_1fr] items-center">
-                  <label
-                    htmlFor="mobile"
-                    className="text-sm font-medium text-[#cad2c5]"
-                  >
-                    Κινητό <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    id="mobile"
-                    name="mobile"
-                    value={formData.mobile}
-                    onChange={handleInputChange}
-                    className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-                    disabled={viewOnly}
-                    required
-                  />
+                <div className="flex items-center" style={{ marginBottom: '20px' }}>
+                  <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
+                    Κινητό
+                  </div>
+                  <div className="w-2/3">
+                    <Input
+                      id="mobile"
+                      name="mobile"
+                      value={formData.mobile}
+                      onChange={handleInputChange}
+                      className="app-input w-full"
+                      disabled={viewOnly}
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-[150px_1fr] items-center">
-                  <label
-                    htmlFor="email"
-                    className="text-sm font-medium text-[#cad2c5]"
-                  >
+                <div className="flex items-center" style={{ marginBottom: '20px' }}>
+                  <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
                     Email
-                  </label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-                    disabled={viewOnly}
-                  />
+                  </div>
+                  <div className="w-2/3">
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="app-input w-full"
+                      disabled={viewOnly}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Group 2: Professional Information */}
             <div className="space-y-0">
-              <div className="bg-[#354f52] p-2 rounded-t-md">
-                <h3 className="text-sm font-medium text-[#cad2c5] uppercase tracking-wider">ΕΠΑΓΓΕΛΜΑΤΙΚΑ ΣΤΟΙΧΕΙΑ</h3>
+              <div className="bg-[#3a5258] p-2 rounded-t-md border border-[#52796f] border-b-0">
+                <h3 className="text-sm font-medium text-[#a8c5b5] uppercase tracking-wider border-b border-[#52796f] pb-1 -mx-2 px-2">ΕΠΑΓΓΕΛΜΑΤΙΚΑ ΣΤΟΙΧΕΙΑ</h3>
               </div>
               
-              <div className="bg-[#354f52]/50 p-4 rounded-b-md space-y-4">
-                <div className="grid grid-cols-[150px_1fr] items-center">
-                  <label
-                    htmlFor="position"
-                    className="text-sm font-medium text-[#cad2c5]"
-                  >
+              <div className="bg-[#3a5258] p-6 rounded-b-md space-y-4 border border-[#52796f] border-t-0">
+                <div className="flex items-center" style={{ marginBottom: '20px' }}>
+                  <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
                     Θέση
-                  </label>
-                  <GlobalDropdown
-                    options={positions}
-                    value={formData.position}
-                    onSelect={(value) =>
-                      setFormData({ ...formData, position: value })
-                    }
-                    placeholder="Επιλέξτε θέση"
-                    className="w-full"
-                  />
+                  </div>
+                  <div className="w-2/3">
+                    <GlobalDropdown
+                      options={positions}
+                      value={formData.position}
+                      onSelect={handlePositionChange}
+                      placeholder="Επιλέξτε θέση"
+                      disabled={viewOnly}
+                      className="w-full"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-[150px_1fr] items-center">
-                  <label
-                    htmlFor="telephone"
-                    className="text-sm font-medium text-[#cad2c5]"
-                  >
-                    Σταθερό Τηλέφωνο
-                  </label>
-                  <Input
-                    id="telephone"
-                    name="telephone"
-                    value={formData.telephone}
-                    onChange={handleInputChange}
-                    className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-                    disabled={viewOnly}
-                  />
+                <div className="flex items-center" style={{ marginBottom: '20px' }}>
+                  <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
+                    Τηλέφωνο
+                  </div>
+                  <div className="w-2/3">
+                    <Input
+                      id="telephone"
+                      name="telephone"
+                      value={formData.telephone}
+                      onChange={handleInputChange}
+                      className="app-input w-full"
+                      disabled={viewOnly}
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-[150px_1fr] items-center">
-                  <label
-                    htmlFor="internal_telephone"
-                    className="text-sm font-medium text-[#cad2c5]"
-                  >
+                <div className="flex items-center" style={{ marginBottom: '20px' }}>
+                  <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
                     Εσωτερικό
-                  </label>
-                  <Input
-                    id="internal_telephone"
-                    name="internal_telephone"
-                    value={formData.internal_telephone}
-                    onChange={handleInputChange}
-                    className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-                    disabled={viewOnly}
-                  />
+                  </div>
+                  <div className="w-2/3">
+                    <Input
+                      id="internal_telephone"
+                      name="internal_telephone"
+                      value={formData.internal_telephone}
+                      onChange={handleInputChange}
+                      className="app-input w-full"
+                      disabled={viewOnly}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Group 3: Notes - Full width below the two columns */}
-          <div className="px-6 pb-6">
+          <div className="px-8 pb-8">
             <div className="space-y-0">
-              <div className="bg-[#354f52] p-2 rounded-t-md">
-                <h3 className="text-sm font-medium text-[#cad2c5] uppercase tracking-wider">ΣΗΜΕΙΩΣΕΙΣ</h3>
+              <div className="bg-[#3a5258] p-2 rounded-t-md border border-[#52796f] border-b-0">
+                <h3 className="text-sm font-medium text-[#a8c5b5] uppercase tracking-wider border-b border-[#52796f] pb-1 -mx-2 px-2">ΣΗΜΕΙΩΣΕΙΣ</h3>
               </div>
               
-              <div className="bg-[#354f52]/50 p-4 rounded-b-md">
+              <div className="bg-[#3a5258] p-6 rounded-b-md border border-[#52796f] border-t-0">
                 <Textarea
                   id="notes"
                   name="notes"
                   value={formData.notes}
                   onChange={handleInputChange}
-                  className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] min-h-[100px] w-full"
+                  className="contact-notes-textarea w-full"
                   disabled={viewOnly}
                   placeholder="Προσθέστε σημειώσεις..."
                 />
@@ -324,7 +375,21 @@ export default function ContactDialog({
             </div>
           </div>
 
-          <div className="flex justify-between items-center p-4 border-t border-[#52796f]/30 bg-[#2f3e46]">
+          {/* Error and Success Messages */}
+          <div className="px-8 pb-4">
+            {error && (
+              <div className="bg-red-500/10 text-red-400 p-3 rounded-md mb-4">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="bg-green-500/10 text-green-400 p-3 rounded-md mb-4">
+                Η αποθήκευση ολοκληρώθηκε με επιτυχία!
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-between items-center p-4 border-t border-[#52796f]">
             {onSetPrimary && contact && !isPrimary ? (
               <Button
                 type="button"

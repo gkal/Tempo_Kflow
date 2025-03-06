@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { Search, Plus, ChevronDown } from "lucide-react";
+import { Search, Plus, ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ContactDialog from "../contacts/ContactDialog";
@@ -15,6 +15,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "@/components/ui/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Custom styles for select dropdown
 const selectStyles = `
@@ -90,9 +101,11 @@ const CustomerForm = ({
   const [contacts, setContacts] = useState([]);
   const [showContactDialog, setShowContactDialog] = useState(false);
   const [selectedContact, setSelectedContact] = useState(null);
-  // No longer needed as we're using primary_contact_id in formData
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<any>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch customer data if editing
   useEffect(() => {
@@ -212,7 +225,20 @@ const CustomerForm = ({
       }));
       // Reset the temp value
       setTempCustomerType(null);
-    } else {
+    } 
+    // Special handling for AFM field - only allow numbers and max 8 characters
+    else if (name === "afm") {
+      // Remove any non-numeric characters
+      const numericValue = value.replace(/\D/g, '');
+      // Limit to 8 characters
+      const limitedValue = numericValue.slice(0, 8);
+      
+      setFormData((prev) => ({
+        ...prev,
+        [name]: limitedValue,
+      }));
+    }
+    else {
       // For all other fields, update normally
       setFormData((prev) => ({
         ...prev,
@@ -334,6 +360,59 @@ const CustomerForm = ({
     setShowContactDialog(true);
   };
 
+  const handleDeleteContact = async () => {
+    if (!contactToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      // Check if this is the primary contact
+      if (contactToDelete.id === formData.primary_contact_id) {
+        // Update customer to remove primary contact reference
+        const { error: customerError } = await supabase
+          .from("customers")
+          .update({ primary_contact_id: null })
+          .eq("id", customerId);
+          
+        if (customerError) throw customerError;
+        
+        // Also update local form data
+        setFormData(prev => ({
+          ...prev,
+          primary_contact_id: ""
+        }));
+      }
+      
+      // Delete the contact (or mark as inactive)
+      const { error } = await supabase
+        .from("contacts")
+        .update({ status: "inactive" })
+        .eq("id", contactToDelete.id);
+        
+      if (error) throw error;
+      
+      // Refresh contacts list
+      await fetchContacts();
+      
+      // Show success message
+      toast({
+        title: "Επιτυχία",
+        description: "Η επαφή διαγράφηκε με επιτυχία.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      toast({
+        title: "Σφάλμα",
+        description: "Προέκυψε σφάλμα κατά τη διαγραφή της επαφής.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setContactToDelete(null);
+    }
+  };
+
   return (
     <div className="h-full overflow-auto bg-[#2f3e46] text-[#cad2c5]">
       <style>{selectStyles}</style>
@@ -414,6 +493,13 @@ const CustomerForm = ({
                       className="app-input"
                       disabled={viewOnly}
                       autoComplete="off"
+                      pattern="[0-9]{8}"
+                      maxLength={8}
+                      minLength={8}
+                      title="Το ΑΦΜ πρέπει να αποτελείται από 8 ψηφία"
+                      placeholder="8 ψηφία"
+                      onInvalid={(e) => e.currentTarget.setCustomValidity('Το ΑΦΜ πρέπει να αποτελείται από 8 ψηφία')}
+                      onInput={(e) => e.currentTarget.setCustomValidity('')}
                     />
                   </div>
                 </div>
@@ -511,6 +597,10 @@ const CustomerForm = ({
                       setShowContactDialog(true);
                     }}
                     onSetPrimary={setPrimaryContact}
+                    onDeleteContact={(contact) => {
+                      setContactToDelete(contact);
+                      setShowDeleteDialog(true);
+                    }}
                     maxHeight="max-h-[200px]"
                   />
                 ) : (
@@ -641,6 +731,7 @@ const CustomerForm = ({
           }}
           contact={selectedContact}
           customerId={customerId}
+          customerName={formData.company_name}
           isPrimary={selectedContact?.id === formData.primary_contact_id}
           onSetPrimary={setPrimaryContact}
           onSave={() => {
@@ -648,6 +739,36 @@ const CustomerForm = ({
           }}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#cad2c5]">
+              Διαγραφή Επαφής
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-[#a8c5b5]">
+              Είστε βέβαιοι ότι θέλετε να διαγράψετε την επαφή{" "}
+              <span className="font-medium text-[#cad2c5]">
+                {contactToDelete?.full_name}
+              </span>
+              ; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#52796f]/20">
+              Ακύρωση
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteContact}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Διαγραφή..." : "Διαγραφή"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

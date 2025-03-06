@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
+import { CloseButton } from "@/components/ui/close-button";
 import {
   Select,
   SelectContent,
@@ -13,7 +21,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 
-interface UserManagementDialogProps {
+interface SimpleUserDialogProps {
   open: boolean;
   onClose: () => void;
   user?: any;
@@ -21,18 +29,14 @@ interface UserManagementDialogProps {
   fetchUsers: () => Promise<void>;
 }
 
-export default function UserManagementDialog({
+export default function SimpleUserDialog({
   open,
   onClose,
   user,
   currentUserRole,
   fetchUsers,
-}: UserManagementDialogProps) {
-  console.log("UserManagementDialog props:", { open, user, currentUserRole });
-  
-  useEffect(() => {
-    console.log("Dialog open state changed:", open);
-  }, [open]);
+}: SimpleUserDialogProps) {
+  console.log("SimpleUserDialog props:", { open, user, currentUserRole });
   
   const [formData, setFormData] = useState({
     username: "",
@@ -62,10 +66,6 @@ export default function UserManagementDialog({
       if (userRole.toLowerCase() === 'readonly') {
         userRole = "Μόνο ανάγνωση";
       }
-      
-      console.log("User from database:", user);
-      console.log("Original user role:", user.role);
-      console.log("Display user role:", userRole);
       
       setFormData({
         username: user.username || "",
@@ -111,14 +111,13 @@ export default function UserManagementDialog({
     setError("");
 
     try {
-      console.log("Form data before submission:", formData);
-      
       if (user) {
         // Update existing user
         let updateData: any = {};
         
         // For regular users and readonly users, only allow password, department, and status updates
-        if (isRegularUser || isReadOnly) {
+        if (currentUserRole === "User" || currentUserRole?.toLowerCase() === "user" || 
+            currentUserRole === "Μόνο ανάγνωση" || currentUserRole?.toLowerCase() === "readonly") {
           updateData = {
             department_id: formData.department_id,
             status: formData.status, // Allow status updates
@@ -139,29 +138,10 @@ export default function UserManagementDialog({
           };
         }
 
-        // Super User and Admin permissions
-        if (isAdmin || isSuperUser) {
-          // Only Admin can change username
-          if (isAdmin) {
-            updateData.username = formData.username;
-          }
-
-          // Super User can't edit Admin users and can't make someone Admin
-          if (isSuperUser) {
-            if (user.role !== "Admin" && user.role?.toLowerCase() !== "admin") {
-              updateData.role =
-                formData.role !== "Admin" ? formData.role : user.role;
-              console.log("Role set by Super User:", updateData.role);
-              updateData.status = formData.status;
-            }
-          } else if (isAdmin) {
-            updateData.role = formData.role;
-            console.log("Role set by Admin:", updateData.role);
-            updateData.status = formData.status;
-          }
+        // Admin permissions
+        if (currentUserRole === "Admin" || currentUserRole?.toLowerCase() === "admin") {
+          updateData.username = formData.username;
         }
-
-        console.log("Update data before submission:", updateData);
 
         const { error: updateError } = await supabase
           .from("users")
@@ -169,20 +149,10 @@ export default function UserManagementDialog({
           .eq("id", user.id);
 
         if (updateError) {
-          console.error("Update error:", updateError);
-          if (
-            updateError.code === "23505" &&
-            updateError.message.includes("users_username_key")
-          ) {
-            throw new Error(
-              "Το όνομα χρήστη χρησιμοποιείται ήδη. Παρακαλώ επιλέξτε διαφορετικό.",
-            );
-          }
           throw updateError;
         }
       } else {
         // Create new user
-        console.log("Creating new user with data:", formData);
         const { error: createError } = await supabase
           .from("users")
           .insert([{
@@ -197,15 +167,6 @@ export default function UserManagementDialog({
           }]);
 
         if (createError) {
-          console.error("Create error:", createError);
-          if (
-            createError.code === "23505" &&
-            createError.message.includes("users_username_key")
-          ) {
-            throw new Error(
-              "Το όνομα χρήστη χρησιμοποιείται ήδη. Παρακαλώ επιλέξτε διαφορετικό.",
-            );
-          }
           throw createError;
         }
       }
@@ -214,14 +175,7 @@ export default function UserManagementDialog({
       await fetchUsers();
 
       setTimeout(() => {
-        setSuccess(false);
-        if (isRegularUser || isReadOnly) {
-          window.location.href = window.location.pathname.includes("/settings")
-            ? "/dashboard"
-            : window.location.pathname;
-        } else {
-          onClose();
-        }
+        onClose();
       }, 1000);
     } catch (error: any) {
       setError(error.message);
@@ -230,69 +184,35 @@ export default function UserManagementDialog({
     }
   };
 
+  // Define what fields can be edited based on user role
   const isAdmin = currentUserRole === "Admin" || currentUserRole?.toLowerCase() === "admin";
   const isSuperUser = currentUserRole === "Super User" || currentUserRole?.toLowerCase() === "super user" || currentUserRole?.toLowerCase() === "moderator";
   const isRegularUser = currentUserRole === "User" || currentUserRole?.toLowerCase() === "user";
   const isReadOnly = currentUserRole === "Μόνο ανάγνωση" || currentUserRole?.toLowerCase() === "readonly";
-  const canEditRoles = isAdmin || (isSuperUser && user?.role !== "Admin" && user?.role?.toLowerCase() !== "admin");
-
-  // For the Dialog's onOpenChange handler
-  const isRegularOrReadOnlyUser = isRegularUser || isReadOnly;
-
-  const isFormValid = () => {
-    if (!user) {
-      // New user mode
-      return (
-        formData.username.length >= 2 &&
-        formData.password.length >= 6 &&
-        formData.department_id &&
-        formData.role
-      );
-    }
-    return true;
-  };
-
-  // Define what fields can be edited based on user role
+  
   const canEditUsername = isAdmin;
   const canEditFullname = isAdmin || isSuperUser;
   const canEditEmail = isAdmin || isSuperUser;
   const canEditPhone = isAdmin || isSuperUser;
   const canEditDepartment = true; // All users can edit department
-  const canEditRole = canEditRoles;
+  const canEditRole = isAdmin || (isSuperUser && user?.role !== "Admin" && user?.role?.toLowerCase() !== "admin");
   const canEditStatus = true; // All users can edit status
 
-  // Add effect to handle open state changes
-  useEffect(() => {
-    console.log("Dialog open state in effect:", open);
-    
-    // If the dialog is closing and the user is a regular user or readonly
-    if (!open && isRegularOrReadOnlyUser) {
-      window.location.href = window.location.pathname.includes("/settings")
-        ? "/dashboard"
-        : window.location.pathname;
-    }
-  }, [open, isRegularOrReadOnlyUser]);
-
-  // If the dialog is not open, don't render anything
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-[9998] bg-black/80 backdrop-blur-sm flex items-center justify-center">
-      <div className="max-w-md bg-[#354f52] rounded-lg border border-[#52796f] text-[#cad2c5] z-[9999] shadow-lg p-6 relative">
-        <button 
-          className="absolute right-4 top-4 text-[#84a98c] hover:text-[#cad2c5]"
-          onClick={onClose}
-        >
-          ✕
-        </button>
-        
-        <div className="flex flex-col space-y-1.5 text-center sm:text-left mb-4">
-          <h2 className="text-lg font-semibold leading-none tracking-tight text-[#cad2c5]">
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-md bg-[#354f52] rounded-lg border border-[#52796f] text-[#cad2c5] z-[9999] shadow-lg">
+        <DialogHeader>
+          <DialogTitle className="text-[#cad2c5]">
             {user ? "Επεξεργασία" : "Νέος Χρήστης"}
-          </h2>
-          <p className="text-sm text-[#84a98c]">
+          </DialogTitle>
+          <DialogDescription className="text-[#84a98c]">
             {user ? (
               <>
                 <span className="font-bold text-lg">{user.username}</span>,{" "}
@@ -301,8 +221,8 @@ export default function UserManagementDialog({
             ) : (
               "Συμπληρώστε τα στοιχεία του νέου χρήστη"
             )}
-          </p>
-        </div>
+          </DialogDescription>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           <div className="space-y-2">
@@ -404,7 +324,6 @@ export default function UserManagementDialog({
                 options={["Admin", "Super User", "User", "Μόνο ανάγνωση"]}
                 value={formData.role}
                 onSelect={(value) => {
-                  console.log("Selected role from dropdown:", value);
                   setFormData(prev => ({ ...prev, role: value }));
                 }}
                 placeholder="Select role"
@@ -441,7 +360,7 @@ export default function UserManagementDialog({
           <div className="flex justify-end space-x-2">
             <Button
               type="submit"
-              disabled={loading || !isFormValid()}
+              disabled={loading}
               className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
             >
               {loading
@@ -452,7 +371,7 @@ export default function UserManagementDialog({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-}
+} 

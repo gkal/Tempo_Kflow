@@ -54,69 +54,17 @@ const customSort = (a, b) => {
   return 0;
 };
 
-// Create a separate component for the cell
-const ActionCell = ({ customer, onDelete, onShowDeleteDialog, onToggleStatus, isAdmin }) => {
-  // It's safe to use hooks in a component
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  
-  // Make role check case-insensitive
-  const isAdminUser = user?.role?.toLowerCase() === 'admin' || 
-                      user?.role?.toLowerCase() === 'super_user';
-  
-  return (
-    <div className="flex items-center justify-end gap-2">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleStatus(customer);
-        }}
-        className="h-8 w-8 p-0 text-[#84a98c] hover:text-[#cad2c5] hover:bg-[#354f52]"
-        title={customer.status === 'active' ? 'Απενεργοποίηση πελάτη' : 'Ενεργοποίηση πελάτη'}
-      >
-        <span className="sr-only">
-          {customer.status === 'active' ? 'Deactivate' : 'Activate'}
-        </span>
-        {customer.status === 'active' ? (
-          <EyeOff className="h-4 w-4" />
-        ) : (
-          <Eye className="h-4 w-4" />
-        )}
-      </Button>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                onShowDeleteDialog(customer);
-              }}
-              className="h-8 w-8 p-0 text-red-500 hover:text-red-400 hover:bg-[#354f52]"
-            >
-              <span className="sr-only">Delete</span>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{isAdmin ? "Οριστική διαγραφή" : "Απενεργοποίηση"}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </div>
-  );
-};
+// ActionCell component has been removed as it's no longer used
 
 export default function CustomersPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
   // Make role check case-insensitive
-  const isAdminOrSuperUser = user?.role?.toLowerCase() === 'admin' || 
-                            user?.role?.toLowerCase() === 'super_user';
+  const isAdminUser = user?.role?.toLowerCase() === 'admin';
+  const isAdminOrSuperUser = isAdminUser || 
+                            user?.role?.toLowerCase() === 'moderator' ||
+                            user?.role?.toLowerCase() === 'super user';
   
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
@@ -280,83 +228,68 @@ export default function CustomersPage() {
     );
   }
 
-  const handleDelete = async (customerId: string) => {
+  const handleDelete = async (customerId) => {
     if (!customerId) return;
     
     try {
       // Make role check case-insensitive
-      const isAdminOrSuperUser = user?.role?.toLowerCase() === 'admin' || 
-                                user?.role?.toLowerCase() === 'super_user';
+      const isAdminUser = user?.role?.toLowerCase() === 'admin';
       
-      if (isAdminOrSuperUser) {
-        // For admin/super users: Perform actual deletion
+      if (isAdminUser) {
+        // For admin users: Perform actual deletion
         
-        // First, remove the primary_contact_id reference from the customer
-        const { error: updateError } = await supabase
-          .from('customers')
-          .update({ primary_contact_id: null })
-          .eq('id', customerId);
-        
-        if (updateError) throw updateError;
-        
-        // Then delete all contacts associated with this customer
-        const { error: contactsError } = await supabase
+        // First delete all contacts associated with this customer
+        await supabase
           .from('contacts')
           .delete()
           .eq('customer_id', customerId);
         
-        if (contactsError) throw contactsError;
-        
-        // Finally delete the customer record
-        const { error: customerError } = await supabase
+        // Then delete the customer
+        await supabase
           .from('customers')
           .delete()
           .eq('id', customerId);
         
-        if (customerError) throw customerError;
-        
-        // Update local state to remove the deleted customer
+        // Update the customers array
         setCustomers(prevCustomers => 
           prevCustomers.filter(c => c.id !== customerId)
         );
         
-        // Also update filtered customers
+        // Update the filtered customers array
         setFilteredCustomers(prevFiltered => 
           prevFiltered.filter(c => c.id !== customerId)
         );
         
         toast({
           title: "Επιτυχής διαγραφή",
-          description: "Ο πελάτης και όλες οι επαφές του διαγράφηκαν οριστικά.",
+          description: 'Ο πελάτης διαγράφηκε οριστικά με επιτυχία!',
           variant: "default",
         });
       } else {
-        // For regular users: Just mark as inactive
-        const { error } = await supabase
+        // For non-admin users: Just deactivate
+        await supabase
           .from('customers')
           .update({ 
             status: 'inactive',
-            modified_by: user?.id,
             updated_at: new Date().toISOString()
           })
           .eq('id', customerId);
         
-        if (error) throw error;
-        
-        // Update the customers array to reflect the status change
-        const updatedCustomers = customers.map(c => 
-          c.id === customerId ? {...c, status: 'inactive'} : c
+        // Update the customers array
+        setCustomers(prevCustomers => 
+          prevCustomers.map(c => 
+            c.id === customerId ? {...c, status: 'inactive'} : c
+          )
         );
-        setCustomers(updatedCustomers);
         
         // Handle filtered customers based on status filter
         if (statusFilter !== 'all' && statusFilter !== 'inactive') {
-          // If the filter doesn't include inactive customers, remove from filtered view
+          // If we're not showing inactive customers, remove from filtered view
           setFilteredCustomers(prevFiltered => 
             prevFiltered.filter(c => c.id !== customerId)
           );
         } else {
-          // Otherwise update the status in the filtered view
+          // Otherwise update in the filtered view
           setFilteredCustomers(prevFiltered => 
             prevFiltered.map(c => c.id === customerId ? {...c, status: 'inactive'} : c)
           );
@@ -364,15 +297,15 @@ export default function CustomersPage() {
         
         toast({
           title: "Επιτυχής απενεργοποίηση",
-          description: "Ο πελάτης έχει απενεργοποιηθεί και δεν θα εμφανίζεται πλέον στη λίστα ενεργών πελατών.",
+          description: 'Ο πελάτης απενεργοποιήθηκε με επιτυχία!',
           variant: "default",
         });
       }
     } catch (error) {
-      console.error('Error processing customer:', error);
+      console.error("Error deleting customer:", error);
       toast({
         title: "Σφάλμα",
-        description: "Υπήρξε πρόβλημα κατά την επεξεργασία του πελάτη.",
+        description: 'Σφάλμα κατά τη διαγραφή του πελάτη',
         variant: "destructive",
       });
     }
@@ -461,13 +394,31 @@ export default function CustomersPage() {
     {
       header: "Κατάσταση",
       accessor: "status",
-      cell: (value) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs ${value === "active" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}
-        >
-          {value === "active" ? "Ενεργός" : "Ανενεργός"}
-        </span>
-      ),
+      sortable: true,
+      cell: (value, row) => {
+        if (!row) return null;
+        
+        return (
+          <div className="flex justify-center" title={value === "active" ? "Ενεργός" : "Ανενεργός"}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCustomerStatus(row);
+              }}
+              className={`h-8 w-8 hover:bg-[#354f52] ${value === "active" ? "text-green-400" : "text-red-400"}`}
+              disabled={!isAdminOrSuperUser}
+            >
+              {value === "active" ? (
+                <Eye className="h-4 w-4" />
+              ) : (
+                <EyeOff className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        );
+      },
     },
     {
       header: "",
@@ -476,17 +427,34 @@ export default function CustomersPage() {
       cell: (_, row) => {
         if (!row) return null;
         
+        // Only show delete button for Admin users
+        if (!isAdminUser) return null;
+        
         return (
-          <ActionCell 
-            customer={row}
-            onDelete={handleDelete}
-            onShowDeleteDialog={(customer) => {
-              setCustomerToDelete(customer);
-              setShowDeleteDialog(true);
-            }}
-            onToggleStatus={toggleCustomerStatus}
-            isAdmin={isAdminOrSuperUser}
-          />
+          <div className="flex justify-end">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCustomerToDelete(row);
+                      setShowDeleteDialog(true);
+                    }}
+                    className="h-8 w-8 p-0 text-red-500 hover:text-red-400 hover:bg-[#354f52]"
+                  >
+                    <span className="sr-only">Delete</span>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Οριστική διαγραφή</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         );
       },
     },
@@ -604,14 +572,18 @@ export default function CustomersPage() {
         <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {isAdminOrSuperUser 
+              {isAdminUser 
                 ? "Οριστική Διαγραφή Πελάτη" 
-                : "Απενεργοποίηση Πελάτη"}
+                : customerToDelete?.status === 'active' 
+                  ? "Απενεργοποίηση Πελάτη"
+                  : "Ενεργοποίηση Πελάτη"}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-[#84a98c]">
-              {isAdminOrSuperUser
+              {isAdminUser
                 ? `Είστε σίγουροι ότι θέλετε να διαγράψετε οριστικά τον πελάτη "${customerToDelete?.company_name}" και όλες τις επαφές του; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.`
-                : `Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε τον πελάτη "${customerToDelete?.company_name}";`
+                : customerToDelete?.status === 'active'
+                  ? `Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε τον πελάτη "${customerToDelete?.company_name}";`
+                  : `Είστε σίγουροι ότι θέλετε να ενεργοποιήσετε τον πελάτη "${customerToDelete?.company_name}";`
               }
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -620,17 +592,27 @@ export default function CustomersPage() {
               Άκυρο
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 text-white hover:bg-red-700"
-              onClick={(e) => {
-                e.preventDefault(); // Prevent default to handle closing manually
-                handleDelete(customerToDelete?.id);
+              className={`text-white ${
+                isAdminUser 
+                  ? "bg-red-600 hover:bg-red-700" 
+                  : customerToDelete?.status === 'active'
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-green-600 hover:bg-green-700"
+              }`}
+              onClick={() => {
+                if (isAdminUser) {
+                  handleDelete(customerToDelete?.id);
+                } else {
+                  toggleCustomerStatus(customerToDelete);
+                }
                 setShowDeleteDialog(false);
-                setCustomerToDelete(null);
               }}
             >
-              {isAdminOrSuperUser 
+              {isAdminUser 
                 ? "Διαγραφή" 
-                : "Απενεργοποίηση"}
+                : customerToDelete?.status === 'active'
+                  ? "Απενεργοποίηση"
+                  : "Ενεργοποίηση"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

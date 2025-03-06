@@ -1,6 +1,4 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { ContactCard } from "./ContactCard";
 
 interface ContactListProps {
@@ -8,6 +6,7 @@ interface ContactListProps {
   primaryContactId?: string;
   onContactClick: (contact: any) => void;
   onAddContact: () => void;
+  onDeleteContact?: (contact: any) => void;
   className?: string;
   maxHeight?: string;
 }
@@ -18,6 +17,7 @@ export function ContactList({
   onContactClick,
   onAddContact,
   onSetPrimary,
+  onDeleteContact,
   className = "",
   maxHeight = "max-h-[300px]",
 }: ContactListProps & { onSetPrimary?: (contactId: string) => void }) {
@@ -42,6 +42,9 @@ export function ContactList({
               onClick={() => onContactClick(contact)}
               onSetPrimary={
                 onSetPrimary ? () => onSetPrimary(contact.id) : undefined
+              }
+              onDelete={
+                onDeleteContact ? () => onDeleteContact(contact) : undefined
               }
             />
           ))

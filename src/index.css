@@ -327,3 +327,17 @@ label,
 .customer-notes-textarea:focus {
   box-shadow: 0 0 0 1px #52796f !important;
 }
+
+/* Contact notes textarea specific styling */
+.contact-notes-textarea {
+  min-height: 124px !important;
+  height: 124px !important;
+  max-height: 124px !important;
+  resize: none !important;
+  border: none !important;
+}
+
+.contact-notes-textarea:hover, 
+.contact-notes-textarea:focus {
+  box-shadow: 0 0 0 1px #52796f !important;
+}

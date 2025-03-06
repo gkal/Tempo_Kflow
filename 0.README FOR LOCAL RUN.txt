@@ -15,15 +15,26 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 npm run dev
 
--------------------
-how to push code to gitub
+Run for all network computers
 
+npm run dev -- --host
+--------------------------
+how to push code to gitub
+--------------------------
 check to see how many files have changed
 git status
 
 to push the files that shown as changed
 git add .
 
-git commit -m "Updated README and dropdown components"
+git commit -m ""
 
 git push
+
+-----------------------------
+How to pull code from github
+-----------------------------
+cd C:\Tempo_Kflow
+git status
+git fetch origin
+git reset --hard origin/main

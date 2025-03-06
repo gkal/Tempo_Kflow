@@ -2,6 +2,7 @@ type Permission =
   | boolean
   | "self-only"
   | "self-password-only"
+  | "self-password-department-status-only"
   | "assigned-only";
 
 interface ModulePermissions {
@@ -57,7 +58,7 @@ const permissions: Record<string, RolePermissions> = {
     users: {
       view: "self-only",
       create: false,
-      edit: "self-password-only",
+      edit: "self-password-department-status-only",
       delete: false,
       recover: false,
     },
@@ -67,14 +68,14 @@ const permissions: Record<string, RolePermissions> = {
     },
     settings: {
       view: "self-only",
-      edit: "self-password-only",
+      edit: "self-password-department-status-only",
     },
   },
   "Μόνο ανάγνωση": {
     users: {
       view: "self-only",
       create: false,
-      edit: false,
+      edit: "self-password-department-status-only",
       delete: false,
       recover: false,
     },
@@ -84,7 +85,7 @@ const permissions: Record<string, RolePermissions> = {
     },
     settings: {
       view: "self-only",
-      edit: false,
+      edit: "self-password-department-status-only",
     },
   },
 };
@@ -110,6 +111,8 @@ export function checkPermission(
     case "self-only":
       return targetUserId === currentUserId;
     case "self-password-only":
+      return targetUserId === currentUserId;
+    case "self-password-department-status-only":
       return targetUserId === currentUserId;
     case "assigned-only":
       // Implement your logic for assigned items

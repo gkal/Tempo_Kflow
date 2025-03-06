@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Phone, Mail, Building, CheckCircle } from "lucide-react";
+import { Phone, Mail, Building, CheckCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ContactCardProps {
@@ -25,7 +25,11 @@ export function ContactCard({
   onClick,
   className,
   onSetPrimary,
-}: ContactCardProps & { onSetPrimary?: () => void }) {
+  onDelete,
+}: ContactCardProps & { 
+  onSetPrimary?: () => void;
+  onDelete?: () => void;
+}) {
   const [isHovered, setIsHovered] = useState(false);
 
   // Generate initials for avatar
@@ -81,30 +85,47 @@ export function ContactCard({
               </span>
             )}
           </div>
-          {onSetPrimary && !isPrimary && isHovered && (
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                onSetPrimary();
-              }}
-              className="ml-2 flex items-center"
-            >
-              <div className="w-5 h-5 rounded-full border border-[#84a98c] cursor-pointer hover:bg-[#52796f]/20 flex items-center justify-center">
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#84a98c"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
+          <div className="flex items-center space-x-4">
+            {onSetPrimary && !isPrimary && isHovered && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSetPrimary();
+                }}
+                className="flex items-center"
+                title="Ορισμός ως κύρια επαφή"
+              >
+                <div className="w-5 h-5 rounded-full border border-[#84a98c] cursor-pointer hover:bg-[#52796f]/20 flex items-center justify-center">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#84a98c"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            {onDelete && isHovered && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="flex items-center"
+                title="Διαγραφή επαφής"
+              >
+                <div className="w-5 h-5 rounded-full border border-red-400 cursor-pointer hover:bg-red-500/20 flex items-center justify-center">
+                  <Trash2 className="h-3 w-3 text-red-400" />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         {contact.position && (
           <div className="text-xs text-[#84a98c] flex items-center">

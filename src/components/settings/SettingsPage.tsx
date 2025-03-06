@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Eye, EyeOff } from "lucide-react";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { checkPermission } from "@/lib/permissions";
-import UserManagementDialog from "./UserManagementDialog";
+import SimpleUserDialog from "./SimpleUserDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,8 +29,13 @@ export default function SettingsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchColumn, setSearchColumn] = useState("fullname");
 
+  // Add effect to log when showUserDialog changes
+  useEffect(() => {
+    console.log("showUserDialog state changed:", showUserDialog);
+  }, [showUserDialog]);
+
   const isAdmin = user?.role?.toLowerCase() === "admin";
-  const isSuperUser = user?.role?.toLowerCase() === "moderator";
+  const isSuperUser = user?.role?.toLowerCase() === "moderator" || user?.role?.toLowerCase() === "super user";
 
   // Define the full columns array for the admin view
   const columns = [
@@ -38,7 +43,14 @@ export default function SettingsPage() {
     { header: "Ονοματεπώνυμο", accessor: "fullname" },
     { header: "Email", accessor: "email" },
     { header: "Τμήμα", accessor: "department" },
-    { header: "Ρόλος", accessor: "role" },
+    { 
+      header: "Ρόλος", 
+      accessor: "role",
+      cell: (value) => {
+        // Map 'readonly' to 'Μόνο ανάγνωση'
+        return value?.toLowerCase() === 'readonly' ? 'Μόνο ανάγνωση' : value;
+      }
+    },
     {
       header: "Ημ/νία Δημιουργίας",
       accessor: "created_at",
@@ -74,26 +86,66 @@ export default function SettingsPage() {
               second: "2-digit",
             })
           : "-",
-    },
-    {
-      header: "Κατάσταση",
-      accessor: "status",
-      cell: (value) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs ${value === "active" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}
-        >
-          {value === "active" ? "Ενεργός" : "Ανενεργός"}
-        </span>
-      ),
     }
   ];
 
-  const handleRowClick = (row) => {
-    // Super users can't edit admin users
-    if (isSuperUser && row.role === "Admin") return;
+  // Define the full columns array with actions for all views
+  const columnsWithActions = [
+    ...columns,
+    // Always include the actions column but conditionally render its content
+    {
+      header: "Κατάσταση",
+      accessor: "status",
+      sortable: true,
+      cell: (value, row) => (
+        <div className="flex justify-center" title={value === "active" ? "Ενεργός" : "Ανενεργός"}>
+          {isAdmin ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 hover:bg-[#354f52] ${value === "active" ? "text-green-400" : "text-red-400"}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setUserToDelete(row);
+                setShowDeleteDialog(true);
+              }}
+            >
+              {value === "active" ? (
+                <Eye className="h-4 w-4" />
+              ) : (
+                <EyeOff className="h-4 w-4" />
+              )}
+            </Button>
+          ) : (
+            <div className={`h-8 w-8 flex items-center justify-center ${value === "active" ? "text-green-400" : "text-red-400"}`}>
+              {value === "active" ? (
+                <Eye className="h-4 w-4" />
+              ) : (
+                <EyeOff className="h-4 w-4" />
+              )}
+            </div>
+          )}
+        </div>
+      ),
+    },
+  ];
 
-    setSelectedUser(row);
-    setShowUserDialog(true);
+  const handleRowClick = (row) => {
+    console.log("Row clicked:", row);
+    console.log("Current user role:", user?.role);
+    
+    // Super users can't edit admin users
+    if (isSuperUser && row.role?.toLowerCase() === "admin") {
+      console.log("Super user can't edit admin users");
+      return;
+    }
+
+    // Force a small delay to ensure state updates properly
+    setTimeout(() => {
+      setSelectedUser(row);
+      setShowUserDialog(true);
+      console.log("Dialog should be shown now");
+    }, 10);
   };
 
   const fetchUsers = async () => {
@@ -132,7 +184,7 @@ export default function SettingsPage() {
     }
   }, [user]);
 
-  const handleDeleteUser = async () => {
+  const handleToggleUserStatus = async () => {
     if (
       !userToDelete ||
       !checkPermission(user?.role || "", "users", "delete")
@@ -141,15 +193,18 @@ export default function SettingsPage() {
     }
 
     try {
+      // Toggle the status between active and inactive
+      const newStatus = userToDelete.status === "active" ? "inactive" : "active";
+      
       const { error } = await supabase
         .from("users")
-        .update({ status: "inactive" })
+        .update({ status: newStatus })
         .eq("id", userToDelete.id);
 
       if (error) throw error;
       await fetchUsers();
     } catch (error) {
-      console.error("Error deactivating user:", error);
+      console.error("Error toggling user status:", error);
       // TODO: Add proper error handling/notification here
     } finally {
       setShowDeleteDialog(false);
@@ -168,7 +223,7 @@ export default function SettingsPage() {
         {currentUser && (
           <div className="mt-4">
             <DataTableBase
-              columns={columns}
+              columns={columnsWithActions}
               data={[currentUser]}
               onRowClick={handleRowClick}
               containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
@@ -177,6 +232,17 @@ export default function SettingsPage() {
             />
           </div>
         )}
+
+        <SimpleUserDialog
+          open={showUserDialog}
+          onClose={() => {
+            setShowUserDialog(false);
+            setSelectedUser(null);
+          }}
+          user={selectedUser}
+          currentUserRole={user?.role === "user" ? "User" : user?.role === "readonly" ? "Μόνο ανάγνωση" : user?.role}
+          fetchUsers={fetchUsers}
+        />
       </div>
     );
   }
@@ -223,34 +289,7 @@ export default function SettingsPage() {
       </div>
 
       <DataTableBase
-        columns={[
-          ...columns,
-          isAdmin && {
-            header: "",
-            accessor: "actions",
-            sortable: false,
-            cell: (_, row) => (
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                {row.status === "active" ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 hover:bg-[#354f52] text-red-400"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setUserToDelete(row);
-                      setShowDeleteDialog(true);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <div className="h-8 w-8"></div>
-                )}
-              </div>
-            ),
-          },
-        ].filter(Boolean)}
+        columns={columnsWithActions}
         data={users}
         defaultSortColumn="fullname"
         searchTerm={searchTerm}
@@ -261,24 +300,17 @@ export default function SettingsPage() {
         isLoading={loading}
       />
 
-      <UserManagementDialog
-        open={showUserDialog}
-        onClose={() => {
-          setShowUserDialog(false);
-          setSelectedUser(null);
-        }}
-        user={selectedUser}
-        currentUserRole={user?.role}
-        fetchUsers={fetchUsers}
-      />
-
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Απενεργοποίηση Χρήστη</AlertDialogTitle>
+            <AlertDialogTitle>
+              {userToDelete?.status === "active" ? "Απενεργοποίηση Χρήστη" : "Ενεργοποίηση Χρήστη"}
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-[#84a98c]">
-              Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε τον χρήστη{" "}
-              {userToDelete?.fullname}?
+              {userToDelete?.status === "active" 
+                ? `Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε τον χρήστη ${userToDelete?.fullname}?`
+                : `Είστε σίγουροι ότι θέλετε να ενεργοποιήσετε τον χρήστη ${userToDelete?.fullname}?`
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -286,14 +318,25 @@ export default function SettingsPage() {
               Άκυρο
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 text-white hover:bg-red-700"
-              onClick={handleDeleteUser}
+              className={`text-white ${userToDelete?.status === "active" ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}`}
+              onClick={handleToggleUserStatus}
             >
-              Απενεργοποίηση
+              {userToDelete?.status === "active" ? "Απενεργοποίηση" : "Ενεργοποίηση"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <SimpleUserDialog
+        open={showUserDialog}
+        onClose={() => {
+          setShowUserDialog(false);
+          setSelectedUser(null);
+        }}
+        user={selectedUser}
+        currentUserRole={user?.role === "user" ? "User" : user?.role === "readonly" ? "Μόνο ανάγνωση" : user?.role}
+        fetchUsers={fetchUsers}
+      />
     </div>
   );
 }
