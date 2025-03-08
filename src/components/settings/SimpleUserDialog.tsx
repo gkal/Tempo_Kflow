@@ -36,8 +36,6 @@ export default function SimpleUserDialog({
   currentUserRole,
   fetchUsers,
 }: SimpleUserDialogProps) {
-  console.log("SimpleUserDialog props:", { open, user, currentUserRole });
-  
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -59,14 +57,16 @@ export default function SimpleUserDialog({
     fetchDepartments();
   }, []);
 
+  // Reset success and error states when dialog opens
+  useEffect(() => {
+    if (open) {
+      setSuccess(false);
+      setError("");
+    }
+  }, [open]);
+
   useEffect(() => {
     if (user) {
-      // Map 'readonly' to 'Μόνο ανάγνωση' for display
-      let userRole = user.role || "User";
-      if (userRole.toLowerCase() === 'readonly') {
-        userRole = "Μόνο ανάγνωση";
-      }
-      
       setFormData({
         username: user.username || "",
         password: "••••••",
@@ -74,7 +74,7 @@ export default function SimpleUserDialog({
         email: user.email || "",
         phone: user.phone || "",
         department_id: user.department_id || "",
-        role: userRole,
+        role: user.role || "User",
         status: user.status || "active",
       });
     } else {
@@ -101,12 +101,6 @@ export default function SimpleUserDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Map 'Μόνο ανάγνωση' back to 'readonly' for database
-    let dbRole = formData.role;
-    if (dbRole === "Μόνο ανάγνωση") {
-      dbRole = "readonly";
-    }
-    
     setLoading(true);
     setError("");
 
@@ -131,11 +125,19 @@ export default function SimpleUserDialog({
             email: formData.email,
             phone: formData.phone,
             department_id: formData.department_id,
-            role: dbRole,
+            role: formData.role,
             status: formData.status,
             // Don't update password if it's masked
             ...(formData.password !== "••••••" && { password: formData.password }),
           };
+          
+          // Ensure superusers can't set Admin role even if they bypass frontend restrictions
+          if (currentUserRole === "Super User" || currentUserRole?.toLowerCase() === "super user") {
+            // If trying to set Admin role, revert to original role or set to Super User for new users
+            if (formData.role === "Admin" || formData.role?.toLowerCase() === "admin") {
+              updateData.role = user ? user.role : "Super User";
+            }
+          }
         }
 
         // Admin permissions
@@ -153,6 +155,13 @@ export default function SimpleUserDialog({
         }
       } else {
         // Create new user
+        // Ensure superusers can't set Admin role even if they bypass frontend restrictions
+        if (currentUserRole === "Super User" || currentUserRole?.toLowerCase() === "super user") {
+          if (formData.role === "Admin" || formData.role?.toLowerCase() === "admin") {
+            formData.role = "Super User";
+          }
+        }
+        
         const { error: createError } = await supabase
           .from("users")
           .insert([{
@@ -162,7 +171,7 @@ export default function SimpleUserDialog({
             email: formData.email,
             phone: formData.phone,
             department_id: formData.department_id,
-            role: dbRole,
+            role: formData.role,
             status: formData.status,
           }]);
 
@@ -186,7 +195,7 @@ export default function SimpleUserDialog({
 
   // Define what fields can be edited based on user role
   const isAdmin = currentUserRole === "Admin" || currentUserRole?.toLowerCase() === "admin";
-  const isSuperUser = currentUserRole === "Super User" || currentUserRole?.toLowerCase() === "super user" || currentUserRole?.toLowerCase() === "moderator";
+  const isSuperUser = currentUserRole === "Super User" || currentUserRole?.toLowerCase() === "super user";
   const isRegularUser = currentUserRole === "User" || currentUserRole?.toLowerCase() === "user";
   const isReadOnly = currentUserRole === "Μόνο ανάγνωση" || currentUserRole?.toLowerCase() === "readonly";
   
@@ -203,16 +212,20 @@ export default function SimpleUserDialog({
       open={open}
       onOpenChange={(isOpen) => {
         if (!isOpen) {
+          setSuccess(false);
           onClose();
         }
       }}
     >
-      <DialogContent className="max-w-md bg-[#354f52] rounded-lg border border-[#52796f] text-[#cad2c5] z-[9999] shadow-lg">
+      <DialogContent 
+        className="max-w-md bg-[#354f52] rounded-lg border border-[#52796f] text-[#cad2c5] z-[9999] shadow-lg"
+        aria-describedby="user-dialog-description"
+      >
         <DialogHeader>
           <DialogTitle className="text-[#cad2c5]">
             {user ? "Επεξεργασία" : "Νέος Χρήστης"}
           </DialogTitle>
-          <DialogDescription className="text-[#84a98c]">
+          <DialogDescription id="user-dialog-description" className="text-[#84a98c]">
             {user ? (
               <>
                 <span className="font-bold text-lg">{user.username}</span>,{" "}
@@ -321,7 +334,7 @@ export default function SimpleUserDialog({
             <div className="space-y-2">
               <Label htmlFor="role">Ρόλος</Label>
               <GlobalDropdown
-                options={["Admin", "Super User", "User", "Μόνο ανάγνωση"]}
+                options={isSuperUser ? ["Super User", "User", "Μόνο ανάγνωση"] : ["Admin", "Super User", "User", "Μόνο ανάγνωση"]}
                 value={formData.role}
                 onSelect={(value) => {
                   setFormData(prev => ({ ...prev, role: value }));

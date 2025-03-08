@@ -14,6 +14,23 @@
     />
     <meta name="autocomplete" content="off" />
     <title>K-Flow</title>
+    <script>
+      // Suppress the warning about missing Description or aria-describedby
+      (function() {
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+          // Check if this is the warning we want to suppress
+          if (args[0] && typeof args[0] === 'string' && 
+              args[0].includes('Missing `Description` or `aria-describedby={undefined}` for {DialogContent}')) {
+            // Do nothing, suppressing the warning
+            return;
+          }
+          
+          // Call the original warn function for all other warnings
+          return originalWarn.apply(console, args);
+        };
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

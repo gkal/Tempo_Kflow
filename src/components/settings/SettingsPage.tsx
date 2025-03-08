@@ -29,13 +29,8 @@ export default function SettingsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchColumn, setSearchColumn] = useState("fullname");
 
-  // Add effect to log when showUserDialog changes
-  useEffect(() => {
-    console.log("showUserDialog state changed:", showUserDialog);
-  }, [showUserDialog]);
-
   const isAdmin = user?.role?.toLowerCase() === "admin";
-  const isSuperUser = user?.role?.toLowerCase() === "moderator" || user?.role?.toLowerCase() === "super user";
+  const isSuperUser = user?.role === "Super User" || user?.role?.toLowerCase() === "super user";
 
   // Define the full columns array for the admin view
   const columns = [
@@ -131,21 +126,13 @@ export default function SettingsPage() {
   ];
 
   const handleRowClick = (row) => {
-    console.log("Row clicked:", row);
-    console.log("Current user role:", user?.role);
-    
     // Super users can't edit admin users
-    if (isSuperUser && row.role?.toLowerCase() === "admin") {
-      console.log("Super user can't edit admin users");
+    if (isSuperUser && (row.role === "Admin" || row.role?.toLowerCase() === "admin")) {
       return;
     }
-
-    // Force a small delay to ensure state updates properly
-    setTimeout(() => {
-      setSelectedUser(row);
-      setShowUserDialog(true);
-      console.log("Dialog should be shown now");
-    }, 10);
+    
+    setSelectedUser(row);
+    setShowUserDialog(true);
   };
 
   const fetchUsers = async () => {
@@ -301,12 +288,15 @@ export default function SettingsPage() {
       />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
+        <AlertDialogContent 
+          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
+          aria-describedby="toggle-user-status-description"
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>
               {userToDelete?.status === "active" ? "Απενεργοποίηση Χρήστη" : "Ενεργοποίηση Χρήστη"}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#84a98c]">
+            <AlertDialogDescription id="toggle-user-status-description" className="text-[#84a98c]">
               {userToDelete?.status === "active" 
                 ? `Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε τον χρήστη ${userToDelete?.fullname}?`
                 : `Είστε σίγουροι ότι θέλετε να ενεργοποιήσετε τον χρήστη ${userToDelete?.fullname}?`

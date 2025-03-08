@@ -19,7 +19,10 @@ interface VersionHistoryProps {
 export function VersionHistory({ open, onOpenChange }: VersionHistoryProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] max-w-2xl">
+      <DialogContent 
+        className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] max-w-2xl"
+        aria-describedby="version-history-description"
+      >
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-[#cad2c5] flex items-center justify-between">
             <span>Ιστορικό Εκδόσεων</span>
@@ -32,7 +35,7 @@ export function VersionHistory({ open, onOpenChange }: VersionHistoryProps) {
               </Button>
             </DialogClose>
           </DialogTitle>
-          <DialogDescription className="text-[#84a98c]">
+          <DialogDescription id="version-history-description" className="text-[#84a98c]">
             Ιστορικό αλλαγών και ενημερώσεων της εφαρμογής
           </DialogDescription>
         </DialogHeader>

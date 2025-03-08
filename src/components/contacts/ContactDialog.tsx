@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { supabase } from "@/lib/supabase";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { X, Star } from "lucide-react";
+import { X, Star, Check } from "lucide-react";
 
 interface ContactDialogProps {
   open: boolean;
@@ -202,7 +202,10 @@ export default function ContactDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f] p-0 max-w-5xl">
+      <DialogContent 
+        className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f] p-0 max-w-5xl"
+        aria-describedby="contact-dialog-description"
+      >
         <DialogHeader className="p-4 border-b border-[#52796f]">
           <div className="flex justify-between items-center">
             <DialogTitle className="text-lg font-semibold text-[#cad2c5]">
@@ -211,9 +214,10 @@ export default function ContactDialog({
               )}
               {contact ? "Επεξεργασία Επαφής" : "Νέα Επαφή"}
               {isPrimary && (
-                <span className="ml-2 text-[#84a98c] text-sm">
-                  (Κύρια Επαφή)
-                </span>
+                <div className="flex items-center">
+                  <span className="text-[#84a98c] text-sm mr-2">Κύρια Επαφή</span>
+                  <Check className="h-4 w-4 text-green-500" />
+                </div>
               )}
               {viewOnly && (
                 <span className="ml-2 text-[#84a98c] text-sm">(Προβολή)</span>
@@ -227,10 +231,8 @@ export default function ContactDialog({
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <DialogDescription className="text-[#84a98c] text-sm mt-1">
-            {contact 
-              ? "Επεξεργαστείτε τα στοιχεία της επαφής" 
-              : "Συμπληρώστε τα στοιχεία της νέας επαφής"}
+          <DialogDescription id="contact-dialog-description" className="sr-only">
+            {contact ? "Φόρμα επεξεργασίας επαφής" : "Φόρμα δημιουργίας νέας επαφής"}
           </DialogDescription>
         </DialogHeader>
 

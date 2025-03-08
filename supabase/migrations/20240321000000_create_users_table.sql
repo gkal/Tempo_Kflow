@@ -1,4 +1,4 @@
-CREATE TYPE user_role AS ENUM ('admin', 'moderator', 'user', 'readonly');
+CREATE TYPE user_role AS ENUM ('Admin', 'Super User', 'User', 'Μόνο ανάγνωση');
 CREATE TYPE user_status AS ENUM ('active', 'inactive');
 
 CREATE TABLE users (
@@ -9,7 +9,7 @@ CREATE TABLE users (
   department TEXT NOT NULL,
   email TEXT,
   phone TEXT,
-  role user_role NOT NULL DEFAULT 'user',
+  role user_role NOT NULL DEFAULT 'User',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_login_at TIMESTAMPTZ,
@@ -48,4 +48,4 @@ CREATE TABLE history_logs (
 
 -- Create default admin user (password: admin123)
 INSERT INTO users (username, password, fullname, department, role) 
-VALUES ('admin', '$2a$10$X7S/rHvX8T3zQz3X3X3X3O3X3X3X3X3X3X3X3X3X3X3X3X3X3X3', 'Διαχειριστής', 'Διοίκηση', 'admin');
+VALUES ('admin', '$2a$10$X7S/rHvX8T3zQz3X3X3X3O3X3X3X3X3X3X3X3X3X3X3X3X3X3X3', 'Διαχειριστής', 'Διοίκηση', 'Admin');

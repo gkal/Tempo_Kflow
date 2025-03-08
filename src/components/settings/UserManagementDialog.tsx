@@ -28,12 +28,6 @@ export default function UserManagementDialog({
   currentUserRole,
   fetchUsers,
 }: UserManagementDialogProps) {
-  console.log("UserManagementDialog props:", { open, user, currentUserRole });
-  
-  useEffect(() => {
-    console.log("Dialog open state changed:", open);
-  }, [open]);
-  
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -57,16 +51,6 @@ export default function UserManagementDialog({
 
   useEffect(() => {
     if (user) {
-      // Map 'readonly' to 'Μόνο ανάγνωση' for display
-      let userRole = user.role || "User";
-      if (userRole.toLowerCase() === 'readonly') {
-        userRole = "Μόνο ανάγνωση";
-      }
-      
-      console.log("User from database:", user);
-      console.log("Original user role:", user.role);
-      console.log("Display user role:", userRole);
-      
       setFormData({
         username: user.username || "",
         password: "••••••",
@@ -74,7 +58,7 @@ export default function UserManagementDialog({
         email: user.email || "",
         phone: user.phone || "",
         department_id: user.department_id || "",
-        role: userRole,
+        role: user.role || "User",
         status: user.status || "active",
       });
     } else {
@@ -101,18 +85,10 @@ export default function UserManagementDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Map 'Μόνο ανάγνωση' back to 'readonly' for database
-    let dbRole = formData.role;
-    if (dbRole === "Μόνο ανάγνωση") {
-      dbRole = "readonly";
-    }
-    
     setLoading(true);
     setError("");
 
     try {
-      console.log("Form data before submission:", formData);
-      
       if (user) {
         // Update existing user
         let updateData: any = {};
@@ -132,7 +108,7 @@ export default function UserManagementDialog({
             email: formData.email,
             phone: formData.phone,
             department_id: formData.department_id,
-            role: dbRole,
+            role: formData.role,
             status: formData.status,
             // Don't update password if it's masked
             ...(formData.password !== "••••••" && { password: formData.password }),
@@ -149,19 +125,18 @@ export default function UserManagementDialog({
           // Super User can't edit Admin users and can't make someone Admin
           if (isSuperUser) {
             if (user.role !== "Admin" && user.role?.toLowerCase() !== "admin") {
+              // Ensure superusers can't set Admin role even if they bypass frontend restrictions
               updateData.role =
-                formData.role !== "Admin" ? formData.role : user.role;
-              console.log("Role set by Super User:", updateData.role);
+                formData.role !== "Admin" && formData.role?.toLowerCase() !== "admin" 
+                  ? formData.role 
+                  : user.role;
               updateData.status = formData.status;
             }
           } else if (isAdmin) {
             updateData.role = formData.role;
-            console.log("Role set by Admin:", updateData.role);
             updateData.status = formData.status;
           }
         }
-
-        console.log("Update data before submission:", updateData);
 
         const { error: updateError } = await supabase
           .from("users")
@@ -169,7 +144,6 @@ export default function UserManagementDialog({
           .eq("id", user.id);
 
         if (updateError) {
-          console.error("Update error:", updateError);
           if (
             updateError.code === "23505" &&
             updateError.message.includes("users_username_key")
@@ -182,7 +156,6 @@ export default function UserManagementDialog({
         }
       } else {
         // Create new user
-        console.log("Creating new user with data:", formData);
         const { error: createError } = await supabase
           .from("users")
           .insert([{
@@ -192,12 +165,11 @@ export default function UserManagementDialog({
             email: formData.email,
             phone: formData.phone,
             department_id: formData.department_id,
-            role: dbRole,
+            role: formData.role,
             status: formData.status,
           }]);
 
         if (createError) {
-          console.error("Create error:", createError);
           if (
             createError.code === "23505" &&
             createError.message.includes("users_username_key")
@@ -231,7 +203,7 @@ export default function UserManagementDialog({
   };
 
   const isAdmin = currentUserRole === "Admin" || currentUserRole?.toLowerCase() === "admin";
-  const isSuperUser = currentUserRole === "Super User" || currentUserRole?.toLowerCase() === "super user" || currentUserRole?.toLowerCase() === "moderator";
+  const isSuperUser = currentUserRole === "Super User" || currentUserRole?.toLowerCase() === "super user";
   const isRegularUser = currentUserRole === "User" || currentUserRole?.toLowerCase() === "user";
   const isReadOnly = currentUserRole === "Μόνο ανάγνωση" || currentUserRole?.toLowerCase() === "readonly";
   const canEditRoles = isAdmin || (isSuperUser && user?.role !== "Admin" && user?.role?.toLowerCase() !== "admin");
@@ -263,7 +235,11 @@ export default function UserManagementDialog({
 
   // Add effect to handle open state changes
   useEffect(() => {
-    console.log("Dialog open state in effect:", open);
+    // Reset success state when dialog opens
+    if (open) {
+      setSuccess(false);
+      setError("");
+    }
     
     // If the dialog is closing and the user is a regular user or readonly
     if (!open && isRegularOrReadOnlyUser) {
@@ -283,7 +259,10 @@ export default function UserManagementDialog({
       <div className="max-w-md bg-[#354f52] rounded-lg border border-[#52796f] text-[#cad2c5] z-[9999] shadow-lg p-6 relative">
         <button 
           className="absolute right-4 top-4 text-[#84a98c] hover:text-[#cad2c5]"
-          onClick={onClose}
+          onClick={() => {
+            setSuccess(false);
+            onClose();
+          }}
         >
           ✕
         </button>
@@ -401,10 +380,9 @@ export default function UserManagementDialog({
             <div className="space-y-2">
               <Label htmlFor="role">Ρόλος</Label>
               <GlobalDropdown
-                options={["Admin", "Super User", "User", "Μόνο ανάγνωση"]}
+                options={isSuperUser ? ["Super User", "User", "Μόνο ανάγνωση"] : ["Admin", "Super User", "User", "Μόνο ανάγνωση"]}
                 value={formData.role}
                 onSelect={(value) => {
-                  console.log("Selected role from dropdown:", value);
                   setFormData(prev => ({ ...prev, role: value }));
                 }}
                 placeholder="Select role"

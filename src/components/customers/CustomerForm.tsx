@@ -272,8 +272,14 @@ const CustomerForm = ({
         ...prev,
         customer_type: tempCustomerType
       }));
-      setTempCustomerType(null);
+      // Don't reset tempCustomerType here, as it might cause a re-render during submission
     }
+    
+    // Create a copy of the form data that includes any temp customer type
+    const submissionData = {
+      ...formData,
+      ...(tempCustomerType !== null ? { customer_type: tempCustomerType } : {})
+    };
     
     // Get all required inputs
     const form = e.currentTarget as HTMLFormElement;
@@ -312,10 +318,10 @@ const CustomerForm = ({
         const { error } = await supabase
           .from("customers")
           .update({
-            ...formData,
+            ...submissionData,
             modified_by: user?.id,
             updated_at: new Date().toISOString(),
-            primary_contact_id: formData.primary_contact_id || null,
+            primary_contact_id: submissionData.primary_contact_id || null,
           })
           .eq("id", customerId);
 
@@ -325,7 +331,7 @@ const CustomerForm = ({
         const { data, error } = await supabase
           .from("customers")
           .insert([{
-            ...formData,
+            ...submissionData,
             created_by: user?.id,
             modified_by: user?.id,
             status: "active",
@@ -340,6 +346,11 @@ const CustomerForm = ({
           const newCustomerId = data[0].id;
           setCustomerId(newCustomerId);
         }
+      }
+
+      // Reset tempCustomerType after successful submission
+      if (tempCustomerType !== null) {
+        setTempCustomerType(null);
       }
 
       setSuccess(true);
@@ -742,12 +753,15 @@ const CustomerForm = ({
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
+        <AlertDialogContent 
+          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
+          aria-describedby="delete-contact-form-description"
+        >
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[#cad2c5]">
               Διαγραφή Επαφής
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-[#a8c5b5]">
+            <AlertDialogDescription id="delete-contact-form-description" className="text-[#a8c5b5]">
               Είστε βέβαιοι ότι θέλετε να διαγράψετε την επαφή{" "}
               <span className="font-medium text-[#cad2c5]">
                 {contactToDelete?.full_name}

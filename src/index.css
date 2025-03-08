@@ -12,7 +12,7 @@
   /* Text colors */
   --app-text-primary: #cad2c5;
   --app-text-secondary: #a8c5b5;
-  --app-text-muted: #84a98c;
+  --app-text-muted: #6a8a70; /* Darker version of #84a98c */
   
   /* Border colors */
   --app-border-primary: #52796f;
@@ -39,6 +39,15 @@
   --webkit-validation-bubble-message-color: #cad2c5;
   --webkit-validation-bubble-background-color: #2f3e46;
   --webkit-validation-bubble-border-color: #52796f;
+
+  /* Accessibility fixes */
+  --radix-dialog-content-aria-describedby: true;
+}
+
+/* Fix for Dialog accessibility warning */
+[role="dialog"],
+[role="alertdialog"] {
+  --radix-dialog-content-aria-describedby: true;
 }
 
 @layer base {
@@ -124,6 +133,11 @@ input::-webkit-caps-lock-indicator {
   outline: none !important;
 }
 
+.app-input::placeholder {
+  color: #4d6652 !important;
+  opacity: 1 !important;
+}
+
 .app-input:hover, .app-input:focus {
   box-shadow: 0 0 0 1px #52796f !important;
 }
@@ -146,15 +160,16 @@ input, textarea, select,
 [data-state] > button {
   background-color: var(--app-bg-primary) !important;
   color: var(--app-text-primary) !important;
-  border-color: var(--app-border-primary) !important;
+  border: none !important;
   transition: all 0.2s ease-in-out;
+  outline: none !important;
 }
 
 input:focus, textarea:focus, select:focus,
 .input:focus, .textarea:focus, .select:focus,
 [role="combobox"]:focus,
 [data-state]:focus > button {
-  border-color: var(--app-text-muted) !important;
+  border: none !important;
   box-shadow: 0 0 0 2px var(--app-focus-ring) !important;
   outline: none !important;
 }
@@ -260,8 +275,8 @@ button[aria-expanded]:active,
 :-ms-input-placeholder,
 :-moz-placeholder,
 .placeholder {
-  color: var(--app-text-muted) !important;
-  opacity: 0.7 !important;
+  color: #4d6652 !important; /* Much darker color */
+  opacity: 1 !important; /* Full opacity */
 }
 
 /* Select options styling */
@@ -340,4 +355,58 @@ label,
 .contact-notes-textarea:hover, 
 .contact-notes-textarea:focus {
   box-shadow: 0 0 0 1px #52796f !important;
+}
+
+/* Login form specific styles */
+.login-input {
+  height: var(--app-input-height) !important;
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+  background-color: #2f3e46 !important;
+  color: #cad2c5 !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.login-input::placeholder {
+  color: #5d7a63 !important; /* Medium green - readable but not too bright */
+  opacity: 1 !important;
+}
+
+.login-input:hover, .login-input:focus {
+  box-shadow: 0 0 0 1px #52796f !important;
+}
+
+/* Force hover state for table rows when context menu is open */
+tr.force-hover,
+tr.force-hover:hover {
+  background-color: rgba(82, 121, 111, 0.3) !important;
+}
+
+tr.force-hover td {
+  text-decoration: underline !important;
+}
+
+/* Remove all borders from form elements */
+input, textarea, select, 
+.input, .textarea, .select,
+[role="combobox"],
+[data-state] > button,
+.app-input,
+.login-input,
+.customer-notes-textarea,
+.contact-notes-textarea {
+  border: none !important;
+  outline: none !important;
+}
+
+input:focus, textarea:focus, select:focus,
+.input:focus, .textarea:focus, .select:focus,
+.app-input:focus, .login-input:focus,
+.customer-notes-textarea:focus,
+.contact-notes-textarea:focus,
+[role="combobox"]:focus,
+[data-state]:focus > button {
+  border: none !important;
+  outline: none !important;
 }

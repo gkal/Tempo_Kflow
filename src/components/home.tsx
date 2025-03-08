@@ -5,6 +5,8 @@ import TopBar from "./layout/TopBar";
 import MetricCards from "./dashboard/MetricCards";
 import DataTable from "./dashboard/DataTable";
 import SettingsPage from "./settings/SettingsPage";
+import { DialogWarningSupressor } from "@/components/ui/dialog-wrapper";
+import { DialogFix } from "@/components/ui/dialog-fix";
 
 const Home = () => {
   const location = useLocation();
@@ -69,6 +71,8 @@ const Home = () => {
 
   return (
     <div className="flex flex-col h-screen bg-[#2f3e46]">
+      <DialogWarningSupressor />
+      <DialogFix />
       <TopBar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />

@@ -27,7 +27,7 @@ export default function LoginForm() {
     email: "",
     phone: "",
     department: "Administration",
-    role: "admin" as const,
+    role: "Admin" as const,
     status: "active" as const,
   });
 
@@ -123,6 +123,14 @@ export default function LoginForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#2f3e46] p-4">
+      <style>
+        {`
+          .login-input::placeholder {
+            color: #5d7a63 !important;
+            opacity: 1 !important;
+          }
+        `}
+      </style>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -156,7 +164,7 @@ export default function LoginForm() {
               onChange={(e) =>
                 setFormData({ ...formData, username: e.target.value })
               }
-              className="app-input"
+              className="login-input"
               required
               autoComplete="off"
             />
@@ -171,7 +179,7 @@ export default function LoginForm() {
                   onChange={(e) =>
                     setFormData({ ...formData, fullname: e.target.value })
                   }
-                  className="app-input"
+                  className="login-input"
                   required
                   autoComplete="off"
                 />
@@ -184,7 +192,7 @@ export default function LoginForm() {
                   onChange={(e) =>
                     setFormData({ ...formData, email: e.target.value })
                   }
-                  className="app-input"
+                  className="login-input"
                   required
                   autoComplete="off"
                 />
@@ -197,7 +205,7 @@ export default function LoginForm() {
                   onChange={(e) =>
                     setFormData({ ...formData, phone: e.target.value })
                   }
-                  className="app-input"
+                  className="login-input"
                   autoComplete="off"
                 />
               </div>
@@ -211,7 +219,7 @@ export default function LoginForm() {
               onChange={(e) =>
                 setFormData({ ...formData, password: e.target.value })
               }
-              className="app-input"
+              className="login-input"
               required
               autoComplete="new-password"
             />

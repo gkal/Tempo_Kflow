@@ -26,10 +26,13 @@ export const Base = {
       <DialogTrigger asChild>
         <Button variant="outline">Edit Profile</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent 
+        className="sm:max-w-[425px]"
+        aria-describedby="edit-profile-description"
+      >
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="edit-profile-description">
             Make changes to your profile here. Click save when you're done.
           </DialogDescription>
         </DialogHeader>

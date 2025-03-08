@@ -28,6 +28,11 @@
   color: #cad2c5;
 }
 
+/* Context menu container */
+[data-customer-id] {
+  position: relative;
+}
+
 .dropdown-menu {
   position: fixed;
   z-index: 9999 !important;
@@ -55,6 +60,11 @@
 .dropdown-item.selected-item {
   background-color: #52796f;
   color: #cad2c5;
+}
+
+/* Force hover state for context menu */
+tr.force-hover {
+  background-color: #354f52 !important;
 }
 
 /* Custom scrollbar */

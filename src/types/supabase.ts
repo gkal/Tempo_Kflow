@@ -127,6 +127,76 @@ export type Database = {
           },
         ]
       }
+      offers: {
+        Row: {
+          id: string
+          customer_id: string
+          created_at: string
+          source: Database["public"]["Enums"]["incoming_source"]
+          requirements: string | null
+          amount: string | null
+          customer_comments: string | null
+          our_comments: string | null
+          status: Database["public"]["Enums"]["offer_status"]
+          result: Database["public"]["Enums"]["offer_result"] | null
+          assigned_to: string | null
+          created_by: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          customer_id: string
+          created_at?: string
+          source: Database["public"]["Enums"]["incoming_source"]
+          requirements?: string | null
+          amount?: string | null
+          customer_comments?: string | null
+          our_comments?: string | null
+          status?: Database["public"]["Enums"]["offer_status"]
+          result?: Database["public"]["Enums"]["offer_result"] | null
+          assigned_to?: string | null
+          created_by?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          customer_id?: string
+          created_at?: string
+          source?: Database["public"]["Enums"]["incoming_source"]
+          requirements?: string | null
+          amount?: string | null
+          customer_comments?: string | null
+          our_comments?: string | null
+          status?: Database["public"]["Enums"]["offer_status"]
+          result?: Database["public"]["Enums"]["offer_result"] | null
+          assigned_to?: string | null
+          created_by?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offers_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offers_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -136,6 +206,9 @@ export type Database = {
     }
     Enums: {
       user_role: "Admin" | "Super User" | "User" | "Μόνο ανάγνωση"
+      incoming_source: "Email" | "Phone" | "Site" | "Physical"
+      offer_status: "wait_for_our_answer" | "wait_for_customer_answer" | "ready"
+      offer_result: "success" | "failed" | "cancel"
     }
     CompositeTypes: {
       [_ in never]: never

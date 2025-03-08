@@ -47,7 +47,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
   },
   {
     version: "1.3.0",
-    date: new Date().toISOString().split('T')[0], // Today's date
+    date: "2025-02-20", // Previous date
     description: "Customer Management Enhancements",
     changes: [
       "Improved customer status toggle with optimized UI updates",
@@ -55,6 +55,18 @@ export const VERSION_HISTORY: VersionEntry[] = [
       "Enhanced edit form with better save/cancel functionality",
       "Removed redundant edit button from customer list",
       "Optimized table updates to avoid full refreshes when toggling status"
+    ]
+  },
+  {
+    version: "1.4.0",
+    date: new Date().toISOString().split('T')[0], // Today's date
+    description: "Σύστημα Διαχείρισης Προσφορών",
+    changes: [
+      "Προσθήκη νέας λειτουργίας Προσφορών για την παρακολούθηση προσφορών πελατών",
+      "Υλοποίηση αλληλεπίδρασης με δεξί κλικ για πρόσβαση στις Προσφορές από τη λίστα πελατών",
+      "Δημιουργία ειδικής διεπαφής διαχείρισης Προσφορών με παρακολούθηση κατάστασης",
+      "Προσθήκη δυνατότητας ανάθεσης Προσφορών σε συγκεκριμένους χρήστες",
+      "Ενσωμάτωση παρακολούθησης πηγής για εισερχόμενα αιτήματα"
     ]
   }
 ];

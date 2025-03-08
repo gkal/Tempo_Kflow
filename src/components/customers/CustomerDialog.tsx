@@ -40,7 +40,10 @@ export default function CustomerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
+      <DialogContent 
+        className="max-w-4xl bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
+        aria-describedby="customer-dialog-description"
+      >
         <DialogHeader>
           <DialogTitle className="text-[#cad2c5]">
             {viewOnly
@@ -49,6 +52,13 @@ export default function CustomerDialog({
                 ? "Επεξεργασία Πελάτη"
                 : "Νέος Πελάτης"}
           </DialogTitle>
+          <DialogDescription id="customer-dialog-description" className="sr-only">
+            {viewOnly
+              ? "Φόρμα προβολής πελάτη"
+              : customerId
+                ? "Φόρμα επεξεργασίας πελάτη"
+                : "Φόρμα δημιουργίας νέου πελάτη"}
+          </DialogDescription>
         </DialogHeader>
 
         <CustomerForm
@@ -76,11 +86,17 @@ const DeleteConfirmation = ({ isOpen, onClose, onConfirm, isDeleting }) => {
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-[#3a5258] border border-[#52796f] text-[#cad2c5] p-6 max-w-md mx-auto">
+      <DialogContent 
+        className="bg-[#3a5258] border border-[#52796f] text-[#cad2c5] p-6 max-w-md mx-auto"
+        aria-describedby="delete-confirmation-dialog-description"
+      >
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-[#cad2c5]">
             {canDelete ? "Οριστική Διαγραφή" : "Απενεργοποίηση Πελάτη"}
           </DialogTitle>
+          <DialogDescription id="delete-confirmation-dialog-description" className="sr-only">
+            Διάλογος επιβεβαίωσης διαγραφής πελάτη
+          </DialogDescription>
           <DialogDescription className="text-[#a8c5b5] mt-2">
             {canDelete 
               ? "Είστε βέβαιοι ότι θέλετε να διαγράψετε οριστικά αυτόν τον πελάτη και όλες τις επαφές του; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί."
