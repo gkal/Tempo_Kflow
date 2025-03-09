@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -22,12 +22,12 @@ import {
   Edit,
   User,
   Plus,
+  Trash2,
 } from "lucide-react";
 import { CloseButton } from "@/components/ui/close-button";
-import ContactDialog from "../contacts/ContactDialog";
+import { ContactDialog } from "@/components/contacts/ContactDialog";
 import CustomerForm from "./CustomerForm";
 import { ContactList } from "@/components/contacts/ContactList";
-import { ContactCard } from "@/components/contacts/ContactCard";
 import { toast } from "@/components/ui/use-toast";
 import { CustomDropdown } from "@/components/ui/custom-dropdown";
 import {
@@ -47,7 +47,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import OffersDialog from "./OffersDialog";
+import { openNewOfferDialog, openEditOfferDialog } from './OfferDialogManager';
+import { CustomerDialog } from "./CustomerDialog";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -66,8 +67,6 @@ export default function CustomerDetailPage() {
   const [showOffersTable, setShowOffersTable] = useState(false);
   const [recentOffers, setRecentOffers] = useState<any[]>([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
-  const [selectedOffer, setSelectedOffer] = useState<string | null>(null);
-  const [showOfferDialog, setShowOfferDialog] = useState(false);
   const [activities, setActivities] = useState([
     {
       id: 1,
@@ -86,6 +85,10 @@ export default function CustomerDetailPage() {
       assignedTo: "Lisa Crosbie",
     },
   ]);
+  const [contactsKey, setContactsKey] = useState(0);
+  const [showCustomerDialog, setShowCustomerDialog] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     if (id) {
@@ -116,6 +119,57 @@ export default function CustomerDetailPage() {
       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
         background: #84a98c;
       }
+      
+      /* Equal heights for all sections */
+      .contact-info-section, .recent-offers-section {
+        height: 400px !important;
+        min-height: 400px !important;
+        max-height: 400px !important;
+      }
+      
+      /* Custom height for contacts section */
+      .contacts-section {
+        height: 235px !important;
+        min-height: 235px !important;
+        max-height: 235px !important;
+      }
+      
+      /* Custom height for notes section */
+      .notes-section {
+        height: 200px !important;
+        min-height: 200px !important;
+        max-height: 200px !important;
+      }
+      
+      /* Ensure content scrolls properly in fixed height containers */
+      .section-content {
+        overflow-y: auto;
+        height: calc(100% - 50px); /* Subtract header height */
+      }
+      
+      /* Add this specific override for the contacts container */
+      #contacts-container::-webkit-scrollbar {
+        width: 8px;
+      }
+      
+      #contacts-container::-webkit-scrollbar-track {
+        background: #2f3e46;
+        border-radius: 4px;
+      }
+      
+      #contacts-container::-webkit-scrollbar-thumb {
+        background: #52796f;
+        border-radius: 4px;
+      }
+      
+      #contacts-container::-webkit-scrollbar-thumb:hover {
+        background: #84a98c;
+      }
+      
+      /* Disable scrollbars for all parent elements of the contacts container */
+      .contacts-section, .contacts-section > div, .contacts-section > div > div {
+        overflow: visible !important;
+      }
     `;
     document.head.appendChild(style);
     
@@ -144,7 +198,7 @@ export default function CustomerDetailPage() {
     }
   };
 
-  // Set primary contact for a customer
+  // Modify the setPrimaryContact function to only refresh the contacts section
   const setPrimaryContact = async (contactId: string) => {
     if (!id) return;
 
@@ -161,11 +215,28 @@ export default function CustomerDetailPage() {
 
       if (error) throw error;
 
-      // Refresh data
-      await fetchCustomerData();
-      await fetchContacts();
+      // Update the customer object locally without a full refresh
+      setCustomer(prev => ({
+        ...prev,
+        primary_contact_id: contactId
+      }));
+      
+      // Increment the key to force only this component to re-render
+      setContactsKey(prev => prev + 1);
+      
+      // Show success toast
+      toast({
+        title: "Επιτυχία",
+        description: "Η κύρια επαφή ενημερώθηκε με επιτυχία.",
+        variant: "default",
+      });
     } catch (error) {
       console.error("Error setting primary contact:", error);
+      toast({
+        title: "Σφάλμα",
+        description: "Προέκυψε σφάλμα κατά την ενημέρωση της κύριας επαφής.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -355,8 +426,9 @@ export default function CustomerDetailPage() {
   
   // Function to handle editing an offer
   const handleEditOffer = (offerId: string) => {
-    setSelectedOffer(offerId);
-    setShowOfferDialog(true);
+    openEditOfferDialog(id, offerId, () => {
+      fetchRecentOffers();
+    });
   };
   
   // Function to format offer status
@@ -572,12 +644,10 @@ export default function CustomerDetailPage() {
           
           <div className="flex items-center space-x-3">
             <Button
-              variant="outline"
-              size="default"
-              onClick={() => setShowCustomerForm(true)}
-              className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5] px-4 py-2 text-base"
+              onClick={() => setShowCustomerDialog(true)}
+              className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
             >
-              <Edit className="h-5 w-5 mr-2" />
+              <Edit className="h-4 w-4 mr-2" />
               Επεξεργασία
             </Button>
             <CloseButton 
@@ -593,93 +663,267 @@ export default function CustomerDetailPage() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Column */}
           <div className="w-full lg:w-1/3">
-            <Card className="bg-[#354f52] border-[#52796f] mb-6">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-semibold text-[#a8c5b5]">
-                    Επαφές
-                  </h2>
-                  <button
-                    type="button"
-                    className="h-7 w-7 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-600 rounded-full flex items-center justify-center"
-                    onClick={() => {
-                      setSelectedContact(null);
-                      setShowContactDialog(true);
-                    }}
-                    title="Προσθήκη Επαφής"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
-                <ContactList
-                  contacts={contacts}
-                  primaryContactId={customer?.primary_contact_id}
-                  onContactClick={(contact) => {
-                    setSelectedContact(contact);
-                    setShowContactDialog(true);
-                  }}
-                  onAddContact={() => {
+            {/* Rebuilt contacts section with updated star icon and tooltips */}
+            <div key={contactsKey} className="bg-[#354f52] rounded-lg border border-[#52796f] mb-6 p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-[#a8c5b5]">
+                  Επαφές
+                </h2>
+                <button
+                  type="button"
+                  className="h-7 w-7 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-600 rounded-full flex items-center justify-center"
+                  onClick={() => {
                     setSelectedContact(null);
                     setShowContactDialog(true);
                   }}
-                  onDeleteContact={(contact) => {
-                    setContactToDelete(contact);
-                    setShowDeleteDialog(true);
-                  }}
-                />
-              </CardContent>
-            </Card>
+                  title="Προσθήκη Επαφής"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              
+              {/* Simple fixed height container with single scrollbar */}
+              <div style={{ height: "120px", overflowY: "auto" }}>
+                {contacts.length === 0 ? (
+                  <div className="text-center py-4 text-[#84a98c]">
+                    Δεν υπάρχουν επαφές για αυτόν τον πελάτη
+                  </div>
+                ) : (
+                  <>
+                    {/* First render the primary contact if it exists */}
+                    {contacts
+                      .filter(contact => contact.id === customer?.primary_contact_id)
+                      .map(contact => (
+                    <div 
+                      key={contact.id}
+                          className="flex items-center p-2 bg-[#2f3e46]/50 rounded-md cursor-pointer mb-1 group"
+                        >
+                          <div className="flex-shrink-0 mr-3">
+                            <div 
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm bg-yellow-500"
+                      onClick={() => {
+                        setSelectedContact(contact);
+                        setShowContactDialog(true);
+                      }}
+                        >
+                          {contact.full_name ? contact.full_name.charAt(0).toUpperCase() : '?'}
+                        </div>
+                      </div>
+                          <div 
+                            className="flex-1 min-w-0"
+                            onClick={() => {
+                              setSelectedContact(contact);
+                              setShowContactDialog(true);
+                            }}
+                          >
+                        <div className="flex items-center">
+                          <p className="text-sm font-medium text-[#cad2c5] truncate">
+                            {contact.full_name}
+                          </p>
+                            <span className="ml-2 text-xs text-yellow-400">
+                              ✓ Κύρια
+                            </span>
+                        </div>
+                        {contact.position && (
+                          <p className="text-xs text-[#84a98c] truncate">
+                            {contact.position}
+                          </p>
+                        )}
+                        <div className="flex items-center text-xs text-[#84a98c]">
+                          {contact.phone && (
+                            <span className="flex items-center mr-2 truncate">
+                              <Phone className="h-3 w-3 mr-1" />
+                              {contact.phone}
+                            </span>
+                          )}
+                          {contact.email && (
+                            <span className="flex items-center truncate">
+                              <Mail className="h-3 w-3 mr-1" />
+                              {contact.email}
+                            </span>
+                )}
+              </div>
+            </div>
 
-            <Card className="bg-[#354f52] border-[#52796f]">
+                          {/* Delete button for primary contact */}
+                          <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <TooltipProvider delayDuration={100}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                              className="h-6 w-6 p-0 text-red-400 hover:text-red-300 hover:bg-[#2f3e46] rounded-full flex items-center justify-center"
+                            onClick={() => {
+                            setContactToDelete(contact);
+                            setShowDeleteDialog(true);
+                          }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
+                                  <p>Διαγραφή επαφής</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </div>
+                      ))}
+                      
+                    {/* Then render all other contacts */}
+                    {contacts
+                      .filter(contact => contact.id !== customer?.primary_contact_id)
+                      .map(contact => (
+                        <div 
+                          key={contact.id}
+                          className="flex items-center p-2 hover:bg-[#2f3e46] rounded-md cursor-pointer mb-1 group"
+                        >
+                          <div className="flex-shrink-0 mr-3">
+                            <div 
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm bg-blue-500"
+                              onClick={() => {
+                                setSelectedContact(contact);
+                                setShowContactDialog(true);
+                              }}
+                            >
+                              {contact.full_name ? contact.full_name.charAt(0).toUpperCase() : '?'}
+                            </div>
+                          </div>
+                          <div 
+                            className="flex-1 min-w-0"
+                            onClick={() => {
+                              setSelectedContact(contact);
+                              setShowContactDialog(true);
+                            }}
+                          >
+                            <div className="flex items-center">
+                              <p className="text-sm font-medium text-[#cad2c5] truncate">
+                                {contact.full_name}
+                              </p>
+                            </div>
+                            {contact.position && (
+                              <p className="text-xs text-[#84a98c] truncate">
+                                {contact.position}
+                              </p>
+                            )}
+                            <div className="flex items-center text-xs text-[#84a98c]">
+                              {contact.phone && (
+                                <span className="flex items-center mr-2 truncate">
+                                  <Phone className="h-3 w-3 mr-1" />
+                                  {contact.phone}
+                                </span>
+                              )}
+                              {contact.email && (
+                                <span className="flex items-center truncate">
+                                  <Mail className="h-3 w-3 mr-1" />
+                                  {contact.email}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Action buttons */}
+                          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Set as primary contact button */}
+                            <TooltipProvider delayDuration={100}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="h-6 w-6 p-0 text-[#84a98c] hover:text-[#cad2c5] hover:bg-[#2f3e46] rounded-full flex items-center justify-center"
+                                    onClick={() => setPrimaryContact(contact.id)}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                    </svg>
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
+                                  <p>Ορισμός ως κύρια επαφή</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            
+                            {/* Delete contact button */}
+                            <TooltipProvider delayDuration={100}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="h-6 w-6 p-0 text-red-400 hover:text-red-300 hover:bg-[#2f3e46] rounded-full flex items-center justify-center"
+                                    onClick={() => {
+                                      setContactToDelete(contact);
+                                      setShowDeleteDialog(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
+                                  <p>Διαγραφή επαφής</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </div>
+                      ))}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <Card className="bg-[#354f52] border-[#52796f] contact-info-section">
               <CardContent className="p-6">
                 <h2 className="text-lg font-semibold mb-4 text-[#a8c5b5]">
                   Στοιχεία Επικοινωνίας
                 </h2>
 
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-[#84a98c] text-sm mb-1">Τηλέφωνο</div>
-                    <div className="flex items-center">
-                      <Phone className="h-4 w-4 mr-2 text-[#84a98c]" />
-                      <span>{customer.telephone || "—"}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-[#84a98c] text-sm mb-1">Fax</div>
-                    <div className="flex items-center">
-                      <Phone className="h-4 w-4 mr-2 text-[#84a98c]" />
-                      <span>{customer.fax_number || "—"}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-[#84a98c] text-sm mb-1">Email</div>
-                    <div className="flex items-center">
-                      <Mail className="h-4 w-4 mr-2 text-[#84a98c]" />
-                      <span>{customer.email || "—"}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-[#84a98c] text-sm mb-1">
-                      Ιστοσελίδα
-                    </div>
-                    <div className="flex items-center">
-                      <Globe className="h-4 w-4 mr-2 text-[#84a98c]" />
-                      <span>{customer.webpage || "—"}</span>
-                    </div>
-                  </div>
-
-                  <Separator className="my-4 bg-[#52796f]/50" />
-
-                  <div>
-                    <div className="text-[#84a98c] text-sm mb-1">Διεύθυνση</div>
+                <div className="section-content custom-scrollbar">
+                  <div className="space-y-4">
                     <div>
-                      <p>{customer.address || "—"}</p>
-                      <p>
-                        {customer.postal_code} {customer.town}
-                      </p>
+                      <div className="text-[#84a98c] text-sm mb-1">Τηλέφωνο</div>
+                      <div className="flex items-center text-sm">
+                        <Phone className="h-4 w-4 mr-2 text-[#84a98c]" />
+                        <span>{customer.telephone || "—"}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[#84a98c] text-sm mb-1">Fax</div>
+                      <div className="flex items-center text-sm">
+                        <Phone className="h-4 w-4 mr-2 text-[#84a98c]" />
+                        <span>{customer.fax_number || "—"}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[#84a98c] text-sm mb-1">Email</div>
+                      <div className="flex items-center text-sm">
+                        <Mail className="h-4 w-4 mr-2 text-[#84a98c]" />
+                        <span>{customer.email || "—"}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[#84a98c] text-sm mb-1">
+                        Ιστοσελίδα
+                      </div>
+                      <div className="flex items-center text-sm">
+                        <Globe className="h-4 w-4 mr-2 text-[#84a98c]" />
+                        <span>{customer.webpage || "—"}</span>
+                      </div>
+                    </div>
+
+                    <Separator className="my-4 bg-[#52796f]/50" />
+
+                    <div>
+                      <div className="text-[#84a98c] text-sm mb-1">Διεύθυνση</div>
+                      <div className="text-sm">
+                        <p>{customer.address || "—"}</p>
+                        <p>
+                          {customer.postal_code} {customer.town}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -699,12 +943,6 @@ export default function CustomerDetailPage() {
                     Σύνοψη
                   </TabsTrigger>
                   <TabsTrigger
-                    value="activities"
-                    className="data-[state=active]:bg-[#354f52] data-[state=active]:text-[#cad2c5] data-[state=active]:border-b-0 text-[#84a98c] rounded-t-lg px-6 py-2 transition-all"
-                  >
-                    Δραστηριότητες
-                  </TabsTrigger>
-                  <TabsTrigger
                     value="details"
                     className="data-[state=active]:bg-[#354f52] data-[state=active]:text-[#cad2c5] data-[state=active]:border-b-0 text-[#84a98c] rounded-t-lg px-6 py-2 transition-all"
                   >
@@ -714,41 +952,37 @@ export default function CustomerDetailPage() {
               </div>
 
               <TabsContent value="summary" className="mt-0 border-t-0 -mt-[1px]">
-                <Card className="bg-[#354f52] border-[#52796f] mb-6 rounded-t-none" style={{ marginBottom: "150px" }}>
+                <Card className="bg-[#354f52] border-[#52796f] mb-6 rounded-t-none notes-section">
                   <CardContent className="p-6">
                     <h2 className="text-lg font-semibold mb-4 text-[#a8c5b5]">
                       Σημειώσεις
                     </h2>
-                    <p className="text-[#cad2c5] mb-4">
-                      {customer.notes || "Δεν υπάρχουν σημειώσεις."}
-                    </p>
+                    <div className="section-content custom-scrollbar">
+                      <p className="text-[#cad2c5] text-sm mb-4">
+                        {customer.notes || "Δεν υπάρχουν σημειώσεις."}
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-[#354f52] border-[#52796f]">
+                <Card className="bg-[#354f52] border-[#52796f] recent-offers-section">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-semibold text-[#a8c5b5]">
                         Πρόσφατες Προσφορές
                       </h2>
-                      <Button
-                        onClick={() => setShowOffersTable(true)}
-                        className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] text-xs h-8"
-                      >
-                        Προβολή όλων
-                      </Button>
                     </div>
 
                     {loadingOffers ? (
-                      <div className="flex items-center justify-center h-[300px]">
+                      <div className="flex items-center justify-center h-[220px]">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#84a98c]"></div>
                       </div>
                     ) : recentOffers.length === 0 ? (
-                      <div className="flex items-center justify-center h-[300px] text-[#84a98c]">
+                      <div className="flex items-center justify-center h-[220px] text-[#84a98c]">
                         Δεν υπάρχουν προσφορές για αυτόν τον πελάτη.
                       </div>
                     ) : (
-                      <div className="max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                      <div style={{ height: "280px", overflowY: "auto" }} className="custom-scrollbar">
                         <div className="space-y-4">
                           {recentOffers.map((offer) => (
                             <div
@@ -758,7 +992,7 @@ export default function CustomerDetailPage() {
                             >
                               <div className="flex items-start justify-between">
                                 <div className="font-medium text-[#cad2c5] max-w-[70%]">
-                                  {truncateText(offer.requirements || "Χωρίς απαιτήσεις", 50)}
+                                  {truncateText(offer.requirements ? offer.requirements : "- -", 50)}
                                 </div>
                                 <div className="flex-shrink-0 ml-2 flex space-x-2">
                                   <span
@@ -798,238 +1032,273 @@ export default function CustomerDetailPage() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="activities" className="mt-0 border-t-0 -mt-[1px]">
-                <Card className="bg-[#354f52] border-[#52796f] rounded-t-none">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-semibold text-[#a8c5b5]">
-                        Όλες οι Δραστηριότητες
-                      </h2>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-[#52796f] text-[#cad2c5] hover:bg-[#52796f]/20"
-                      >
-                        <span className="h-4 w-4 mr-2">+</span>
-                        Νέα Δραστηριότητα
-                      </Button>
-                    </div>
-
-                    <div className="space-y-4">
-                      {activities.map((activity) => (
-                        <div
-                          key={activity.id}
-                          className="flex items-start p-3 bg-[#2f3e46] rounded-lg"
-                        >
-                          <div className="flex-shrink-0 mr-3 mt-1">
-                            {activity.type === "task" ? (
-                              <CheckCircle2 className="h-5 w-5 text-[#84a98c]" />
-                            ) : (
-                              <Clock className="h-5 w-5 text-[#84a98c]" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-medium">{activity.title}</div>
-                            <div className="text-sm text-[#84a98c]">
-                              Ανατέθηκε σε: {activity.assignedTo}
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${activity.status === "active" ? "bg-blue-500/20 text-blue-400" : "bg-green-500/20 text-green-400"}`}
-                            >
-                              {activity.status === "active"
-                                ? "Εκκρεμεί"
-                                : "Ολοκληρώθηκε"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
               <TabsContent value="details" className="mt-0 border-t-0 -mt-[1px]">
                 <Card className="bg-[#354f52] border-[#52796f] rounded-t-none">
                   <CardContent className="p-6">
-                    <h2 className="text-lg font-semibold mb-4 text-[#a8c5b5]">
-                      Στοιχεία Πελάτη
-                    </h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                      <div className="bg-[#354f52] rounded-lg p-6 shadow-md h-full">
-                        <h2 className="text-xl font-bold text-[#cad2c5] mb-4 flex items-center">
-                          <User className="mr-2 h-5 w-5" />
+                    {/* Customer Information Section */}
+                    <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden mb-6">
+                      <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
+                        <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
                           ΣΤΟΙΧΕΙΑ ΠΕΛΑΤΗ
                         </h2>
-                        
-                        <div className="space-y-4">
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">
-                              Επωνυμία
-                            </div>
-                            <div className="font-medium">
-                              {customer.company_name}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">
-                              Τύπος Πελάτη
-                            </div>
-                            <div className="font-medium">
-                              {customer.customer_type || "Εταιρεία"}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">ΑΦΜ</div>
-                            <div className="font-medium">{customer.afm || "—"}</div>
-                          </div>
-
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">ΔΟΥ</div>
-                            <div className="font-medium">{customer.doy || "—"}</div>
-                          </div>
-
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">
-                              Διεύθυνση
-                            </div>
-                            <div className="font-medium">
-                              {customer.address || "—"}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">Τ.Κ.</div>
-                            <div className="font-medium">
-                              {customer.postal_code || "—"}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">Πόλη</div>
-                            <div className="font-medium">
-                              {customer.town || "—"}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">
-                              Τηλέφωνο
-                            </div>
-                            <div className="font-medium">
-                              {customer.telephone || "—"}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">Email</div>
-                            <div className="font-medium">
-                              {customer.email || "—"}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">
-                              Ιστοσελίδα
-                            </div>
-                            <div className="font-medium">
-                              {customer.webpage || "—"}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="text-[#84a98c] text-sm mb-1">Fax</div>
-                            <div className="font-medium">
-                              {customer.fax_number || "—"}
-                            </div>
-                          </div>
-                        </div>
                       </div>
-                      
-                      <div className="bg-[#354f52] rounded-lg p-6 shadow-md">
-                        <div className="flex justify-between items-center mb-4">
-                          <h2 className="text-xl font-bold text-[#cad2c5] flex items-center">
-                            <Phone className="mr-2 h-5 w-5" />
-                            ΕΠΑΦΕΣ ΕΤΑΙΡΕΙΑΣ
-                          </h2>
+                      <div className="p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {/* Basic Information */}
+                          <div>
+                            <div className="space-y-3">
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                  Επωνυμία
+                                </div>
+                                <div className="text-sm font-normal">
+                                  {customer.company_name || "—"}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                  Τύπος Πελάτη
+                                </div>
+                                <div className="text-sm font-normal">
+                                  {customer.customer_type || "Εταιρεία"}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">ΑΦΜ</div>
+                                <div className="text-sm font-normal">{customer.afm || "—"}</div>
+                              </div>
+
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">ΔΟΥ</div>
+                                <div className="text-sm font-normal">{customer.doy || "—"}</div>
+                              </div>
+                            </div>
+                          </div>
                           
-                          <button
-                            type="button"
-                            className="h-7 w-7 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-600 rounded-full flex items-center justify-center"
-                            onClick={() => {
-                              setSelectedContact(null);
-                              setShowContactDialog(true);
-                            }}
-                            title="Προσθήκη Επαφής"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
+                          {/* Contact Information */}
+                          <div>
+                            <div className="space-y-3">
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                  Τηλέφωνο
+                                </div>
+                                <div className="text-sm font-normal">
+                                  {customer.telephone || "—"}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">Email</div>
+                                <div className="text-sm font-normal">
+                                  {customer.email || "—"}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                  Ιστοσελίδα
+                                </div>
+                                <div className="text-sm font-normal">
+                                  {customer.webpage || "—"}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">Fax</div>
+                                <div className="text-sm font-normal">
+                                  {customer.fax_number || "—"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Address Information */}
+                          <div>
+                            <div className="space-y-3">
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                  Διεύθυνση
+                                </div>
+                                <div className="text-sm font-normal">
+                                  {customer.address || "—"}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">Τ.Κ.</div>
+                                <div className="text-sm font-normal">
+                                  {customer.postal_code || "—"}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">Πόλη</div>
+                                <div className="text-sm font-normal">
+                                  {customer.town || "—"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                         
-                        <ContactList
-                          contacts={contacts}
-                          primaryContactId={customer?.primary_contact_id}
-                          onContactClick={(contact) => {
-                            setSelectedContact(contact);
-                            setShowContactDialog(true);
-                          }}
-                          onAddContact={() => {
-                            setSelectedContact(null);
-                            setShowContactDialog(true);
-                          }}
-                          onDeleteContact={(contact) => {
-                            setContactToDelete(contact);
-                            setShowDeleteDialog(true);
-                          }}
-                        />
+                        {/* Additional fields */}
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {Object.entries(customer).map(([key, value]) => {
+                            // Skip fields that are already displayed or belong to other categories
+                            if (['id', 'company_name', 'customer_type', 'afm', 'doy', 
+                                 'address', 'postal_code', 'town', 
+                                 'telephone', 'email', 'webpage', 'fax_number',
+                                 'notes', 'status', 'created_at', 'updated_at', 
+                                 'created_by', 'modified_by', 'primary_contact_id'].includes(key)) {
+                              return null;
+                            }
+                            
+                            // Skip object values and null/undefined values
+                            if (typeof value === 'object' || value === null || value === undefined) {
+                              return null;
+                            }
+                            
+                            // Skip history-related fields
+                            if (key.includes('date') || key.includes('time') || key.includes('by') || 
+                                key.includes('history') || key.includes('log')) {
+                              return null;
+                            }
+                            
+                            // Display any other fields that might exist
+                            return (
+                              <div key={key}>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                  {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}
+                                </div>
+                                <div className="text-sm font-normal">{value.toString() || "—"}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
 
-                    <Separator className="my-6 bg-[#52796f]/50" />
-
-                    <h2 className="text-lg font-semibold mb-4 text-[#a8c5b5]">
-                      Ιστορικό
-                    </h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">
-                          Δημιουργήθηκε από
-                        </div>
-                        <div className="font-medium">
-                          {customer.created_by?.fullname || "—"}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">
-                          Ημερομηνία δημιουργίας
-                        </div>
-                        <div className="font-medium">
-                          {formatDateTime(customer.created_at)}
+                    {/* History Section */}
+                    <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+                      <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f] flex justify-between items-center">
+                        <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                          ΙΣΤΟΡΙΚΟ
+                        </h2>
+                        <div className="flex items-center">
+                          <span className="text-xs text-[#84a98c] mr-2 font-bold">Κατάσταση:</span>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            customer.status === 'active' 
+                              ? 'bg-green-900/30 text-green-300' 
+                              : 'bg-red-900/30 text-red-300'
+                          }`}>
+                            {customer.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
+                          </span>
                         </div>
                       </div>
+                      <div className="p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Creation Information Section */}
+                          <div className="bg-[#354f52]/30 p-3 rounded-md">
+                            <h3 className="text-xs font-semibold text-[#a8c5b5] mb-3 uppercase">Δημιουργία</h3>
+                            <div className="space-y-3">
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                  Δημιουργήθηκε από
+                                </div>
+                                <div className="text-sm font-normal">
+                                  {customer.created_by?.fullname || "—"}
+                                </div>
+                              </div>
 
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">
-                          Τελευταία τροποποίηση από
-                        </div>
-                        <div className="font-medium">
-                          {customer.modified_by?.fullname || "—"}
-                        </div>
-                      </div>
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                  Ημερομηνία δημιουργίας
+                                </div>
+                                <div className="text-sm font-normal">
+                                  {formatDateTime(customer.created_at)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
 
-                      <div>
-                        <div className="text-[#84a98c] text-sm mb-1">
-                          Ημερομηνία τροποποίησης
+                          {/* Modification Information Section */}
+                          <div className="bg-[#354f52]/30 p-3 rounded-md">
+                            <h3 className="text-xs font-semibold text-[#a8c5b5] mb-3 uppercase">Τροποποίηση</h3>
+                            <div className="space-y-3">
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                  Τελευταία τροποποίηση από
+                                </div>
+                                <div className="text-sm font-normal">
+                                  {customer.modified_by?.fullname || "—"}
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                  Ημερομηνία τροποποίησης
+                                </div>
+                                <div className="text-sm font-normal">
+                                  {formatDateTime(customer.updated_at)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="font-medium">
-                          {formatDateTime(customer.updated_at)}
-                        </div>
+                        
+                        {/* Additional history fields */}
+                        {Object.entries(customer).some(([key, value]) => 
+                          !['id', 'company_name', 'customer_type', 'afm', 'doy', 
+                            'address', 'postal_code', 'town', 
+                            'telephone', 'email', 'webpage', 'fax_number',
+                            'notes', 'status', 'created_at', 'updated_at', 
+                            'created_by', 'modified_by', 'primary_contact_id'].includes(key) &&
+                          (key.includes('date') || key.includes('time') || key.includes('by') || 
+                           key.includes('history') || key.includes('log')) &&
+                          typeof value !== 'object' && value !== null && value !== undefined
+                        ) && (
+                          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <h3 className="text-xs font-semibold text-[#a8c5b5] col-span-full mt-2 mb-1">
+                              Επιπλέον Πληροφορίες
+                            </h3>
+                            {Object.entries(customer).map(([key, value]) => {
+                              // Only include fields that might be related to history but aren't already displayed
+                              if (['id', 'company_name', 'customer_type', 'afm', 'doy', 
+                                   'address', 'postal_code', 'town', 
+                                   'telephone', 'email', 'webpage', 'fax_number',
+                                   'notes', 'status', 'created_at', 'updated_at', 
+                                   'created_by', 'modified_by', 'primary_contact_id'].includes(key)) {
+                                return null;
+                              }
+                              
+                              // Include fields that might be related to history (containing 'date', 'time', etc.)
+                              if (key.includes('date') || key.includes('time') || key.includes('by') || 
+                                  key.includes('history') || key.includes('log')) {
+                                // Skip object values and null/undefined values
+                                if (typeof value === 'object' || value === null || value === undefined) {
+                                  return null;
+                                }
+                                
+                                return (
+                                  <div key={key}>
+                                    <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                      {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}
+                                    </div>
+                                    <div className="text-sm font-normal">
+                                      {key.includes('date') || key.includes('time') 
+                                        ? formatDateTime(value.toString()) 
+                                        : value.toString() || "—"}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              
+                              return null;
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -1043,36 +1312,22 @@ export default function CustomerDetailPage() {
       {/* Contact Dialog */}
       <ContactDialog
         open={showContactDialog}
-        onClose={() => {
-          setShowContactDialog(false);
-          setSelectedContact(null);
-          // Refresh contacts when dialog closes
-          fetchContacts();
+        onOpenChange={(open) => setShowContactDialog(open)}
+        contactId={selectedContact?.id}
+        customerId={customer.id}
+        refreshData={async () => {
+          await fetchContacts();
+          return Promise.resolve();
         }}
-        contact={selectedContact}
-        customerId={id}
-        customerName={customer?.company_name}
-        isPrimary={selectedContact?.id === customer?.primary_contact_id}
-        onSetPrimary={setPrimaryContact}
-        onSave={fetchContacts}
       />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent 
-          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-          aria-describedby="delete-contact-description"
-        >
+        <AlertDialogContent aria-describedby="delete-customer-description" className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#cad2c5]">
-              Διαγραφή Επαφής
-            </AlertDialogTitle>
-            <AlertDialogDescription id="delete-contact-description" className="text-[#a8c5b5]">
-              Είστε βέβαιοι ότι θέλετε να διαγράψετε την επαφή{" "}
-              <span className="font-medium text-[#cad2c5]">
-                {contactToDelete?.full_name}
-              </span>
-              ; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
+            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+            <AlertDialogDescription id="delete-customer-description">
+              Are you sure you want to delete this customer? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1080,7 +1335,7 @@ export default function CustomerDetailPage() {
               Ακύρωση
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteContact}
+              onClick={handleDelete}
               className="bg-red-600 hover:bg-red-700 text-white"
               disabled={isDeleting}
             >
@@ -1090,25 +1345,6 @@ export default function CustomerDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Offers Dialog */}
-      {showOfferDialog && (
-        <OffersDialog
-          open={showOfferDialog}
-          onOpenChange={(open) => {
-            setShowOfferDialog(open);
-            if (!open) {
-              setSelectedOffer(null);
-              fetchRecentOffers(); // Refresh offers when dialog closes
-            }
-          }}
-          customerId={id || ""}
-          offerId={selectedOffer || undefined}
-          onSave={() => {
-            fetchRecentOffers();
-          }}
-        />
-      )}
-      
       {/* Offers Table */}
       {showOffersTable && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -1137,6 +1373,14 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Customer Dialog for editing */}
+      <CustomerDialog
+        open={showCustomerDialog}
+        onOpenChange={(open) => setShowCustomerDialog(open)}
+        customer={{ id: customer.id }}
+        refreshData={fetchCustomerData}
+      />
     </div>
   );
 }

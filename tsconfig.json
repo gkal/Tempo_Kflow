@@ -16,8 +16,9 @@
 
     "strict": false,
     "paths": {
-      "@/*": ["./src/*"]
-    }
+      "@/*": ["src/*", "app/*"]
+    },
+    "baseUrl": "."
   },
   "include": ["src"],
   "exclude": ["src/tempobook"],

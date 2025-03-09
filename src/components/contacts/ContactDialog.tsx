@@ -7,29 +7,22 @@ import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { supabase } from "@/lib/supabase";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { X, Star, Check } from "lucide-react";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
 
 interface ContactDialogProps {
   open: boolean;
-  onClose: () => void;
-  contact?: any;
+  onOpenChange: (open: boolean) => void;
   customerId: string;
-  onSave: () => void;
-  onSetPrimary?: (contactId: string) => void;
-  isPrimary?: boolean;
-  viewOnly?: boolean;
-  customerName?: string;
+  contactId?: string;
+  refreshData?: () => void;
 }
 
-export default function ContactDialog({
+export function ContactDialog({
   open,
-  onClose,
-  contact,
+  onOpenChange,
   customerId,
-  onSave,
-  onSetPrimary,
-  isPrimary = false,
-  viewOnly = false,
-  customerName = "",
+  contactId,
+  refreshData,
 }: ContactDialogProps) {
   const [formData, setFormData] = useState({
     full_name: "",
@@ -43,58 +36,54 @@ export default function ContactDialog({
 
   const [positions, setPositions] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [customerInfo, setCustomerInfo] = useState("");
+  const [customerInfo, setCustomerInfo] = useState<{ company_name: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fix the type issue with customerId
+  const safeCustomerId = typeof customerId === 'string' 
+    ? customerId 
+    : typeof customerId === 'object' && customerId !== null 
+      ? (customerId as any).id ? String((customerId as any).id) : String(customerId)
+      : String(customerId);
 
   useEffect(() => {
-    if (contact) {
-      setFormData({
-        full_name: contact.full_name || "",
-        position: contact.position || "",
-        telephone: contact.telephone || "",
-        mobile: contact.mobile || "",
-        email: contact.email || "",
-        internal_telephone: contact.internal_telephone || "",
-        notes: contact.notes || "",
-      });
-    } else {
-      // Reset form when creating a new contact
-      setFormData({
-        full_name: "",
-        position: "",
-        telephone: "",
-        mobile: "",
-        email: "",
-        internal_telephone: "",
-        notes: "",
-      });
+    if (open) {
+      fetchCustomerInfo();
     }
-    fetchPositions();
-    fetchCustomerInfo();
-    // Reset messages when dialog opens
-    setError("");
-    setSuccess(false);
-  }, [contact, open, customerId]);
+  }, [open, safeCustomerId]);
 
   const fetchCustomerInfo = async () => {
-    if (!customerName && customerId) {
-      try {
-        const { data, error } = await supabase
-          .from("customers")
-          .select("company_name")
-          .eq("id", customerId)
-          .single();
+    if (!safeCustomerId) {
+      setError("Δεν βρέθηκε αναγνωριστικό πελάτη");
+      setLoading(false);
+      return;
+    }
 
-        if (error) throw error;
-        if (data) {
-          setCustomerInfo(data.company_name);
-        }
-      } catch (error) {
+    try {
+      setLoading(true);
+      
+      // Use the safe string ID in the API call
+      const { data, error } = await supabase
+        .from('customers')
+        .select('company_name')
+        .eq('id', safeCustomerId)
+        .single();
+
+      if (error) {
         console.error("Σφάλμα κατά τη φόρτωση στοιχείων πελάτη:", error);
+        setError("Αδυναμία φόρτωσης στοιχείων πελάτη");
+        setLoading(false);
+        return;
       }
-    } else {
-      setCustomerInfo(customerName);
+
+      setCustomerInfo(data);
+      setLoading(false);
+    } catch (err) {
+      console.error("Σφάλμα κατά τη φόρτωση στοιχείων πελάτη:", err);
+      setError("Αδυναμία φόρτωσης στοιχείων πελάτη");
+      setLoading(false);
     }
   };
 
@@ -135,14 +124,14 @@ export default function ContactDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid() || viewOnly) return;
+    if (!isFormValid()) return;
 
     setIsSubmitting(true);
     setError("");
     setSuccess(false);
     
     try {
-      if (contact?.id) {
+      if (contactId) {
         // Update existing contact
         const { error } = await supabase
           .from("contacts")
@@ -156,13 +145,13 @@ export default function ContactDialog({
             notes: formData.notes,
             updated_at: new Date(),
           })
-          .eq("id", contact.id);
+          .eq("id", contactId);
 
         if (error) throw error;
       } else {
         // Create new contact
         const { error } = await supabase.from("contacts").insert({
-          customer_id: customerId,
+          customer_id: safeCustomerId,
           full_name: formData.full_name,
           position: formData.position,
           telephone: formData.telephone,
@@ -176,14 +165,14 @@ export default function ContactDialog({
       }
 
       // Call onSave immediately to refresh the contacts list
-      onSave();
+      await refreshData?.();
       
       // Show success message briefly
       setSuccess(true);
       
       // Close the dialog after a short delay
       setTimeout(() => {
-        onClose();
+        onOpenChange(false);
       }, 800);
     } catch (error: any) {
       console.error("Σφάλμα κατά την αποθήκευση επαφής:", error);
@@ -193,15 +182,8 @@ export default function ContactDialog({
     }
   };
 
-  const handleSetPrimary = () => {
-    if (onSetPrimary && contact?.id) {
-      onSetPrimary(contact.id);
-      onClose();
-    }
-  };
-
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f] p-0 max-w-5xl"
         aria-describedby="contact-dialog-description"
@@ -210,29 +192,20 @@ export default function ContactDialog({
           <div className="flex justify-between items-center">
             <DialogTitle className="text-lg font-semibold text-[#cad2c5]">
               {customerInfo && (
-                <span className="text-[#84a98c] mr-2">{customerInfo} -</span>
+                <span className="text-[#84a98c] mr-2">{customerInfo.company_name} -</span>
               )}
-              {contact ? "Επεξεργασία Επαφής" : "Νέα Επαφή"}
-              {isPrimary && (
-                <div className="flex items-center">
-                  <span className="text-[#84a98c] text-sm mr-2">Κύρια Επαφή</span>
-                  <Check className="h-4 w-4 text-green-500" />
-                </div>
-              )}
-              {viewOnly && (
-                <span className="ml-2 text-[#84a98c] text-sm">(Προβολή)</span>
-              )}
+              {contactId ? "Επεξεργασία Επαφής" : "Νέα Επαφή"}
             </DialogTitle>
             <Button
               variant="ghost"
               className="h-8 w-8 p-0 text-[#cad2c5]"
-              onClick={onClose}
+              onClick={() => onOpenChange(false)}
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
           <DialogDescription id="contact-dialog-description" className="sr-only">
-            {contact ? "Φόρμα επεξεργασίας επαφής" : "Φόρμα δημιουργίας νέας επαφής"}
+            {contactId ? "Φόρμα επεξεργασίας επαφής" : "Φόρμα δημιουργίας νέας επαφής"}
           </DialogDescription>
         </DialogHeader>
 
@@ -257,7 +230,6 @@ export default function ContactDialog({
                       value={formData.full_name}
                       onChange={handleInputChange}
                       className="app-input w-full"
-                      disabled={viewOnly}
                       required
                     />
                   </div>
@@ -274,7 +246,6 @@ export default function ContactDialog({
                       value={formData.mobile}
                       onChange={handleInputChange}
                       className="app-input w-full"
-                      disabled={viewOnly}
                     />
                   </div>
                 </div>
@@ -291,7 +262,6 @@ export default function ContactDialog({
                       value={formData.email}
                       onChange={handleInputChange}
                       className="app-input w-full"
-                      disabled={viewOnly}
                     />
                   </div>
                 </div>
@@ -315,7 +285,6 @@ export default function ContactDialog({
                       value={formData.position}
                       onSelect={handlePositionChange}
                       placeholder="Επιλέξτε θέση"
-                      disabled={viewOnly}
                       className="w-full"
                     />
                   </div>
@@ -332,7 +301,6 @@ export default function ContactDialog({
                       value={formData.telephone}
                       onChange={handleInputChange}
                       className="app-input w-full"
-                      disabled={viewOnly}
                     />
                   </div>
                 </div>
@@ -348,7 +316,6 @@ export default function ContactDialog({
                       value={formData.internal_telephone}
                       onChange={handleInputChange}
                       className="app-input w-full"
-                      disabled={viewOnly}
                     />
                   </div>
                 </div>
@@ -370,63 +337,51 @@ export default function ContactDialog({
                   value={formData.notes}
                   onChange={handleInputChange}
                   className="contact-notes-textarea w-full"
-                  disabled={viewOnly}
                   placeholder="Προσθέστε σημειώσεις..."
                 />
               </div>
             </div>
           </div>
 
-          {/* Error and Success Messages */}
           <div className="px-8 pb-4">
-            {error && (
-              <div className="bg-red-500/10 text-red-400 p-3 rounded-md mb-4">
-                {error}
-              </div>
-            )}
-            {success && (
-              <div className="bg-green-500/10 text-green-400 p-3 rounded-md mb-4">
-                Η αποθήκευση ολοκληρώθηκε με επιτυχία!
-              </div>
-            )}
+            {/* Remove these message blocks */}
           </div>
 
           <div className="flex justify-between items-center p-4 border-t border-[#52796f]">
-            {onSetPrimary && contact && !isPrimary ? (
-              <Button
-                type="button"
-                onClick={handleSetPrimary}
-                variant="outline"
-                className="bg-transparent border-[#84a98c] text-[#84a98c] hover:bg-[#84a98c]/10"
-              >
-                <Star className="mr-2 h-4 w-4" />
-                Ορισμός ως Κύρια
-              </Button>
-            ) : (
-              <div></div>
-            )}
+            {/* Left side: Messages or Set as Primary button */}
+            <div className="flex-1 mr-8">
+              {error && (
+                <div className="bg-red-500/10 text-red-400 p-2 rounded-md text-sm">
+                  {error}
+                </div>
+              )}
+              {success && (
+                <div className="bg-green-500/10 text-green-400 p-2 rounded-md text-sm">
+                  Η αποθήκευση ολοκληρώθηκε με επιτυχία!
+                </div>
+              )}
+            </div>
 
+            {/* Right side: Buttons with Save first, then Cancel */}
             <div className="flex space-x-2">
               <Button
+                type="submit"
+                disabled={!isFormValid() || isSubmitting}
+                className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
+              >
+                {isSubmitting ? (
+                  <LoadingSpinner size="sm" className="mr-2" />
+                ) : null}
+                Αποθήκευση
+              </Button>
+              <Button
                 type="button"
-                onClick={onClose}
+                onClick={() => onOpenChange(false)}
                 variant="outline"
                 className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#52796f]/20"
               >
                 Ακύρωση
               </Button>
-              {!viewOnly && (
-                <Button
-                  type="submit"
-                  disabled={!isFormValid() || isSubmitting}
-                  className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
-                >
-                  {isSubmitting ? (
-                    <LoadingSpinner size="sm" className="mr-2" />
-                  ) : null}
-                  Αποθήκευση
-                </Button>
-              )}
             </div>
           </div>
         </form>

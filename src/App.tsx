@@ -6,6 +6,8 @@ import SettingsPage from "./components/settings/SettingsPage";
 import { useAuth } from "./lib/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./components/ui/dropdown.css";
+import { OfferDialogContainer } from './components/customers/OfferDialogManager';
+import GlobalOffersDialog from './components/customers/GlobalOffersDialog';
 // import { fixDropdowns } from './lib/fixDropdowns';
 
 function App() {
@@ -81,6 +83,16 @@ function App() {
     // fixDropdowns();
   }, []);
 
+  // Check if running in StrictMode
+  useEffect(() => {
+    const isStrictMode = process.env.NODE_ENV === 'development';
+    console.log("Running in StrictMode:", isStrictMode);
+    
+    if (isStrictMode) {
+      console.warn("React StrictMode is enabled, which causes components to mount twice in development. This is normal behavior and won't happen in production.");
+    }
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#2f3e46]">
@@ -150,6 +162,8 @@ function App() {
         )}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <OfferDialogContainer />
+      <GlobalOffersDialog />
     </Suspense>
   );
 }

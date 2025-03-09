@@ -1,0 +1,23 @@
+/* Settings page cursor fix */
+.settings-page-container table tr {
+  cursor: pointer !important;
+}
+
+.settings-page-container table td {
+  cursor: pointer !important;
+}
+
+.settings-page-container table th {
+  cursor: pointer !important;
+}
+
+/* Target any elements inside table cells that might be overriding the cursor */
+.settings-page-container table td * {
+  cursor: pointer !important;
+}
+
+/* Ensure text selection still works properly */
+.settings-page-container table td span,
+.settings-page-container table td div {
+  cursor: pointer !important;
+} 

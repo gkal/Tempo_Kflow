@@ -66,7 +66,7 @@ export function SearchBar({
     onColumnChange(column);
   };
 
-  // Custom CSS for the placeholder color and to ensure no borders
+  // Update the custom styles to remove borders on hover
   const customStyles = `
     .search-input::placeholder {
       color: #84a98c !important;
@@ -81,12 +81,47 @@ export function SearchBar({
       border: none !important;
       box-shadow: none !important;
     }
+    .search-input:hover {
+      outline: none !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    /* Remove any borders from the search container on hover */
+    .search-container:hover .search-input {
+      outline: none !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    /* Ensure no borders appear on the input itself */
+    input.search-input {
+      border-width: 0 !important;
+      outline-width: 0 !important;
+    }
+  `;
+
+  // Updated selection styles with more specific selectors
+  const searchBarStyles = `
+    /* Override the yellow highlight with our green theme */
+    .search-input::selection,
+    input::selection,
+    .search-bar-container *::selection {
+      background-color: #52796f !important;
+      color: #cad2c5 !important;
+    }
+    
+    .search-input::-moz-selection,
+    input::-moz-selection,
+    .search-bar-container *::-moz-selection {
+      background-color: #52796f !important;
+      color: #cad2c5 !important;
+    }
   `;
 
   return (
     <>
       <style>{customStyles}</style>
-      <div className={`flex items-center rounded-md border border-[#52796f] bg-[#2f3e46] ${className}`}>
+      <style>{searchBarStyles}</style>
+      <div className={`search-container flex items-center rounded-md border border-[#52796f] bg-[#2f3e46] ${className}`}>
         <div className="flex items-center px-3 py-2">
           <Search className="h-4 w-4 text-[#84a98c]" />
         </div>

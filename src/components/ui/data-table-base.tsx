@@ -56,6 +56,7 @@ interface DataTableBaseProps {
   isLoading?: boolean;
   highlightedRowId?: string;
   renderRow?: (row: any, index: number, defaultRow: React.ReactNode) => React.ReactNode;
+  onSearchFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
 }
 
 export function DataTableBase({
@@ -74,6 +75,7 @@ export function DataTableBase({
   isLoading = false,
   highlightedRowId,
   renderRow,
+  onSearchFocus,
 }: DataTableBaseProps) {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -332,7 +334,26 @@ export function DataTableBase({
     }
   };
 
-  // Highlight search matches in text
+  // Add a global style for search highlighting
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .search-highlight {
+        background-color: #52796f !important;
+        color: #cad2c5 !important;
+        padding: 0 4px;
+        border-radius: 2px;
+        display: inline-block;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  // Modify the highlightMatch function
   const highlightMatch = (text: any, searchTerm: string, columnType: string): React.ReactNode => {
     if (!text || !searchTerm) return text || "-";
     
@@ -350,7 +371,7 @@ export function DataTableBase({
     return (
       <>
         {textStr.substring(0, index)}
-        <span className="bg-yellow-200 text-black px-1 rounded">
+        <span className="search-highlight">
           {textStr.substring(index, index + searchTerm.length)}
         </span>
         {textStr.substring(index + searchTerm.length)}
@@ -368,8 +389,38 @@ export function DataTableBase({
     return acc;
   }, {});
 
+  // Add a new function to handle search input focus
+  const handleSearchFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Select all text in the input when it receives focus
+    e.target.select();
+    // Call the external handler if provided
+    if (onSearchFocus) {
+      onSearchFocus(e);
+    }
+  };
+
   return (
     <div className="w-full flex flex-col" ref={tableRef}>
+      {/* If you have a search input inside this component, add the onFocus handler */}
+      {showSearch && (
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+            <Input
+              type="text"
+              placeholder="Search..."
+              className={cn(
+                searchBarStyles.inputClasses,
+                searchBarStyles.containerClasses
+              )}
+              value={searchTerm}
+              onChange={(e) => {/* your existing search handler */}}
+              onFocus={handleSearchFocus}
+            />
+          </div>
+        </div>
+      )}
+      
       {/* Main table container with fixed header */}
       <div className="relative overflow-hidden border border-[#52796f] rounded-md">
         {/* Fixed header border that doesn't scroll */}

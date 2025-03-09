@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Search, Plus, ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import ContactDialog from "../contacts/ContactDialog";
+import { ContactDialog } from "@/components/contacts/ContactDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ContactList } from "@/components/contacts/ContactList";
 import { Label } from "@/components/ui/label";
@@ -65,10 +65,12 @@ const selectStyles = `
 
 interface CustomerFormProps {
   customerId?: string;
-  onSave?: () => void;
+  onSave?: (newCustomerId?: string, companyName?: string) => void;
   onCancel?: () => void;
   viewOnly?: boolean;
   onValidityChange?: (isValid: boolean) => void;
+  onError?: (errorMessage: string) => void;
+  keepDialogOpen?: boolean;
 }
 
 const CustomerForm = ({
@@ -77,6 +79,8 @@ const CustomerForm = ({
   onCancel,
   viewOnly = false,
   onValidityChange,
+  onError,
+  keepDialogOpen = false,
 }: CustomerFormProps) => {
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const { user } = useAuth();
@@ -264,15 +268,17 @@ const CustomerForm = ({
   const [saveDisabled, setSaveDisabled] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log("Form submission started");
     e.preventDefault();
+    console.log("Default form submission prevented");
     
     // If there's a temporary customer type, apply it now
     if (tempCustomerType !== null) {
+      console.log("Applying temporary customer type:", tempCustomerType);
       setFormData(prev => ({
         ...prev,
         customer_type: tempCustomerType
       }));
-      // Don't reset tempCustomerType here, as it might cause a re-render during submission
     }
     
     // Create a copy of the form data that includes any temp customer type
@@ -280,17 +286,19 @@ const CustomerForm = ({
       ...formData,
       ...(tempCustomerType !== null ? { customer_type: tempCustomerType } : {})
     };
+    console.log("Submission data prepared:", submissionData);
     
-    // Get all required inputs
+    // Validation checks
+    console.log("Starting validation checks");
+    let isValid = true;
     const form = e.currentTarget as HTMLFormElement;
     const requiredInputs = form.querySelectorAll('input[required], select[required], textarea[required]');
     
-    // Check if any required fields are empty
-    let isValid = true;
     requiredInputs.forEach(input => {
       const element = input as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
       if (!element.value) {
         isValid = false;
+        console.log("Required field empty:", element.id || element.name);
         
         // Show custom Greek validation message
         alert('Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία');
@@ -304,18 +312,21 @@ const CustomerForm = ({
     });
     
     if (!isValid) {
+      console.log("Validation failed, stopping submission");
       return;
     }
     
     // Continue with form submission
+    console.log("Validation passed, continuing with submission");
     setLoading(true);
     setError("");
     setSuccess(false);
     
     try {
       if (customerId) {
+        console.log("Updating existing customer with ID:", customerId);
         // Update existing customer
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("customers")
           .update({
             ...submissionData,
@@ -323,10 +334,30 @@ const CustomerForm = ({
             updated_at: new Date().toISOString(),
             primary_contact_id: submissionData.primary_contact_id || null,
           })
-          .eq("id", customerId);
+          .eq("id", customerId)
+          .select();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Supabase update error:", error);
+          throw error;
+        }
+        
+        console.log("Customer updated successfully, response:", data);
+        // Set success state
+        setSuccess(true);
+        console.log("Success state set to true");
+        
+        // Call onSave with the existing ID and company name
+        if (onSave) {
+          console.log("Calling onSave callback with:", customerId, formData.company_name);
+          onSave(customerId, formData.company_name);
+        }
+        
+        // Dispatch a custom event to notify of successful save
+        console.log("Dispatching customer-form-success event");
+        document.dispatchEvent(new CustomEvent('customer-form-success'));
       } else {
+        console.log("Creating new customer");
         // Create new customer
         const { data, error } = await supabase
           .from("customers")
@@ -335,36 +366,80 @@ const CustomerForm = ({
             created_by: user?.id,
             modified_by: user?.id,
             status: "active",
-            primary_contact_id: null, // Explicitly set to null for new customers
+            primary_contact_id: null,
           }])
           .select();
 
-        if (error) throw error;
-
-        // Set the customerId to the newly created customer's ID
-        if (data && data.length > 0) {
-          const newCustomerId = data[0].id;
-          setCustomerId(newCustomerId);
+        if (error) {
+          console.error("Supabase insert error:", error);
+          throw error;
         }
-      }
 
+        console.log("New customer created successfully, response:", data);
+        // Set success state
+        setSuccess(true);
+        
+        // Set the customerId to the newly created customer's ID
+        let newCustomerId = null;
+        if (data && data.length > 0) {
+          newCustomerId = data[0].id;
+          console.log("New customer ID:", newCustomerId);
+          setCustomerId(newCustomerId);
+        } else {
+          console.error("No data returned from insert operation");
+        }
+
+        // Call onSave with the new ID and company name
+        if (onSave) {
+          console.log("Calling onSave callback with:", newCustomerId, formData.company_name);
+          onSave(newCustomerId, formData.company_name);
+        }
+        
+        // Dispatch a custom event to notify of successful save
+        console.log("Dispatching customer-form-success event");
+        document.dispatchEvent(new CustomEvent('customer-form-success'));
+      }
+      
       // Reset tempCustomerType after successful submission
       if (tempCustomerType !== null) {
+        console.log("Resetting tempCustomerType");
         setTempCustomerType(null);
       }
-
-      setSuccess(true);
-      setTimeout(() => {
-        setSuccess(false);
-        if (onSave) onSave(); // Call onSave to refresh the customer list
-      }, 1000);
     } catch (error: any) {
-      console.error("Error saving customer:", error);
-      setError(error.message || "Σφάλμα κατά την αποθήκευση");
+      console.error("Error during save operation:", error);
+      const errorMessage = error.message || "Σφάλμα κατά την αποθήκευση";
+      console.log("Setting error message:", errorMessage);
+      setError(errorMessage);
+      if (onError) {
+        console.log("Calling onError callback with:", errorMessage);
+        onError(errorMessage);
+      }
     } finally {
+      console.log("Setting loading to false");
       setLoading(false);
     }
   };
+
+  // Also add a log when the hidden save button is clicked
+  useEffect(() => {
+    const saveButton = document.getElementById('save-customer-form');
+    if (saveButton) {
+      const originalClick = saveButton.onclick;
+      saveButton.onclick = (e) => {
+        console.log("Hidden save button clicked");
+        if (originalClick) {
+          return originalClick.call(saveButton, e);
+        }
+      };
+    }
+    
+    return () => {
+      const saveButton = document.getElementById('save-customer-form');
+      if (saveButton) {
+        saveButton.onclick = null;
+      }
+    };
+  }, []);
 
   const handleContactClick = (contact) => {
     setSelectedContact(contact);
@@ -574,17 +649,6 @@ const CustomerForm = ({
                   <div className="flex space-x-2">
                     <button
                       type="button"
-                      className="h-7 text-[#a8c5b5] hover:text-[#cad2c5] hover:bg-[#2f3e46] flex items-center text-sm px-2 rounded"
-                      onClick={() => {
-                        // Open contact selection dialog or dropdown
-                      }}
-                      disabled={viewOnly || contacts.length === 0}
-                    >
-                      <Search className="h-4 w-4 mr-1" />
-                      Επιλογή
-                    </button>
-                    <button
-                      type="button"
                       className="h-7 w-7 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-600 rounded-full flex items-center justify-center"
                       onClick={() => {
                         setSelectedContact(null);
@@ -717,72 +781,48 @@ const CustomerForm = ({
               </div>
             </div>
           </div>
-
-          {/* Error and Success Messages */}
-          {error && (
-            <div className="bg-red-500/10 text-red-400 p-3 rounded-md mb-4">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="bg-green-500/10 text-green-400 p-3 rounded-md mb-4">
-              Η αποθήκευση ολοκληρώθηκε με επιτυχία!
-            </div>
-          )}
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent aria-describedby="delete-contact-description">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Contact</AlertDialogTitle>
+              <AlertDialogDescription id="delete-contact-description">
+                Are you sure you want to delete this contact? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#52796f]/20">
+                Ακύρωση
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteContact}
+                className="bg-red-600 hover:bg-red-700 text-white"
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Διαγραφή..." : "Διαγραφή"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </form>
 
       {/* Contact Dialog */}
       {customerId && (
         <ContactDialog
           open={showContactDialog}
-          onClose={() => {
-            setShowContactDialog(false);
-            setSelectedContact(null);
-          }}
-          contact={selectedContact}
-          customerId={customerId}
-          customerName={formData.company_name}
-          isPrimary={selectedContact?.id === formData.primary_contact_id}
-          onSetPrimary={setPrimaryContact}
-          onSave={() => {
-            fetchContacts();
+          onOpenChange={(open) => setShowContactDialog(open)}
+          customerId={customerId || ""}
+          contactId={selectedContact?.id}
+          refreshData={async () => {
+            if (typeof fetchContacts === 'function') {
+              await fetchContacts();
+            }
+            return Promise.resolve();
           }}
         />
       )}
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent 
-          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-          aria-describedby="delete-contact-form-description"
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#cad2c5]">
-              Διαγραφή Επαφής
-            </AlertDialogTitle>
-            <AlertDialogDescription id="delete-contact-form-description" className="text-[#a8c5b5]">
-              Είστε βέβαιοι ότι θέλετε να διαγράψετε την επαφή{" "}
-              <span className="font-medium text-[#cad2c5]">
-                {contactToDelete?.full_name}
-              </span>
-              ; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#52796f]/20">
-              Ακύρωση
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteContact}
-              className="bg-red-600 hover:bg-red-700 text-white"
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Διαγραφή..." : "Διαγραφή"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

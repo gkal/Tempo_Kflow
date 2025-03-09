@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { Phone, Mail, Globe, User, Plus } from "lucide-react";
 import "../ui/dropdown.css";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
 
 interface CustomerContextMenuProps {
   children: React.ReactNode;
@@ -17,6 +18,7 @@ export function CustomerContextMenu({
   const [isOpen, setIsOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   // Set up global context menu handler
   useEffect(() => {
@@ -201,6 +203,16 @@ export function CustomerContextMenu({
     <>
       {childrenWithAttribute}
       {renderContextMenu()}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent aria-describedby="delete-customer-description">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+            <AlertDialogDescription id="delete-customer-description">
+              Are you sure you want to delete this customer? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 } 

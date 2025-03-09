@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
@@ -35,8 +35,9 @@ import {
 } from "@/components/ui/select";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { CustomerContextMenu } from "./CustomerContextMenu";
-import OffersDialog from "./OffersDialog";
 import React from "react";
+import { CustomerDialog } from "./CustomerDialog";
+import { openNewOfferDialog, openEditOfferDialog } from './OfferDialogManager';
 
 // Add Customer interface
 interface Customer {
@@ -77,7 +78,7 @@ interface CustomerRowProps {
   formatStatus: (status: string) => string;
   formatResult: (result: string) => string;
   handleEditOffer: (customerId: string, offerId: string) => void;
-  handleDeleteOffer: (customerId: string, offerId: string, e: React.MouseEvent) => void;
+  handleDeleteOffer: (customerId: string, offerId: string) => void;
   onCreateOffer: (customerId: string, source: string) => void;
 }
 
@@ -96,7 +97,7 @@ const CustomerRow = React.memo(({
   formatStatus, 
   formatResult, 
   handleEditOffer, 
-  handleDeleteOffer,
+  handleDeleteOffer, 
   onCreateOffer
 }: CustomerRowProps) => {
   // Safety check - if row is undefined, return the default row
@@ -113,14 +114,14 @@ const CustomerRow = React.memo(({
   const expandedRow = isExpanded ? (
     <tr className="bg-[#2f3e46] border-t border-b border-[#52796f]" data-customer-id={row.id}>
       <td colSpan={columns.length} className="p-0">
-        <div className="p-3">
+        <div className="p-3 pl-8">
           {isLoading ? (
             <div className="flex justify-center items-center py-4">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
             </div>
           ) : offers.length === 0 ? (
             <div className="text-center py-4 text-[#84a98c]">
-              Δεν υπάρχουν εκκρεμείς προσφορές για αυτόν τον πελάτη
+              Δεν υπάρχουν προσφορές για αυτόν τον πελάτη
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -134,9 +135,7 @@ const CustomerRow = React.memo(({
                     <th className="px-3 py-2 text-left text-xs font-medium">Ποσό</th>
                     <th className="px-3 py-2 text-left text-xs font-medium">Κατάσταση</th>
                     <th className="px-3 py-2 text-left text-xs font-medium">Αποτέλεσμα</th>
-                    {isAdminOrSuperUser && (
-                      <th className="px-3 py-2 text-center text-xs font-medium w-10">Ενέργειες</th>
-                    )}
+                    <th className="px-3 py-2 text-center text-xs font-medium w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -178,18 +177,33 @@ const CustomerRow = React.memo(({
                           {formatResult(offer.result)}
                         </span>
                       </td>
-                      {isAdminOrSuperUser && (
-                        <td className="px-3 py-2 text-xs text-center">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => handleDeleteOffer(row.id, offer.id, e)}
-                            className="h-6 w-6 p-0 text-red-500 hover:text-red-400 hover:bg-[#354f52]"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </td>
-                      )}
+                      <td className="px-3 py-2 text-xs text-center">
+                        {isAdminOrSuperUser && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    // Just stop propagation - this is the most important part
+                                    e.stopPropagation();
+                                    
+                                    // Simple approach - directly call the handler
+                                    handleDeleteOffer(row.id, offer.id);
+                                  }}
+                                  className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
+                                <p>Διαγραφή προσφοράς</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -222,9 +236,49 @@ const CustomerRow = React.memo(({
 // Ensure CustomerRow has a display name for better debugging
 CustomerRow.displayName = 'CustomerRow';
 
+// Define the props interface directly in this file
+interface OffersDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  customerId: string;
+  offerId?: string;
+  onSave: () => void;
+  defaultSource?: string;
+}
+
 export default function CustomersPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  // Define searchColumns here, before it's used in any hooks
+  const searchColumns = [
+    { header: "Επωνυμία", accessor: "company_name" },
+    { header: "Τύπος", accessor: "customer_type" },
+    { header: "ΑΦΜ", accessor: "afm" },
+    { header: "Email", accessor: "email" },
+    { header: "Τηλέφωνο", accessor: "telephone" },
+    { header: "Διεύθυνση", accessor: "address" },
+  ];
+  
+  // Add this useEffect inside the component function
+  useEffect(() => {
+    // Suppress specific accessibility warnings
+    const originalConsoleWarn = console.warn;
+    console.warn = function(message, ...args) {
+      if (typeof message === 'string' && (
+        message.includes('Missing `Description` or `aria-describedby`') ||
+        message.includes('aria-describedby={undefined}')
+      )) {
+        // Suppress these specific warnings
+        return;
+      }
+      originalConsoleWarn.apply(console, [message, ...args]);
+    };
+
+    return () => {
+      console.warn = originalConsoleWarn; // Restore original console.warn on unmount
+    };
+  }, []);
   
   // Make role check case-insensitive
   const isAdminUser = user?.role?.toLowerCase() === 'admin';
@@ -237,8 +291,8 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchColumn, setSearchColumn] = useState("company_name");
-  const [showForm, setShowForm] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [showDialog, setShowDialog] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
   const [formValid, setFormValid] = useState(false);
@@ -247,23 +301,177 @@ export default function CustomersPage() {
   const [options, setOptions] = useState<{ value: string; label: string }[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string>("");
   const [lastUpdatedCustomerId, setLastUpdatedCustomerId] = useState<string | null>(null);
-  const [showOfferDialog, setShowOfferDialog] = useState(false);
-  const [offerCustomerId, setOfferCustomerId] = useState<string | null>(null);
-  const [offerSource, setOfferSource] = useState<string>("Email");
   const [expandedCustomers, setExpandedCustomers] = useState<Record<string, boolean>>({});
   const [customerOffers, setCustomerOffers] = useState<Record<string, any[]>>({});
   const [loadingOffers, setLoadingOffers] = useState<Record<string, boolean>>({});
+  const [showDeleteOfferDialog, setShowDeleteOfferDialog] = useState(false);
+  const [offerToDelete, setOfferToDelete] = useState<{ customerId: string, offerId: string } | null>(null);
 
-  // Define searchColumns here, before it's used in the useEffect hook
-  const searchColumns = [
-    { header: "Επωνυμία", accessor: "company_name" },
-    { header: "Τύπος", accessor: "customer_type" },
-    { header: "ΑΦΜ", accessor: "afm" },
-    { header: "Email", accessor: "email" },
-    { header: "Τηλέφωνο", accessor: "telephone" },
-    { header: "Διεύθυνση", accessor: "address" },
-  ];
+  // State to track if the dialog is ready to be shown
+  const [isDialogReady, setIsDialogReady] = useState(false);
+  
+  // State to store the loaded component
+  const [OffersDialogComponent, setOffersDialogComponent] = useState<React.ComponentType<any> | null>(null);
+  
+  // Add a ref to track if we're already showing a dialog
+  const dialogActiveRef = useRef(false);
+  
+  // Add a new ref to track the scroll position
+  const scrollPositionRef = useRef(0);
+  
+  // Define fetchCustomerOffers function first
+  const fetchCustomerOffers = useCallback(async (customerId: string) => {
+    try {
+      setLoadingOffers(prev => ({ ...prev, [customerId]: true }));
+      
+      const { data, error } = await supabase
+        .from('offers')
+        .select(`
+          *,
+          assigned_user:users!assigned_to(fullname),
+          created_user:users!created_by(fullname),
+          contact:contacts(full_name, position)
+        `)
+        .eq("customer_id", customerId)
+        .or('result.is.null,result.eq.pending') // Only fetch offers where result is null or 'pending'
+        .order("created_at", { ascending: false });
 
+      if (error) throw error;
+      
+      // Store the offers in state
+      setCustomerOffers(prev => ({
+        ...prev,
+        [customerId]: data || []
+      }));
+      
+      // Update the offersCount for this customer without triggering a full reload
+      const offersCount = data?.length || 0;
+      
+      // If there are no offers, automatically collapse the row
+      if (offersCount === 0) {
+        setExpandedCustomers(prev => ({
+          ...prev,
+          [customerId]: false
+        }));
+      }
+      
+      // Update customers state with the new offersCount
+      setCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, offersCount, isExpanded: offersCount > 0 ? customer.isExpanded : false } 
+            : customer
+        )
+      );
+      
+      // Update filteredCustomers state with the new offersCount
+      setFilteredCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, offersCount, isExpanded: offersCount > 0 ? customer.isExpanded : false } 
+            : customer
+        )
+      );
+      
+    } catch (error) {
+      console.error("Error fetching offers for customer:", error);
+      toast({
+        title: "Σφάλμα",
+        description: "Δεν ήταν δυνατή η φόρτωση των προσφορών.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingOffers(prev => ({ ...prev, [customerId]: false }));
+    }
+  }, []);
+  
+  // Define refreshCustomers early in the component
+  function refreshCustomers() {
+    fetchCustomers();
+  }
+  
+  // Update the handleCreateOffer function to expand the row after adding an offer
+  function handleCreateOffer(customerId, source = "Email") {
+    // Open the dialog
+    openNewOfferDialog(customerId, source, () => {
+      // Update the offers for this specific customer
+      fetchCustomerOffers(customerId);
+      
+      // Set the expanded state to true for this customer
+      setExpandedCustomers(prev => ({
+        ...prev,
+        [customerId]: true
+      }));
+      
+      // Also update the expanded state in the customers and filteredCustomers arrays
+      setCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, isExpanded: true } 
+            : customer
+        )
+      );
+      
+      setFilteredCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, isExpanded: true } 
+            : customer
+        )
+      );
+    });
+  }
+  
+  function handleEditOffer(customerId, offerId) {
+    openEditOfferDialog(customerId, offerId, () => {
+      // Instead of refreshing all customers, just fetch the offers for this specific customer
+      fetchCustomerOffers(customerId);
+      
+      // Make sure the row is expanded to show the updated offer
+      setExpandedCustomers(prev => ({
+        ...prev,
+        [customerId]: true
+      }));
+      
+      // Also update the expanded state in the customers and filteredCustomers arrays
+      setCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, isExpanded: true } 
+            : customer
+        )
+      );
+      
+      setFilteredCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, isExpanded: true } 
+            : customer
+        )
+      );
+    });
+  }
+  
+  // Replace the handleSaveOffer function
+  const handleSaveOffer = useCallback(() => {
+    // Just refresh all customers
+    refreshCustomers();
+  }, []);
+  
+  // Replace the handleCloseOfferDialog function
+  const handleCloseOfferDialog = useCallback(() => {
+    // Nothing needed here since the dialog manager handles closing
+  }, []);
+  
+  // Replace the handleOpenOfferDialog function
+  const handleOpenOfferDialog = useCallback((customerId: string, source: string = "Email", offerId?: string) => {
+    if (offerId) {
+      openEditOfferDialog(customerId, offerId, refreshCustomers);
+    } else {
+      openNewOfferDialog(customerId, source, refreshCustomers);
+    }
+  }, [refreshCustomers]);
+  
   // Format status for display
   const formatStatus = (status: string) => {
     switch (status) {
@@ -298,114 +506,16 @@ export default function CustomersPage() {
       case "Email":
         return "Email";
       case "Phone":
+      case "Telephone":
         return "Τηλέφωνο";
+      case "Website":
       case "Site":
         return "Ιστοσελίδα";
+      case "In Person":
       case "Physical":
-        return "Φυσική Παρουσία";
+        return "Φυσική παρουσία";
       default:
         return source;
-    }
-  };
-
-  // Function to handle editing an offer
-  const handleEditOffer = (customerId: string, offerId: string) => {
-    setOfferCustomerId(customerId);
-    setSelectedCustomer({ id: customerId, offerId });
-    setShowOfferDialog(true);
-  };
-
-  // Function to create an offer
-  const handleCreateOffer = (customerId: string, source: string) => {
-    setOfferCustomerId(customerId);
-    setOfferSource(source);
-    setShowOfferDialog(true);
-  };
-
-  // Function to fetch offers for a specific customer
-  const fetchCustomerOffers = async (customerId: string) => {
-    try {
-      setLoadingOffers(prev => ({ ...prev, [customerId]: true }));
-      
-      const { data, error } = await supabase
-        .from('offers')
-        .select(`
-          *,
-          assigned_user:users!assigned_to(fullname),
-          created_user:users!created_by(fullname),
-          contact:contacts(full_name, position)
-        `)
-        .eq("customer_id", customerId)
-        .or('result.is.null,result.eq.pending') // Fetch offers where result is null or 'pending'
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      
-      // Store the offers in state
-      setCustomerOffers(prev => ({
-        ...prev,
-        [customerId]: data || []
-      }));
-      
-      // Update the offersCount for this customer without triggering a full reload
-      const offersCount = data?.length || 0;
-      
-      // Update customers state with the new offersCount
-      setCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, offersCount } 
-            : customer
-        )
-      );
-      
-      // Update filteredCustomers state with the new offersCount
-      setFilteredCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, offersCount } 
-            : customer
-        )
-      );
-      
-    } catch (error) {
-      console.error("Error fetching offers for customer:", error);
-      toast({
-        title: "Σφάλμα",
-        description: "Δεν ήταν δυνατή η φόρτωση των προσφορών.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingOffers(prev => ({ ...prev, [customerId]: false }));
-    }
-  };
-
-  // Function to handle deleting an offer
-  const handleDeleteOffer = async (customerId: string, offerId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    try {
-      const { error } = await supabase
-        .from('offers')
-        .delete()
-        .eq('id', offerId);
-        
-      if (error) throw error;
-      
-      // Update the offers list
-      await fetchCustomerOffers(customerId);
-      
-      toast({
-        title: "Επιτυχής διαγραφή",
-        description: "Η προσφορά διαγράφηκε με επιτυχία.",
-      });
-    } catch (error) {
-      console.error("Error deleting offer:", error);
-      toast({
-        title: "Σφάλμα",
-        description: "Δεν ήταν δυνατή η διαγραφή της προσφοράς.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -444,10 +554,80 @@ export default function CustomersPage() {
     );
   };
 
+  // Move toggleCustomerStatus function before columns definition
+  // Add toggleCustomerStatus function inside the component
+  const toggleCustomerStatus = async (customer) => {
+    try {
+      const newStatus = customer.status === 'active' ? 'inactive' : 'active';
+      
+      // Update in database
+      await supabase
+        .from('customers')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', customer.id);
+      
+      // Update the customers array
+      const updatedCustomers = customers.map(c => 
+        c.id === customer.id ? {...c, status: newStatus} : c
+      );
+      setCustomers(updatedCustomers);
+      
+      // Handle filtered customers based on status filter
+      if (statusFilter !== 'all' && statusFilter !== newStatus) {
+        // If the new status doesn't match the filter, remove from filtered view
+        setFilteredCustomers(prevFiltered => 
+          prevFiltered.filter(c => c.id !== customer.id)
+        );
+        
+        // Show success message with additional info about filter
+        toast({
+          title: "Επιτυχής ενημέρωση",
+          description: `${newStatus === 'active' 
+            ? 'Ο πελάτης ενεργοποιήθηκε' 
+            : 'Ο πελάτης απενεργοποιήθηκε'} με επιτυχία! (Αφαιρέθηκε από την τρέχουσα προβολή)`,
+          variant: "default",
+        });
+      } else {
+        // If the status matches the filter or we're showing all, update in the filtered view
+        setFilteredCustomers(prevFiltered => 
+          prevFiltered.map(c => c.id === customer.id ? {...c, status: newStatus} : c)
+        );
+        
+        // Set the last updated customer ID for highlighting
+        setLastUpdatedCustomerId(customer.id);
+        
+        // Clear the highlight after 2 seconds
+        setTimeout(() => {
+          setLastUpdatedCustomerId(null);
+        }, 2000);
+        
+        // Show standard success message
+        toast({
+          title: "Επιτυχής ενημέρωση",
+          description: newStatus === 'active' 
+            ? 'Ο πελάτης ενεργοποιήθηκε με επιτυχία!' 
+            : 'Ο πελάτης απενεργοποιήθηκε με επιτυχία!',
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      console.error("Error updating customer status:", error);
+      toast({
+        title: "Σφάλμα",
+        description: 'Σφάλμα κατά την ενημέρωση της κατάστασης του πελάτη',
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Now define columns after the toggleCustomerStatus function
   // Memoize the columns to prevent unnecessary re-renders
   const columns = useMemo(() => [
     {
-      header: "Εκκρεμείς Προσφορές",
+      header: "Προσφορές",
       accessor: "expand",
       width: "40px",
       cell: (value, row) => {
@@ -547,11 +727,85 @@ export default function CustomersPage() {
         );
       },
     },
-  ], [isAdminOrSuperUser, toggleCustomerExpanded]);
+    {
+      header: "",
+      accessor: "actions",
+      width: "60px",
+      cell: (value, row) => {
+        if (!row || !isAdminOrSuperUser) return null;
+        
+        return (
+          <div className="flex justify-center">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Set the customer to delete and show the confirmation dialog
+                      setCustomerToDelete(row);
+                      setShowDeleteDialog(true);
+                    }}
+                    className="h-8 w-8 hover:bg-[#354f52] text-red-500 hover:text-red-400"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
+                  <p>{isAdminUser ? "Διαγραφή πελάτη" : "Απενεργοποίηση πελάτη"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        );
+      },
+    },
+  ], [isAdminOrSuperUser, toggleCustomerExpanded, toggleCustomerStatus]);
 
   const handleColumnChange = (column: string) => {
     setSelectedColumn(column);
     setSearchColumn(column); // Update the searchColumn state as well
+  };
+
+  // Add the handleDeleteOffer function before renderCustomRow
+  const handleDeleteOffer = (customerId: string, offerId: string) => {
+    setOfferToDelete({ customerId, offerId });
+    setShowDeleteOfferDialog(true);
+  };
+
+  // Update the confirmDeleteOffer function to handle the case when the last offer is deleted
+  const confirmDeleteOffer = async () => {
+    if (!offerToDelete) return;
+    
+    try {
+      const { error } = await supabase
+        .from('offers')
+        .delete()
+        .eq('id', offerToDelete.offerId);
+      
+      if (error) throw error;
+      
+      // Update the offers list for this customer
+      await fetchCustomerOffers(offerToDelete.customerId);
+      
+      toast({
+        title: "Επιτυχής διαγραφή",
+        description: "Η προσφορά διαγράφηκε με επιτυχία!",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error deleting offer:", error);
+      toast({
+        title: "Σφάλμα",
+        description: "Δεν ήταν δυνατή η διαγραφή της προσφοράς.",
+        variant: "destructive",
+      });
+    } finally {
+      setShowDeleteOfferDialog(false);
+      setOfferToDelete(null);
+    }
   };
 
   // Custom row renderer to add expandable offers section
@@ -595,83 +849,7 @@ export default function CustomersPage() {
         {customerRowComponent}
       </CustomerContextMenu>
     );
-  }, [customerOffers, loadingOffers, columns, isAdminOrSuperUser, handleEditOffer, handleDeleteOffer, handleCreateOffer, formatDateTime, formatSource, formatStatus, formatResult]);
-
-  // Add toggleCustomerStatus function inside the component
-  const toggleCustomerStatus = async (customer) => {
-    try {
-      const newStatus = customer.status === 'active' ? 'inactive' : 'active';
-      
-      // Update in database
-      await supabase
-        .from('customers')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', customer.id);
-      
-      // Update the customers array
-      const updatedCustomers = customers.map(c => 
-        c.id === customer.id ? {...c, status: newStatus} : c
-      );
-      setCustomers(updatedCustomers);
-      
-      // Handle filtered customers based on status filter
-      if (statusFilter !== 'all' && statusFilter !== newStatus) {
-        // If the new status doesn't match the filter, remove from filtered view
-        setFilteredCustomers(prevFiltered => 
-          prevFiltered.filter(c => c.id !== customer.id)
-        );
-        
-        // Show success message with additional info about filter
-        toast({
-          title: "Επιτυχής ενημέρωση",
-          description: `${newStatus === 'active' 
-            ? 'Ο πελάτης ενεργοποιήθηκε' 
-            : 'Ο πελάτης απενεργοποιήθηκε'} με επιτυχία! (Αφαιρέθηκε από την τρέχουσα προβολή)`,
-          variant: "default",
-        });
-      } else {
-        // If the status matches the filter or we're showing all, update in the filtered view
-        setFilteredCustomers(prevFiltered => 
-          prevFiltered.map(c => c.id === customer.id ? {...c, status: newStatus} : c)
-        );
-        
-        // Set the last updated customer ID for highlighting
-        setLastUpdatedCustomerId(customer.id);
-        
-        // Clear the highlight after 2 seconds
-        setTimeout(() => {
-          setLastUpdatedCustomerId(null);
-        }, 2000);
-        
-        // Show standard success message
-        toast({
-          title: "Επιτυχής ενημέρωση",
-          description: newStatus === 'active' 
-            ? 'Ο πελάτης ενεργοποιήθηκε με επιτυχία!' 
-            : 'Ο πελάτης απενεργοποιήθηκε με επιτυχία!',
-          variant: "default",
-        });
-      }
-    } catch (error) {
-      console.error("Error updating customer status:", error);
-      toast({
-        title: "Σφάλμα",
-        description: 'Σφάλμα κατά την ενημέρωση της κατάστασης του πελάτη',
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleOfferSave = () => {
-    // Refresh data if needed
-    toast({
-      title: "Επιτυχής δημιουργία",
-      description: "Η προσφορά δημιουργήθηκε με επιτυχία.",
-    });
-  };
+  }, [customerOffers, loadingOffers, columns, isAdminOrSuperUser, handleEditOffer, handleDeleteOffer, handleCreateOffer]);
 
   // Fetch customers when user or filters change
   useEffect(() => {
@@ -680,7 +858,8 @@ export default function CustomersPage() {
     }
   }, [user, refreshTrigger, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchCustomers = async () => {
+  // Update the fetchCustomers function to accept a parameter for customers to expand
+  const fetchCustomers = async (customersToExpand: string[] = []) => {
     try {
       setLoading(true);
       
@@ -730,34 +909,68 @@ export default function CustomersPage() {
         });
         
         // Add isExpanded property and offersCount to each customer in a single step
-        const customersWithData = customersData?.map(customer => ({
-          ...customer,
-          isExpanded: expandedCustomers[customer.id] || false,
-          offers: customerOffers[customer.id] || [],
-          offersCount: countsMap[customer.id] || 0
-        })) || [];
+        const customersWithData = customersData?.map(customer => {
+          // Check if this customer should be expanded (either from current state or from parameter)
+          const shouldBeExpanded = expandedCustomers[customer.id] || customersToExpand.includes(customer.id);
+          const offersCount = countsMap[customer.id] || 0;
+          
+          return {
+            ...customer,
+            isExpanded: shouldBeExpanded,
+            offers: customerOffers[customer.id] || [],
+            offersCount
+          };
+        }) || [];
         
         // Update both states at once
         setCustomers(customersWithData);
         setFilteredCustomers(customersWithData);
+        
+        // Also update the expandedCustomers state to include any newly expanded customers
+        if (customersToExpand.length > 0) {
+          setExpandedCustomers(prev => {
+            const newState = { ...prev };
+            customersToExpand.forEach(id => {
+              newState[id] = true;
+            });
+            return newState;
+          });
+        }
       } else {
         // Convert the array of counts to a map for easier lookup
         const countsMap = {};
         offerCounts?.forEach(item => {
           countsMap[item.customer_id] = item.count;
         });
-  
+
         // Add isExpanded property and offersCount to each customer in a single step
-        const customersWithData = customersData?.map(customer => ({
-          ...customer,
-          isExpanded: expandedCustomers[customer.id] || false,
-          offers: customerOffers[customer.id] || [],
-          offersCount: countsMap[customer.id] || 0
-        })) || [];
-  
+        const customersWithData = customersData?.map(customer => {
+          // Check if this customer should be expanded (either from current state or from parameter)
+          const shouldBeExpanded = expandedCustomers[customer.id] || customersToExpand.includes(customer.id);
+          const offersCount = countsMap[customer.id] || 0;
+          
+          return {
+            ...customer,
+            isExpanded: shouldBeExpanded,
+            offers: customerOffers[customer.id] || [],
+            offersCount
+          };
+        }) || [];
+        
         // Update both states at once
         setCustomers(customersWithData);
         setFilteredCustomers(customersWithData);
+        
+        // Also update the expandedCustomers state to include any newly expanded customers
+        if (customersToExpand.length > 0) {
+          setExpandedCustomers(prev => {
+            const newState = { ...prev };
+            customersToExpand.forEach(id => {
+              newState[id] = true;
+            });
+            return newState;
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -797,7 +1010,7 @@ export default function CustomersPage() {
 
   const handleEditCustomer = (customer) => {
     setSelectedCustomer(customer);
-    setShowForm(true);
+    setShowDialog(true);
   };
 
   const handleDeleteCustomer = async () => {
@@ -823,10 +1036,6 @@ export default function CustomersPage() {
     }
   };
 
-  const refreshCustomers = () => {
-    setRefreshTrigger(prev => prev + 1);
-  };
-
   const handleDelete = async (customerId) => {
     if (!customerId) return;
     
@@ -837,17 +1046,49 @@ export default function CustomersPage() {
       if (isAdminUser) {
         // For admin users: Perform actual deletion
         
-        // First delete all contacts associated with this customer
-        await supabase
+        // First delete all offers associated with this customer
+        const { error: offersError } = await supabase
+          .from('offers')
+          .delete()
+          .eq('customer_id', customerId);
+        
+        if (offersError) {
+          console.error("Error deleting customer offers:", offersError);
+          throw new Error("Failed to delete customer offers");
+        }
+        
+        // Set primary_contact_id to null to break the circular reference
+        const { error: updateError } = await supabase
+          .from('customers')
+          .update({ primary_contact_id: null })
+          .eq('id', customerId);
+        
+        if (updateError) {
+          console.error("Error updating customer primary contact:", updateError);
+          throw new Error("Failed to update customer primary contact");
+        }
+        
+        // Then delete all contacts associated with this customer
+        const { error: contactsError } = await supabase
           .from('contacts')
           .delete()
           .eq('customer_id', customerId);
         
-        // Then delete the customer
-        await supabase
+        if (contactsError) {
+          console.error("Error deleting customer contacts:", contactsError);
+          throw new Error("Failed to delete customer contacts");
+        }
+        
+        // Finally delete the customer
+        const { error: customerError } = await supabase
           .from('customers')
           .delete()
           .eq('id', customerId);
+        
+        if (customerError) {
+          console.error("Error deleting customer:", customerError);
+          throw new Error("Failed to delete customer");
+        }
         
         // Update the customers array
         setCustomers(prevCustomers => 
@@ -861,7 +1102,7 @@ export default function CustomersPage() {
         
         toast({
           title: "Επιτυχής διαγραφή",
-          description: 'Ο πελάτης διαγράφηκε οριστικά με επιτυχία!',
+          description: 'Ο πελάτης, οι επαφές και οι προσφορές του διαγράφηκαν οριστικά με επιτυχία!',
           variant: "default",
         });
       } else {
@@ -904,186 +1145,145 @@ export default function CustomersPage() {
       console.error("Error deleting customer:", error);
       toast({
         title: "Σφάλμα",
-        description: 'Σφάλμα κατά τη διαγραφή του πελάτη',
+        description: 'Σφάλμα κατά τη διαγραφή του πελάτη: ' + (error.message || 'Άγνωστο σφάλμα'),
         variant: "destructive",
       });
+    }
+  };
+
+  // Find the refreshData function that's causing the error
+  const refreshData = () => {
+    // Make sure we're not trying to access properties of null or undefined
+    // and that we're passing a string ID, not an object
+    if (selectedCustomer && selectedCustomer.id) {
+      // If you're using the ID directly, make sure it's a string
+      const customerId = typeof selectedCustomer.id === 'string' 
+        ? selectedCustomer.id 
+        : String(selectedCustomer.id);
+        
+      // Use the string ID in your API calls
+      // ... your existing code ...
+    } else {
+      // If there's no selected customer, just fetch all customers
+      fetchCustomers();
     }
   };
 
   // If showing the form, render it instead of the customer list
   return (
     <div className="p-4">
-      {showForm ? (
-        <div className="h-full flex flex-col">
-          <div className="flex items-center justify-between mb-4 p-4 bg-[#354f52] border-b border-[#52796f]">
-            <h1 className="text-xl font-bold text-[#a8c5b5]">
-              {selectedCustomer ? "Επεξεργασία Πελάτη" : "Νέος Πελάτης"}
-            </h1>
-            <div className="flex items-center space-x-2">
-              <Button
-                form="customer-form"
-                type="submit"
-                disabled={!formValid}
-                className="bg-[#52796f] hover:bg-[#52796f]/90 text-white rounded-md px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Αποθήκευση
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f] hover:bg-[#354f52]"
-                onClick={() => {
-                  setShowForm(false);
-                  setSelectedCustomer(null);
-                }}
-              >
-                Άκυρο
-              </Button>
-            </div>
-          </div>
+      <div className="mb-2">
+        <h1 className="text-2xl font-bold text-[#cad2c5] mb-2">
+          Διαχείριση Πελατών
+        </h1>
+        <Button
+          onClick={() => {
+            setSelectedCustomer(null);
+            setShowDialog(true);
+          }}
+          className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] mb-2"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Νέος Πελάτης
+        </Button>
+      </div>
 
-          <div className="flex-1 overflow-auto relative">
-            <CustomerForm
-              customerId={selectedCustomer?.id}
-              onSave={() => {
-                refreshCustomers();
-                setShowForm(false);
-                setSelectedCustomer(null);
+      <div className="flex justify-between items-center mb-4">
+        <div className="w-1/4">
+          {/* Empty div to maintain layout */}
+        </div>
+        
+        <div className="flex-1 flex justify-center">
+          <SearchBar
+            placeholder="Αναζήτηση..."
+            value={searchTerm}
+            onChange={setSearchTerm}
+            options={options}
+            selectedColumn={selectedColumn}
+            onColumnChange={handleColumnChange}
+          />
+        </div>
+        
+        <div className="flex items-center gap-2 w-1/4 justify-end">
+          {/* Status filters styled as in the DataTableBase */}
+          <div className="flex items-center gap-2">
+            <div 
+              onClick={() => {
+                setStatusFilter("all");
+                setRefreshTrigger(prev => prev + 1);
               }}
-              onCancel={() => {
-                setShowForm(false);
-                setSelectedCustomer(null);
+              className="relative inline-block min-w-[70px]"
+            >
+              <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+                ${statusFilter === "all" 
+                  ? "bg-blue-500/20 text-blue-400 font-medium shadow-[0_0_8px_2px_rgba(59,130,246,0.3)] ring-blue-400/50" 
+                  : "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 ring-transparent"}`}
+              >
+                Όλοι
+              </span>
+            </div>
+            
+            <div 
+              onClick={() => {
+                setStatusFilter("active");
+                setRefreshTrigger(prev => prev + 1);
               }}
-              onValidityChange={setFormValid}
-            />
+              className="relative inline-block min-w-[70px]"
+            >
+              <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+                ${statusFilter === "active" 
+                  ? "bg-green-500/20 text-green-400 font-medium shadow-[0_0_8px_2px_rgba(74,222,128,0.3)] ring-green-400/50" 
+                  : "bg-green-500/10 text-green-400 hover:bg-green-500/20 ring-transparent"}`}
+              >
+                Ενεργός
+              </span>
+            </div>
+            
+            <div 
+              onClick={() => {
+                setStatusFilter("inactive");
+                setRefreshTrigger(prev => prev + 1);
+              }}
+              className="relative inline-block min-w-[70px]"
+            >
+              <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+                ${statusFilter === "inactive" 
+                  ? "bg-red-500/20 text-red-400 font-medium shadow-[0_0_8px_2px_rgba(248,113,113,0.3)] ring-red-400/50" 
+                  : "bg-red-500/10 text-red-400 hover:bg-red-500/20 ring-transparent"}`}
+              >
+                Ανενεργός
+              </span>
+            </div>
           </div>
         </div>
-      ) : (
-        <>
-          <div className="mb-2">
-            <h1 className="text-2xl font-bold text-[#cad2c5] mb-2">
-              Διαχείριση Πελατών
-            </h1>
-            <Button
-              onClick={() => {
-                setSelectedCustomer(null);
-                setShowForm(true);
-                setFormValid(false);
-              }}
-              className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] mb-2"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Νέος Πελάτης
-            </Button>
-          </div>
+      </div>
 
-          <div className="flex justify-between items-center mb-4">
-            <div className="w-1/4">
-              {/* Empty div to maintain layout */}
-            </div>
-            
-            <div className="flex-1 flex justify-center">
-              <SearchBar
-                placeholder="Αναζήτηση..."
-                value={searchTerm}
-                onChange={setSearchTerm}
-                options={options}
-                selectedColumn={selectedColumn}
-                onColumnChange={handleColumnChange}
-              />
-            </div>
-            
-            <div className="flex items-center gap-2 w-1/4 justify-end">
-              {/* Status filters styled as in the DataTableBase */}
-              <div className="flex items-center gap-2">
-                <div 
-                  onClick={() => {
-                    setStatusFilter("all");
-                    setRefreshTrigger(prev => prev + 1);
-                  }}
-                  className="relative inline-block min-w-[70px]"
-                >
-                  <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
-                    ${statusFilter === "all" 
-                      ? "bg-blue-500/20 text-blue-400 font-medium shadow-[0_0_8px_2px_rgba(59,130,246,0.3)] ring-blue-400/50" 
-                      : "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 ring-transparent"}`}
-                  >
-                    Όλοι
-                  </span>
-                </div>
-                
-                <div 
-                  onClick={() => {
-                    setStatusFilter("active");
-                    setRefreshTrigger(prev => prev + 1);
-                  }}
-                  className="relative inline-block min-w-[70px]"
-                >
-                  <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
-                    ${statusFilter === "active" 
-                      ? "bg-green-500/20 text-green-400 font-medium shadow-[0_0_8px_2px_rgba(74,222,128,0.3)] ring-green-400/50" 
-                      : "bg-green-500/10 text-green-400 hover:bg-green-500/20 ring-transparent"}`}
-                  >
-                    Ενεργός
-                  </span>
-                </div>
-                
-                <div 
-                  onClick={() => {
-                    setStatusFilter("inactive");
-                    setRefreshTrigger(prev => prev + 1);
-                  }}
-                  className="relative inline-block min-w-[70px]"
-                >
-                  <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
-                    ${statusFilter === "inactive" 
-                      ? "bg-red-500/20 text-red-400 font-medium shadow-[0_0_8px_2px_rgba(248,113,113,0.3)] ring-red-400/50" 
-                      : "bg-red-500/10 text-red-400 hover:bg-red-500/20 ring-transparent"}`}
-                  >
-                    Ανενεργός
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+      <DataTableBase
+        key={`customers-table-${statusFilter}`}
+        columns={columns}
+        data={filteredCustomers}
+        isLoading={loading}
+        defaultSortColumn="company_name"
+        searchTerm={searchTerm}
+        searchColumn={searchColumn}
+        onRowClick={(row) => navigate(`/customers/${row.id}`)}
+        containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
+        rowClassName="hover:bg-[#354f52]/50 cursor-pointer group"
+        highlightedRowId={lastUpdatedCustomerId}
+        renderRow={renderCustomRow}
+      />
 
-          <DataTableBase
-            key={`customers-table-${statusFilter}`}
-            columns={columns}
-            data={filteredCustomers}
-            isLoading={loading}
-            defaultSortColumn="company_name"
-            searchTerm={searchTerm}
-            searchColumn={searchColumn}
-            onRowClick={(row) => navigate(`/customers/${row.id}`)}
-            containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
-            rowClassName="hover:bg-[#354f52]/50 cursor-pointer group"
-            highlightedRowId={lastUpdatedCustomerId}
-            renderRow={renderCustomRow}
-          />
-        </>
-      )}
-
-      {/* Offer Dialog */}
-      <OffersDialog
-        open={showOfferDialog}
-        onOpenChange={(open) => {
-          setShowOfferDialog(open);
-          if (!open) {
-            setOfferCustomerId(null);
-            setSelectedCustomer(null);
-          }
-        }}
-        customerId={offerCustomerId || ""}
-        offerId={selectedCustomer?.offerId}
-        onSave={() => {
-          // Refresh the offers for this customer
-          if (offerCustomerId) {
-            fetchCustomerOffers(offerCustomerId);
-          }
-          setRefreshTrigger(prev => prev + 1);
-        }}
-        defaultSource={offerSource}
+      {/* Add CustomerDialog component */}
+      <CustomerDialog
+        open={showDialog}
+        onOpenChange={(open) => setShowDialog(open)}
+        customer={selectedCustomer ? {
+          ...selectedCustomer,
+          id: typeof selectedCustomer.id === 'string' 
+            ? selectedCustomer.id 
+            : String(selectedCustomer.id)
+        } : undefined}
+        refreshData={fetchCustomers}
       />
 
       {/* Delete Customer Confirmation */}
@@ -1093,7 +1293,7 @@ export default function CustomersPage() {
           aria-describedby="delete-customer-description"
         >
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className="text-[#cad2c5]">
               {isAdminUser 
                 ? "Οριστική Διαγραφή Πελάτη" 
                 : customerToDelete?.status === 'active' 
@@ -1102,7 +1302,7 @@ export default function CustomersPage() {
             </AlertDialogTitle>
             <AlertDialogDescription id="delete-customer-description" className="text-[#84a98c]">
               {isAdminUser
-                ? `Είστε σίγουροι ότι θέλετε να διαγράψετε οριστικά τον πελάτη "${customerToDelete?.company_name}" και όλες τις επαφές του; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.`
+                ? `Είστε σίγουροι ότι θέλετε να διαγράψετε οριστικά τον πελάτη "${customerToDelete?.company_name}", όλες τις επαφές του και όλες τις προσφορές του; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.`
                 : customerToDelete?.status === 'active'
                   ? `Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε τον πελάτη "${customerToDelete?.company_name}";`
                   : `Είστε σίγουροι ότι θέλετε να ενεργοποιήσετε τον πελάτη "${customerToDelete?.company_name}";`
@@ -1135,6 +1335,32 @@ export default function CustomersPage() {
                 : customerToDelete?.status === 'active'
                   ? "Απενεργοποίηση"
                   : "Ενεργοποίηση"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Offer Confirmation */}
+      <AlertDialog open={showDeleteOfferDialog} onOpenChange={setShowDeleteOfferDialog}>
+        <AlertDialogContent 
+          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
+          aria-describedby="delete-offer-description"
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#cad2c5]">Διαγραφή Προσφοράς</AlertDialogTitle>
+            <AlertDialogDescription id="delete-offer-description" className="text-[#84a98c]">
+              Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την προσφορά; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#354f52] text-[#cad2c5] hover:bg-[#354f52]/90">
+              Άκυρο
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmDeleteOffer}
+            >
+              Διαγραφή
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

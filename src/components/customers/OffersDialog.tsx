@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
@@ -18,9 +18,26 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { Check, X, Plus } from "lucide-react";
-import ContactDialog from "@/components/contacts/ContactDialog";
+import { ContactDialog } from "@/components/contacts/ContactDialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-interface OffersDialogProps {
+// Import our new components
+import DialogHeaderSection from "./offer-dialog/DialogHeaderSection";
+import BasicInfoSection from "./offer-dialog/BasicInfoSection";
+import AddressSection from "./offer-dialog/AddressSection";
+import RequirementsSection from "./offer-dialog/RequirementsSection";
+import StatusSection from "./offer-dialog/StatusSection";
+import CommentsSection from "./offer-dialog/CommentsSection";
+import DialogFooterSection from "./offer-dialog/DialogFooterSection";
+
+// Export the props interface so it can be imported by other files
+export interface OffersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customerId: string;
@@ -29,132 +46,43 @@ interface OffersDialogProps {
   defaultSource?: string;
 }
 
-export default function OffersDialog({
-  open,
-  onOpenChange,
-  customerId,
-  offerId,
-  onSave,
-  defaultSource = "Email",
-}: OffersDialogProps) {
-  // Add global style for placeholder
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      #requirements::placeholder, #amount::placeholder, #customer_comments::placeholder, #our_comments::placeholder {
-        color: #5d7a63 !important;
-        opacity: 1 !important;
-        font-size: 0.875rem !important;
-      }
-      
-      #requirements, #amount, #customer_comments, #our_comments {
-        font-size: 0.875rem !important; /* Smaller text size */
-        line-height: 1.5 !important;
-        resize: none !important;
-        vertical-align: top !important;
-        padding-top: 2px !important;
-        padding-bottom: 2px !important;
-        box-sizing: border-box !important;
-      }
-      
-      #requirements, #amount {
-        height: 75px !important;
-        min-height: 75px !important;
-        max-height: 75px !important;
-      }
-      
-      #customer_comments, #our_comments {
-        height: 60px !important;
-        min-height: 60px !important;
-        max-height: 60px !important;
-      }
-      
-      /* Hover effects for inputs and textareas */
-      input:hover, textarea:hover, select:hover {
-        box-shadow: 0 0 0 1px #52796f !important;
-      }
-      
-      input:focus, textarea:focus, select:focus {
-        box-shadow: 0 0 0 2px #52796f !important;
-        outline: none !important;
-      }
-      
-      /* Custom styling for date picker */
-      input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-        filter: invert(0.8) sepia(0.3) saturate(0.5) hue-rotate(100deg);
-        opacity: 0.8;
-      }
-      
-      /* Override browser's default selection color */
-      input[type="datetime-local"] {
-        color-scheme: dark;
-      }
-      
-      /* Custom selection colors for the date picker */
-      ::-moz-selection {
-        background-color: #52796f !important;
-        color: #cad2c5 !important;
-      }
-      
-      ::selection {
-        background-color: #52796f !important;
-        color: #cad2c5 !important;
-      }
-      
-      /* Force green highlight for date picker */
-      input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
-        background-color: transparent !important;
-      }
-      
-      input[type="datetime-local"]::-webkit-datetime-edit-text,
-      input[type="datetime-local"]::-webkit-datetime-edit-month-field,
-      input[type="datetime-local"]::-webkit-datetime-edit-day-field,
-      input[type="datetime-local"]::-webkit-datetime-edit-year-field,
-      input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
-      input[type="datetime-local"]::-webkit-datetime-edit-minute-field,
-      input[type="datetime-local"]::-webkit-datetime-edit-ampm-field {
-        color: #cad2c5 !important;
-      }
-      
-      input[type="datetime-local"]::-webkit-datetime-edit-text:focus,
-      input[type="datetime-local"]::-webkit-datetime-edit-month-field:focus,
-      input[type="datetime-local"]::-webkit-datetime-edit-day-field:focus,
-      input[type="datetime-local"]::-webkit-datetime-edit-year-field:focus,
-      input[type="datetime-local"]::-webkit-datetime-edit-hour-field:focus,
-      input[type="datetime-local"]::-webkit-datetime-edit-minute-field:focus,
-      input[type="datetime-local"]::-webkit-datetime-edit-ampm-field:focus {
-        background-color: #52796f !important;
-        color: #cad2c5 !important;
-      }
-      
-      /* Adjust section heights */
-      .bg-\\[\\#3a5258\\].px-4.py-2 {
-        padding-top: 0.375rem !important;
-        padding-bottom: 0.375rem !important;
-      }
-      
-      /* Force equal heights for sections */
-      .section-basic-info, .section-requirements {
-        height: 180px !important;
-      }
-      
-      /* Make dropdown headers match input height */
-      .dropdown-header {
-        height: 36px !important;
-        min-height: 36px !important;
-        max-height: 36px !important;
-        display: flex !important;
-        align-items: center !important;
-        font-size: 0.9rem !important;
-      }
-    `;
-    document.head.appendChild(style);
+// Create a context to share state between components
+export const OfferDialogContext = React.createContext<any>(null);
+
+// Wrap the component with React.memo to prevent unnecessary re-renders
+const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) {
+  // Generate a unique instance ID for this component instance
+  const instanceId = React.useId();
+  
+  // Check if props is null or undefined
+  if (!props || !props.customerId) {
+    console.error("OffersDialog received invalid props", props);
+    return null;
+  }
+  
+  const {
+    open,
+    onOpenChange,
+    customerId,
+    offerId,
+    onSave,
+    defaultSource = "Email",
+  } = props;
+  
+  // Use useRef to track if this is the first render
+  const isFirstRender = React.useRef(true);
+  
+  // Log initialization only on first render
+  React.useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+    }
     
     return () => {
-      document.head.removeChild(style);
+      // Cleanup on unmount
     };
   }, []);
-
+  
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
@@ -171,6 +99,7 @@ export default function OffersDialog({
   const [selectedContact, setSelectedContact] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   // Format current date and time in ISO format for datetime-local input
   const formatCurrentDateTimeForInput = () => {
@@ -208,16 +137,40 @@ export default function OffersDialog({
     { value: "cancel", label: "Ακύρωση" }
   ];
 
-  // Helper functions for source
+  // Helper functions for source, status, and result
   const getSourceLabel = (value: string) => {
-    return sourceOptions.find(option => option.value === value)?.label || value;
+    switch (value) {
+      case "Email":
+        return "Email";
+      case "Phone":
+      case "Telephone":
+        return "Τηλέφωνο";
+      case "Website":
+      case "Site":
+        return "Ιστοσελίδα";
+      case "In Person":
+      case "Physical":
+        return "Φυσική παρουσία";
+      default:
+        return value;
+    }
   };
   
   const getSourceValue = (label: string) => {
-    return sourceOptions.find(option => option.label === label)?.value || label;
+    switch (label) {
+      case "Email":
+        return "Email";
+      case "Τηλέφωνο":
+        return "Phone";
+      case "Ιστοσελίδα":
+        return "Website";
+      case "Φυσική παρουσία":
+        return "In Person";
+      default:
+        return label;
+    }
   };
 
-  // Helper functions for status and result
   const getStatusLabel = (value: string) => {
     return statusOptions.find(option => option.value === value)?.label || value;
   };
@@ -264,24 +217,6 @@ export default function OffersDialog({
   useEffect(() => {
     setValue("source", defaultSource);
   }, [defaultSource, setValue]);
-
-  // Reset success and error states when dialog opens or closes
-  useEffect(() => {
-    if (open) {
-      // Reset states when dialog opens
-      setError("");
-      setSuccess(false);
-    }
-  }, [open]);
-
-  // Update current date/time when dialog opens
-  useEffect(() => {
-    if (open && !offerId) {
-      const newDate = formatCurrentDateTimeForInput();
-      setCurrentDate(newDate);
-      setValue("offer_date", newDate);
-    }
-  }, [open, offerId, setValue]);
 
   // Fetch users for assignment dropdown
   useEffect(() => {
@@ -458,9 +393,10 @@ export default function OffersDialog({
         const contactNameOptions: string[] = [];
         
         data?.forEach(contact => {
-          // Store both full name and display name with position
+          // Store full name without position for the dropdown header
           contactIdToName[contact.id] = contact.full_name;
           
+          // Store display name with position for the dropdown options
           const displayName = contact.position 
             ? `${contact.full_name} (${contact.position})` 
             : contact.full_name;
@@ -501,8 +437,10 @@ export default function OffersDialog({
   };
   
   const getContactDisplayNameById = (id: string) => {
-    // Return the display name with position for the dropdown options
-    return contactDisplayMap[id] || "";
+    const contact = contacts.find((c) => c.id === id);
+    if (!contact) return "";
+    // Return only the full name without the position
+    return contact.full_name;
   };
 
   const onSubmit = async (data) => {
@@ -632,507 +570,290 @@ export default function OffersDialog({
     return true;
   };
 
+  // Add console log when form is fully loaded
+  useEffect(() => {
+    if (open) {
+      // Check if key DOM elements are rendered
+      setTimeout(() => {
+      }, 100);
+    }
+  }, [open]);
+
+  // If you're doing focus operations when the dialog opens
+  useEffect(() => {
+    if (open) {
+      // Let the dialog render first
+      requestAnimationFrame(() => {
+        // Then focus in the next frame
+        requestAnimationFrame(() => {
+          const element = document.querySelector('.dialog-content input') as HTMLElement;
+          if (element) element.focus();
+        });
+      });
+    }
+  }, [open]);
+
+  // Create a context value to share with child components
+  const contextValue = {
+    register,
+    watch,
+    setValue,
+    errors,
+    isEditing,
+    loading,
+    customerName,
+    currentDate,
+    sourceOptions,
+    statusOptions,
+    resultOptions,
+    userOptions,
+    contactOptions,
+    selectedContactId,
+    setSelectedContactId,
+    getSourceLabel,
+    getSourceValue,
+    getStatusLabel,
+    getStatusValue,
+    getResultLabel,
+    getResultValue,
+    getUserIdByName,
+    getUserNameById,
+    getContactIdByName,
+    getContactNameById,
+    getContactDisplayNameById,
+    watchOfferResult,
+    watchResult,
+    watchHma,
+    setShowContactDialog
+  };
+
+  // Find where contactOptions are created or where the dropdown is rendered
+  // It might look something like this:
+  useEffect(() => {
+    // Update contact options to only include full name
+    const options = contacts.map(contact => contact.full_name);
+    setContactOptions(options);
+    
+    // Update the display map to only use full name
+    const displayMap = {};
+    contacts.forEach(contact => {
+      displayMap[contact.id] = contact.full_name; // Only use full_name
+    });
+    setContactDisplayMap(displayMap);
+  }, [contacts]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="sm:max-w-[1000px] bg-[#2f3e46] border-[#52796f] text-[#cad2c5] p-0 overflow-hidden" 
+      <DialogContent
+        className="max-w-4xl bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
+        aria-labelledby="offer-dialog-title"
         aria-describedby="offer-dialog-description"
       >
-        <DialogHeader className="p-4 border-b border-[#52796f] bg-[#3a5258]">
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-3">
-              <div className="text-[#a8c5b5] text-base font-medium mr-2">
-                {customerName}
+        <style>
+          {`
+            textarea {
+              min-height: 4rem !important;
+              resize: none !important;
+            }
+            
+            /* Remove background and border from dialog header */
+            .dialog-header-section,
+            .p-5.border-b.border-\\[\\#52796f\\].bg-\\[\\#3a5258\\] {
+              background: transparent !important;
+              border-bottom: none !important;
+            }
+            
+            /* Custom text selection colors with !important to override */
+            .max-w-4xl *::selection {
+              background-color: #52796f !important;
+              color: #cad2c5 !important;
+            }
+            
+            .max-w-4xl *::-moz-selection {
+              background-color: #52796f !important;
+              color: #cad2c5 !important;
+            }
+            
+            /* Target specific elements */
+            .max-w-4xl textarea::selection,
+            .max-w-4xl input::selection,
+            .max-w-4xl div::selection {
+              background-color: #52796f !important;
+              color: #cad2c5 !important;
+            }
+            
+            .max-w-4xl textarea::-moz-selection,
+            .max-w-4xl input::-moz-selection,
+            .max-w-4xl div::-moz-selection {
+              background-color: #52796f !important;
+              color: #cad2c5 !important;
+            }
+            
+            /* Specifically target date/time input */
+            input[type="datetime-local"]::selection,
+            input[type="datetime-local"]::-moz-selection {
+              background-color: #52796f !important;
+              color: #cad2c5 !important;
+            }
+            
+            /* Target all input types to be safe */
+            input[type]::selection,
+            input[type]::-moz-selection {
+              background-color: #52796f !important;
+              color: #cad2c5 !important;
+            }
+          `}
+        </style>
+        
+        <div className="dialog-content">
+          <OfferDialogContext.Provider value={contextValue}>
+            <DialogHeaderSection 
+              customerName={customerName}
+              isEditing={isEditing}
+              watch={watch}
+              setValue={setValue}
+              contactOptions={contactOptions}
+              selectedContactId={selectedContactId}
+              setSelectedContactId={setSelectedContactId}
+              getContactNameById={getContactNameById}
+              getContactDisplayNameById={getContactDisplayNameById}
+              setShowContactDialog={setShowContactDialog}
+              contactDisplayMap={contactDisplayMap}
+              contacts={contacts}
+            />
+
+            <form onSubmit={handleSubmit(onSubmit)} className="p-4 flex flex-col">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Left Column */}
+                <div className="space-y-4">
+                  <BasicInfoSection />
+                  <AddressSection />
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-4">
+                  <RequirementsSection />
+                  <StatusSection />
+                </div>
               </div>
-              <DialogTitle className="text-[#cad2c5] text-base cursor-default">
-                {isEditing ? "Επεξεργασία Προσφοράς" : "Νέα Προσφορά"}
-              </DialogTitle>
-            </div>
-            <div>
-              {/* Empty div to maintain layout */}
-            </div>
-          </div>
-          <div className="flex justify-center items-center mt-2 space-x-6">
-            <div className="flex items-center">
-              <div className="text-[#a8c5b5] text-sm mr-2">
-                Ημερομηνία:
-              </div>
-              <Input
-                type="datetime-local"
-                value={watch("offer_date")}
-                onChange={(e) => setValue("offer_date", e.target.value)}
-                className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] h-8 w-48 hover:shadow-[0_0_0_1px_#52796f] focus:shadow-[0_0_0_2px_#52796f] focus:outline-none"
+
+              {/* Comments Section - Full Width */}
+              <CommentsSection />
+
+              <DialogFooterSection 
+                error={error}
+                success={success}
+                loading={loading}
+                isEditing={isEditing}
+                isFormValid={isFormValid}
+                watchOfferResult={watchOfferResult}
+                watchResult={watchResult}
+                onOpenChange={onOpenChange}
               />
-            </div>
-            
-            <div className="flex items-center">
-              <div className="text-[#a8c5b5] text-sm mr-2">
-                Επαφή:
-              </div>
-              <div className="w-56 flex items-center">
-                <div className="flex-1">
-                  <GlobalDropdown
-                    options={contactOptions}
-                    value={getContactNameById(selectedContactId || "")}
-                    onSelect={(name) => setSelectedContactId(getContactIdByName(name))}
-                    placeholder="Επιλέξτε επαφή"
-                    className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-                    disabled={contacts.length === 0}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="h-7 w-7 p-0 ml-2 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-600 rounded-full flex items-center justify-center"
-                  onClick={() => {
-                    setSelectedContact(null);
-                    setShowContactDialog(true);
-                  }}
-                  title="Προσθήκη Επαφής"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-          <DialogDescription id="offer-dialog-description" className="sr-only">
-            {isEditing ? "Φόρμα επεξεργασίας προσφοράς" : "Φόρμα δημιουργίας νέας προσφοράς"}
-          </DialogDescription>
-        </DialogHeader>
+            </form>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-4 flex flex-col">
-          <div className="grid grid-cols-2 gap-4">
-            {/* Left Column */}
-            <div className="space-y-4">
-              {/* Basic Information Section */}
-              <div className="section-basic-info bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-                <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
-                  <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                    ΒΑΣΙΚΑ ΣΤΟΙΧΕΙΑ
-                  </h2>
-                </div>
-                <div className="p-3">
-                  <div className="space-y-3">
-                    <div className="flex items-center">
-                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-                        Πηγή Αιτήματος
-                      </div>
-                      <div className="w-2/3">
-                        <div className="w-3/4">
-                          <GlobalDropdown
-                            options={sourceOptions.map(option => option.label)}
-                            value={getSourceLabel(watch("source"))}
-                            onSelect={(label) => setValue("source", getSourceValue(label))}
-                            placeholder="Επιλέξτε πηγή"
-                          />
-                        </div>
-                      </div>
-                    </div>
+            {/* Contact Dialog */}
+            <ContactDialog
+              open={showContactDialog}
+              onOpenChange={(open) => {
+                setShowContactDialog(open);
+                if (!open) {
+                  setSelectedContact(null);
+                  // Refresh contacts when dialog closes
+                  const fetchContacts = async () => {
+                    if (!customerId) return;
+                    
+                    try {
+                      const { data, error } = await supabase
+                        .from("contacts")
+                        .select("id, full_name, position, created_at")
+                        .eq("customer_id", customerId)
+                        .eq("status", "active");
 
-                    <div className="flex items-start">
-                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-1 pt-2">
-                        Ζήτηση
-                      </div>
-                      <div className="w-2/3">
-                        <textarea
-                          id="amount"
-                          className="w-full bg-[#2f3e46] text-[#cad2c5] p-2 rounded-sm"
-                          style={{
-                            border: '1px solid #52796f',
-                            outline: 'none',
-                            fontSize: '0.875rem'
-                          }}
-                          placeholder="Ζήτηση πελάτη"
-                          rows={3}
-                          {...register("amount")}
-                        ></textarea>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Address Section */}
-              <div className="bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-                <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
-                  <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                    ΔΙΕΥΘΥΝΣΗ ΠΑΡΑΛΑΒΗΣ
-                  </h2>
-                </div>
-                <div className="p-3">
-                  <div className="space-y-3">
-                    <div className="flex items-center">
-                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-                        Διεύθυνση
-                      </div>
-                      <div className="w-2/3">
-                        <Input
-                          id="address"
-                          className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8"
-                          {...register("address")}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center">
-                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-                        Τ.Κ.
-                      </div>
-                      <div className="w-2/3">
-                        <Input
-                          id="tk"
-                          className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8"
-                          {...register("tk")}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center">
-                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-                        Πόλη
-                      </div>
-                      <div className="w-2/3">
-                        <Input
-                          id="town"
-                          className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8"
-                          {...register("town")}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column */}
-            <div className="space-y-4">
-              {/* Requirements Section */}
-              <div className="section-requirements bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-                <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
-                  <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                    ΑΠΑΙΤΗΣΕΙΣ
-                  </h2>
-                </div>
-                <div className="p-3 space-y-3">
-                  <div className="flex items-start">
-                    <div className="w-1/6 text-[#a8c5b5] text-sm pr-1 pt-2">
-                      Απαιτήσεις
-                    </div>
-                    <div className="w-5/6">
-                      <textarea
-                        id="requirements"
-                        className="w-full bg-[#2f3e46] text-[#cad2c5] p-2 rounded-sm"
-                        style={{
-                          border: '1px solid #52796f',
-                          outline: 'none',
-                          fontSize: '0.875rem'
-                        }}
-                        placeholder="Απαιτήσεις του πελάτη προς εμάς"
-                        rows={3}
-                        {...register("requirements")}
-                      ></textarea>
-                    </div>
-                  </div>
+                      if (error) throw error;
+                      
+                      // Create a map of contact IDs to names and display names
+                      const contactIdToName: Record<string, string> = {};
+                      const contactIdToDisplayName: Record<string, string> = {};
+                      const contactNameOptions: string[] = [];
+                      
+                      data?.forEach(contact => {
+                        // Store both full name and display name with position
+                        contactIdToName[contact.id] = contact.full_name;
+                        
+                        const displayName = contact.position 
+                          ? `${contact.full_name} (${contact.position})` 
+                          : contact.full_name;
+                        
+                        contactIdToDisplayName[contact.id] = displayName;
+                        contactNameOptions.push(displayName);
+                      });
+                      
+                      setContactMap(contactIdToName);
+                      setContactDisplayMap(contactIdToDisplayName);
+                      setContactOptions(contactNameOptions);
+                      setContacts(data || []);
+                      
+                      // If we have contacts and no contact is selected, select the first one
+                      if (data && data.length > 0 && !selectedContactId) {
+                        setSelectedContactId(data[0].id);
+                      }
+                    } catch (error) {
+                      console.error("Error fetching contacts:", error);
+                    }
+                  };
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex items-center">
-                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-                        ΗΜΑ
-                      </div>
-                      <div className="w-2/3 flex items-center">
-                        <div className="relative flex items-center">
-                          <div className={`w-12 h-6 rounded-full transition-colors duration-200 ease-in-out bg-[#354f52] border border-[#52796f]`}>
-                            <div 
-                              className={`absolute top-1 w-4 h-4 rounded-full transition-transform duration-200 ease-in-out ${
-                                watchHma 
-                                  ? 'transform translate-x-7 bg-[#52796f]' 
-                                  : 'transform translate-x-1 bg-gray-500'
-                              }`}
-                            ></div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setValue("hma", !watchHma)}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          ></button>
-                          <span className="ml-2 text-sm">
-                            {watchHma ? 'Ναι' : 'Όχι'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center">
-                      <div className="w-1/2 text-[#a8c5b5] text-sm pr-1">
-                        Πιστοποιητικό
-                      </div>
-                      <div className="w-1/2">
-                        <Input
-                          id="certificate"
-                          className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8"
-                          {...register("certificate")}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Section */}
-              <div className="bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-                <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
-                  <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                    ΚΑΤΑΣΤΑΣΗ & ΑΝΑΘΕΣΗ
-                  </h2>
-                </div>
-                <div className="p-3">
-                  <div className="grid grid-cols-1 gap-3">
-                    <div className="flex items-center">
-                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-                        Κατάσταση
-                      </div>
-                      <div className="w-2/3">
-                        <GlobalDropdown
-                          options={statusOptions.map(option => option.label)}
-                          value={getStatusLabel(watch("offer_result"))}
-                          onSelect={(label) => setValue("offer_result", getStatusValue(label))}
-                          placeholder="Επιλέξτε κατάσταση"
-                          className="dropdown-header"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center">
-                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-                        Ανάθεση σε
-                      </div>
-                      <div className="w-2/3">
-                        <GlobalDropdown
-                          options={userOptions}
-                          value={getUserNameById(watch("assigned_to") || "")}
-                          onSelect={(value) => setValue("assigned_to", getUserIdByName(value))}
-                          placeholder="Επιλέξτε χρήστη"
-                          className="dropdown-header"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center">
-                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-                        Αποτέλεσμα
-                      </div>
-                      <div className="w-2/3">
-                        <GlobalDropdown
-                          options={resultOptions.map(option => option.label)}
-                          value={getResultLabel(watch("result") || "none")}
-                          onSelect={(label) => setValue("result", getResultValue(label))}
-                          placeholder="Επιλέξτε αποτέλεσμα"
-                          disabled={watchOfferResult !== "ready"}
-                          className="dropdown-header"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Comments Section - Full Width */}
-          <div className="mt-4">
-            <div className="bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-              <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
-                <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                  ΣΧΟΛΙΑ
-                </h2>
-              </div>
-              <div className="p-3">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-[#a8c5b5] text-sm mb-1">
-                      Σχόλια Πελάτη
-                    </div>
-                    <textarea
-                      id="customer_comments"
-                      className="w-full bg-[#2f3e46] text-[#cad2c5] p-2 rounded-sm"
-                      style={{
-                        border: '1px solid #52796f',
-                        outline: 'none',
-                        fontSize: '0.875rem'
-                      }}
-                      placeholder="Σχόλια πελάτη..."
-                      rows={3}
-                      {...register("customer_comments")}
-                    ></textarea>
-                  </div>
-
-                  <div>
-                    <div className="text-[#a8c5b5] text-sm mb-1">
-                      Δικά μας Σχόλια
-                    </div>
-                    <textarea
-                      id="our_comments"
-                      className="w-full bg-[#2f3e46] text-[#cad2c5] p-2 rounded-sm"
-                      style={{
-                        border: '1px solid #52796f',
-                        outline: 'none',
-                        fontSize: '0.875rem'
-                      }}
-                      placeholder="Δικά μας σχόλια..."
-                      rows={3}
-                      {...register("our_comments")}
-                    ></textarea>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="mt-6 flex items-center justify-between">
-            <div className="flex-1 mr-4">
-              {error && (
-                <div className="bg-red-500/10 text-red-400 p-2 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
-              {success && (
-                <div className="bg-green-500/10 text-green-400 p-2 rounded-md text-sm">
-                  Η αποθήκευση ολοκληρώθηκε με επιτυχία!
-                </div>
-              )}
-              {watchOfferResult === "ready" && (watchResult === "none" || !watchResult) && !error && !success && (
-                <div className="bg-yellow-500/10 text-yellow-400 p-2 rounded-md text-sm">
-                  Όταν η κατάσταση είναι "Ολοκληρώθηκε", πρέπει να επιλέξετε ένα αποτέλεσμα.
-                </div>
-              )}
-            </div>
-            <div className="flex space-x-2">
-              <Button
-                type="submit"
-                disabled={loading || !isFormValid()}
-                className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
-              >
-                {isEditing ? "Ενημέρωση" : "Αποθήκευση"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
-              >
-                Ακύρωση
-              </Button>
-            </div>
-          </DialogFooter>
-        </form>
-
-        {/* Contact Dialog */}
-        <ContactDialog
-          open={showContactDialog}
-          onClose={() => {
-            setShowContactDialog(false);
-            setSelectedContact(null);
-            // Refresh contacts when dialog closes
-            const fetchContacts = async () => {
-              if (!customerId) return;
-              
-              try {
-                const { data, error } = await supabase
-                  .from("contacts")
-                  .select("id, full_name, position, created_at")
-                  .eq("customer_id", customerId)
-                  .eq("status", "active");
-
-                if (error) throw error;
-                
-                // Create a map of contact IDs to names and display names
-                const contactIdToName: Record<string, string> = {};
-                const contactIdToDisplayName: Record<string, string> = {};
-                const contactNameOptions: string[] = [];
-                
-                data?.forEach(contact => {
-                  // Store both full name and display name with position
-                  contactIdToName[contact.id] = contact.full_name;
-                  
-                  const displayName = contact.position 
-                    ? `${contact.full_name} (${contact.position})` 
-                    : contact.full_name;
-                  
-                  contactIdToDisplayName[contact.id] = displayName;
-                  contactNameOptions.push(displayName);
-                });
-                
-                setContactMap(contactIdToName);
-                setContactDisplayMap(contactIdToDisplayName);
-                setContactOptions(contactNameOptions);
-                setContacts(data || []);
-                
-                // If we have contacts and no contact is selected, select the first one
-                if (data && data.length > 0 && !selectedContactId) {
-                  setSelectedContactId(data[0].id);
+                  fetchContacts();
                 }
-              } catch (error) {
-                console.error("Error fetching contacts:", error);
-              }
-            };
-            
-            fetchContacts();
-          }}
-          contact={selectedContact}
-          customerId={customerId}
-          customerName={customerName}
-          onSave={() => {
-            // Refresh contacts when a new contact is saved
-            const fetchContacts = async () => {
-              if (!customerId) return;
-              
-              try {
-                const { data, error } = await supabase
-                  .from("contacts")
-                  .select("id, full_name, position, created_at")
-                  .eq("customer_id", customerId)
-                  .eq("status", "active");
+              }}
+              contactId={selectedContact?.id}
+              customerId={customerId}
+              refreshData={async () => {
+                // If you need to refresh contacts, define the function here
+                // or call an existing function that fetches contacts
+                // For example:
+                // await loadContacts();
+                // or just return a resolved promise if no action is needed
+                return Promise.resolve();
+              }}
+            />
 
-                if (error) throw error;
-                
-                // Create a map of contact IDs to names and display names
-                const contactIdToName: Record<string, string> = {};
-                const contactIdToDisplayName: Record<string, string> = {};
-                const contactNameOptions: string[] = [];
-                
-                data?.forEach(contact => {
-                  // Store both full name and display name with position
-                  contactIdToName[contact.id] = contact.full_name;
-                  
-                  const displayName = contact.position 
-                    ? `${contact.full_name} (${contact.position})` 
-                    : contact.full_name;
-                  
-                  contactIdToDisplayName[contact.id] = displayName;
-                  contactNameOptions.push(displayName);
-                });
-                
-                setContactMap(contactIdToName);
-                setContactDisplayMap(contactIdToDisplayName);
-                setContactOptions(contactNameOptions);
-                setContacts(data || []);
-                
-                // If we have contacts and no contact is selected, select the most recently added one
-                if (data && data.length > 0) {
-                  // Sort by created_at in descending order to get the most recent contact
-                  const sortedContacts = [...data].sort((a, b) => 
-                    new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-                  );
-                  setSelectedContactId(sortedContacts[0].id);
-                }
-              } catch (error) {
-                console.error("Error fetching contacts:", error);
-              }
-            };
-            
-            fetchContacts();
-          }}
-        />
+            {/* Delete Offer Dialog */}
+            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+              <AlertDialogContent aria-describedby="delete-offer-description">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Offer</AlertDialogTitle>
+                  <AlertDialogDescription id="delete-offer-description">
+                    Are you sure you want to delete this offer? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="flex justify-end space-x-2 mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowDeleteDialog(false)}
+                    className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      // Handle delete logic here
+                      setShowDeleteDialog(false);
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </AlertDialogContent>
+            </AlertDialog>
+          </OfferDialogContext.Provider>
+        </div>
       </DialogContent>
     </Dialog>
   );
-} 
+});
+
+export default OffersDialog; 

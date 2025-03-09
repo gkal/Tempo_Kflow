@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import './settings-cursor-fix.css'; // Import the CSS fix
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -126,11 +127,6 @@ export default function SettingsPage() {
   ];
 
   const handleRowClick = (row) => {
-    // Super users can't edit admin users
-    if (isSuperUser && (row.role === "Admin" || row.role?.toLowerCase() === "admin")) {
-      return;
-    }
-    
     setSelectedUser(row);
     setShowUserDialog(true);
   };
@@ -227,7 +223,9 @@ export default function SettingsPage() {
             setSelectedUser(null);
           }}
           user={selectedUser}
-          currentUserRole={user?.role === "user" ? "User" : user?.role === "readonly" ? "Μόνο ανάγνωση" : user?.role}
+          currentUserRole={user?.role?.toLowerCase() === "user" ? "User" : 
+                          user?.role?.toLowerCase() === "readonly" ? "Μόνο ανάγνωση" : 
+                          user?.role}
           fetchUsers={fetchUsers}
         />
       </div>
@@ -236,97 +234,120 @@ export default function SettingsPage() {
 
   // Admin view
   return (
-    <div className="p-4">
-      <div className="mb-2">
-        <h1 className="text-2xl font-bold text-[#cad2c5] mb-2">
-          Διαχείριση Χρηστών
-        </h1>
-        {isAdmin && (
-          <Button
-            onClick={() => {
-              setSelectedUser(null);
-              setShowUserDialog(true);
-            }}
-            className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] mb-2"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Νέος Χρήστης
-          </Button>
-        )}
-      </div>
-
-      <div className="flex justify-between mb-4">
-        <div className="w-1/4">
-          {/* Empty div to maintain layout */}
+    <>
+      <style>
+        {`
+          .settings-page-container table tr {
+            cursor: pointer !important;
+          }
+          
+          .settings-page-container table td {
+            cursor: pointer !important;
+          }
+          
+          .settings-page-container table th {
+            cursor: pointer !important;
+          }
+          
+          .settings-page-container table td * {
+            cursor: pointer !important;
+          }
+          
+          .settings-page-container table td span,
+          .settings-page-container table td div {
+            cursor: pointer !important;
+          }
+        `}
+      </style>
+      
+      <div className="p-4 settings-page-container">
+        <div className="mb-2">
+          <h1 className="text-2xl font-bold text-[#cad2c5] mb-2">
+            Διαχείριση Χρηστών
+          </h1>
+          {isAdmin && (
+            <Button
+              onClick={() => {
+                setSelectedUser(null);
+                setShowUserDialog(true);
+              }}
+              className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] mb-2"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Νέος Χρήστης
+            </Button>
+          )}
         </div>
-        
-        <div className="flex-1 flex justify-center">
-          <SearchBar
-            onChange={setSearchTerm}
-            value={searchTerm}
-            options={columns.map(col => ({ value: col.accessor, label: col.header }))}
-            selectedColumn={searchColumn}
-            onColumnChange={setSearchColumn}
+
+        <div className="flex justify-between mb-4">
+          <div className="w-1/4">
+            {/* Empty div to maintain layout */}
+          </div>
+          
+          <div className="flex-1 flex justify-center">
+            <SearchBar
+              onChange={setSearchTerm}
+              value={searchTerm}
+              options={columns.map(col => ({ value: col.accessor, label: col.header }))}
+              selectedColumn={searchColumn}
+              onColumnChange={setSearchColumn}
+            />
+          </div>
+          
+          <div className="w-1/4">
+            {/* Empty div to maintain layout */}
+          </div>
+        </div>
+
+        <div className="settings-page-table">
+          <DataTableBase
+            columns={columnsWithActions}
+            data={users}
+            defaultSortColumn="fullname"
+            searchTerm={searchTerm}
+            searchColumn={searchColumn}
+            onRowClick={handleRowClick}
+            containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
+            rowClassName={`hover:bg-[#354f52]/50 ${isSuperUser ? '[&[data-role="Admin"]]:cursor-not-allowed [&[data-role="Admin"]]:opacity-50' : ""}`}
+            isLoading={loading}
           />
         </div>
-        
-        <div className="w-1/4">
-          {/* Empty div to maintain layout */}
-        </div>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent aria-describedby="delete-settings-description">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Settings</AlertDialogTitle>
+              <AlertDialogDescription id="delete-settings-description">
+                Are you sure you want to delete these settings? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-[#354f52] text-[#cad2c5] hover:bg-[#354f52]/90">
+                Άκυρο
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className={`text-white ${userToDelete?.status === "active" ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}`}
+                onClick={handleToggleUserStatus}
+              >
+                {userToDelete?.status === "active" ? "Απενεργοποίηση" : "Ενεργοποίηση"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <SimpleUserDialog
+          open={showUserDialog}
+          onClose={() => {
+            setShowUserDialog(false);
+            setSelectedUser(null);
+          }}
+          user={selectedUser}
+          currentUserRole={user?.role?.toLowerCase() === "user" ? "User" : 
+                          user?.role?.toLowerCase() === "readonly" ? "Μόνο ανάγνωση" : 
+                          user?.role}
+          fetchUsers={fetchUsers}
+        />
       </div>
-
-      <DataTableBase
-        columns={columnsWithActions}
-        data={users}
-        defaultSortColumn="fullname"
-        searchTerm={searchTerm}
-        searchColumn={searchColumn}
-        onRowClick={handleRowClick}
-        containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
-        rowClassName={`hover:bg-[#354f52]/50 ${isSuperUser ? 'cursor-pointer [&[data-role="Admin"]]:cursor-not-allowed [&[data-role="Admin"]]:opacity-50' : ""}`}
-        isLoading={loading}
-      />
-
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent 
-          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-          aria-describedby="toggle-user-status-description"
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {userToDelete?.status === "active" ? "Απενεργοποίηση Χρήστη" : "Ενεργοποίηση Χρήστη"}
-            </AlertDialogTitle>
-            <AlertDialogDescription id="toggle-user-status-description" className="text-[#84a98c]">
-              {userToDelete?.status === "active" 
-                ? `Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε τον χρήστη ${userToDelete?.fullname}?`
-                : `Είστε σίγουροι ότι θέλετε να ενεργοποιήσετε τον χρήστη ${userToDelete?.fullname}?`
-              }
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-[#354f52] text-[#cad2c5] hover:bg-[#354f52]/90">
-              Άκυρο
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={`text-white ${userToDelete?.status === "active" ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}`}
-              onClick={handleToggleUserStatus}
-            >
-              {userToDelete?.status === "active" ? "Απενεργοποίηση" : "Ενεργοποίηση"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <SimpleUserDialog
-        open={showUserDialog}
-        onClose={() => {
-          setShowUserDialog(false);
-          setSelectedUser(null);
-        }}
-        user={selectedUser}
-        currentUserRole={user?.role === "user" ? "User" : user?.role === "readonly" ? "Μόνο ανάγνωση" : user?.role}
-        fetchUsers={fetchUsers}
-      />
-    </div>
+    </>
   );
 }

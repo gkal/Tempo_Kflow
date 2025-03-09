@@ -12,6 +12,13 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface UserManagementDialogProps {
   open: boolean;
@@ -44,6 +51,7 @@ export default function UserManagementDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
@@ -430,6 +438,17 @@ export default function UserManagementDialog({
             </Button>
           </div>
         </form>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent aria-describedby="delete-user-description">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete User</AlertDialogTitle>
+              <AlertDialogDescription id="delete-user-description">
+                Are you sure you want to delete this user? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

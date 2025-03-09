@@ -224,13 +224,14 @@ export default function OffersTable({
       case "Email":
         return "Email";
       case "Phone":
+      case "Telephone":
         return "Τηλέφωνο";
+      case "Website":
       case "Site":
         return "Ιστοσελίδα";
       case "Physical":
-        return "Φυσική Παρουσία";
       case "In Person":
-        return "Φυσική Παρουσία";
+        return "Φυσική παρουσία";
       default:
         return source;
     }
@@ -437,17 +438,11 @@ export default function OffersTable({
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent 
-          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-          aria-describedby="delete-offer-description"
-        >
+        <AlertDialogContent aria-describedby="delete-offer-description">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#cad2c5]">
-              Διαγραφή Προσφοράς
-            </AlertDialogTitle>
-            <AlertDialogDescription id="delete-offer-description" className="text-[#84a98c]">
-              Είστε βέβαιοι ότι θέλετε να διαγράψετε αυτή την προσφορά; Αυτή η
-              ενέργεια δεν μπορεί να αναιρεθεί.
+            <AlertDialogTitle>Delete Offer</AlertDialogTitle>
+            <AlertDialogDescription id="delete-offer-description">
+              Are you sure you want to delete this offer? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
