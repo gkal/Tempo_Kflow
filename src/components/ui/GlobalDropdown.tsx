@@ -1,30 +1,37 @@
 import React, { useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Edit } from "lucide-react";
 import "../ui/dropdown.css";
 
 interface GlobalDropdownProps {
   options: string[];
   onSelect: (option: string) => void;
+  onEdit?: (option: string) => void;
   placeholder?: string;
   value?: string;
   header?: string;
   className?: string;
   disabled?: boolean;
+  renderOption?: (option: string) => React.ReactNode;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
 export function GlobalDropdown({
   options,
   onSelect,
+  onEdit,
   placeholder = "Select an option",
   value,
   header,
   className = "",
   disabled = false,
+  renderOption,
+  onContextMenu,
 }: GlobalDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | undefined>(value);
   const [isHovered, setIsHovered] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0, width: 0 });
@@ -32,6 +39,13 @@ export function GlobalDropdown({
   useEffect(() => {
     setSelectedOption(value);
   }, [value]);
+
+  // Reset state when dropdown closes
+  useEffect(() => {
+    if (!isOpen) {
+      setHoveredItem(null);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && buttonRef.current) {
@@ -94,26 +108,44 @@ export function GlobalDropdown({
           left: `${buttonPosition.left}px`,
           width: `${buttonPosition.width}px`,
           minWidth: `${buttonPosition.width}px`,
-          zIndex: 9999, // Explicitly set z-index here as well
-          pointerEvents: 'auto', // Ensure clicks are captured
-          maxHeight: '200px', // Set a max height
-          overflowY: 'auto' // Enable vertical scrolling
+          zIndex: 30,  // Much lower than dialogs
+          pointerEvents: 'auto',
+          maxHeight: '200px',
+          overflowY: 'auto'
         }}
-        onClick={(e) => e.stopPropagation()} // Prevent clicks from bubbling
-        onWheel={handleWheel} // Handle wheel events
+        onClick={(e) => e.stopPropagation()}
+        onWheel={handleWheel}
       >
         {options.map((option) => (
           <div
             key={option}
             className={`dropdown-item text-sm ${
               option === selectedOption ? "selected-item" : ""
-            }`}
+            } relative group`}
+            onMouseEnter={() => setHoveredItem(option)}
+            onMouseLeave={() => setHoveredItem(null)}
             onClick={(e) => {
-              e.stopPropagation(); // Prevent event bubbling
+              e.stopPropagation();
               handleSelect(option);
             }}
           >
-            {option}
+            <div className="flex justify-between items-center w-full pr-2">
+              <span>{renderOption ? renderOption(option) : option}</span>
+              {hoveredItem === option && option !== "add_new_position" && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onEdit) {
+                      onEdit(option);
+                      setIsOpen(false);
+                    }
+                  }}
+                  className="text-[#84a98c] hover:text-[#52796f] transition-colors"
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>,
@@ -132,8 +164,24 @@ export function GlobalDropdown({
     cursor: disabled ? 'not-allowed' : 'pointer',
   };
 
+  // Render the selected value or placeholder
+  const renderSelectedValue = () => {
+    if (!selectedOption) return placeholder;
+    return renderOption ? renderOption(selectedOption) : selectedOption;
+  };
+
   return (
-    <div className={`GlobalDropdown ${className}`} ref={dropdownRef}>
+    <div 
+      className={`GlobalDropdown ${className}`} 
+      ref={dropdownRef}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (onContextMenu && value && value !== "add_new_position") {
+          onContextMenu(e);
+        }
+      }}
+    >
       {header && <div className="text-sm font-medium mb-1 text-[#cad2c5]">{header}</div>}
       <button
         ref={buttonRef}
@@ -144,13 +192,20 @@ export function GlobalDropdown({
             setIsOpen(!isOpen);
           }
         }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (onContextMenu && !disabled && value && value !== "add_new_position") {
+            onContextMenu(e);
+          }
+        }}
         onMouseEnter={() => !disabled && setIsHovered(true)}
         onMouseLeave={() => !disabled && setIsHovered(false)}
         className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-md focus:outline-none text-[#cad2c5]"
         style={buttonStyle}
         disabled={disabled}
       >
-        <span>{selectedOption || placeholder}</span>
+        <span>{renderSelectedValue()}</span>
         <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       

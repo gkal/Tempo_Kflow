@@ -172,7 +172,8 @@ const CustomerRow = React.memo(({
                         <span className={`
                           ${offer.result === "success" ? "text-green-400" : 
                             offer.result === "failed" ? "text-red-400" : 
-                            offer.result === "cancel" ? "text-yellow-400" : "text-gray-400"}
+                            offer.result === "cancel" ? "text-yellow-400" :
+                            offer.result === "waiting" ? "text-purple-400" : "text-gray-400"}
                         `}>
                           {formatResult(offer.result)}
                         </span>
@@ -495,8 +496,10 @@ export default function CustomersPage() {
         return "Αποτυχία";
       case "cancel":
         return "Ακύρωση";
+      case "waiting":
+        return "Αναμονή";
       default:
-        return "-";
+        return result || "—";
     }
   };
 
@@ -1271,6 +1274,7 @@ export default function CustomersPage() {
         rowClassName="hover:bg-[#354f52]/50 cursor-pointer group"
         highlightedRowId={lastUpdatedCustomerId}
         renderRow={renderCustomRow}
+        showOfferMessage={true}
       />
 
       {/* Add CustomerDialog component */}

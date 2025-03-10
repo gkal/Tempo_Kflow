@@ -395,6 +395,7 @@ export default function CustomerDetailPage() {
     if (!id) return;
     
     try {
+      console.log("Fetching recent offers for customer:", id);
       setLoadingOffers(true);
       
       const { data, error } = await supabase
@@ -408,10 +409,11 @@ export default function CustomerDetailPage() {
         .eq("customer_id", id)
         .order("created_at", { ascending: false })
         .limit(5);
-        
+
       if (error) throw error;
-      
+
       setRecentOffers(data || []);
+      console.log("Recent offers fetched:", data);
     } catch (error) {
       console.error("Error fetching recent offers:", error);
       toast({
@@ -456,6 +458,8 @@ export default function CustomerDetailPage() {
         return "Ακύρωση";
       case "pending":
         return "Σε εξέλιξη";
+      case "waiting":
+        return "Αναμονή";
       default:
         return result || "—";
     }
@@ -486,6 +490,8 @@ export default function CustomerDetailPage() {
         return "bg-yellow-500/20 text-yellow-400";
       case "pending":
         return "bg-blue-500/20 text-blue-400";
+      case "waiting":
+        return "bg-purple-500/20 text-purple-400";
       default:
         return "bg-gray-500/20 text-gray-400";
     }
@@ -683,7 +689,7 @@ export default function CustomerDetailPage() {
               </div>
               
               {/* Simple fixed height container with single scrollbar */}
-              <div style={{ height: "120px", overflowY: "auto" }}>
+              <div style={{ height: "120px", overflowY: "auto" }} className="custom-scrollbar rounded-md border border-[#52796f] bg-[#2f3e46] p-2">
                 {contacts.length === 0 ? (
                   <div className="text-center py-4 text-[#84a98c]">
                     Δεν υπάρχουν επαφές για αυτόν τον πελάτη
@@ -952,13 +958,13 @@ export default function CustomerDetailPage() {
               </div>
 
               <TabsContent value="summary" className="mt-0 border-t-0 -mt-[1px]">
-                <Card className="bg-[#354f52] border-[#52796f] mb-6 rounded-t-none notes-section">
-                  <CardContent className="p-6">
-                    <h2 className="text-lg font-semibold mb-4 text-[#a8c5b5]">
+                <Card className="bg-[#354f52] border-[#52796f] mb-4 rounded-t-none notes-section">
+                  <CardContent className="p-4">
+                    <h2 className="text-lg font-semibold mb-2 text-[#a8c5b5]">
                       Σημειώσεις
                     </h2>
                     <div className="section-content custom-scrollbar">
-                      <p className="text-[#cad2c5] text-sm mb-4">
+                      <p className="text-[#cad2c5] text-sm">
                         {customer.notes || "Δεν υπάρχουν σημειώσεις."}
                       </p>
                     </div>
@@ -992,7 +998,7 @@ export default function CustomerDetailPage() {
                             >
                               <div className="flex items-start justify-between">
                                 <div className="font-medium text-[#cad2c5] max-w-[70%]">
-                                  {truncateText(offer.requirements ? offer.requirements : "- -", 50)}
+                                  {truncateText(offer.amount ? offer.amount : "- -", 50)}
                                 </div>
                                 <div className="flex-shrink-0 ml-2 flex space-x-2">
                                   <span

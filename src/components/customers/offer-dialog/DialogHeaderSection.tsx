@@ -3,7 +3,6 @@ import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/di
 import { Input } from "@/components/ui/input";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { Plus } from "lucide-react";
-import { useOfferDialog } from './useOfferDialog';
 
 const DialogHeaderSection = ({ 
   customerName,
@@ -34,10 +33,12 @@ const DialogHeaderSection = ({
           {/* Empty div to maintain layout */}
         </div>
       </div>
-      <div className="flex justify-center items-center mt-3">
-        <div className="grid grid-cols-2 gap-8 w-[700px]">
-          <div className="flex items-center justify-end">
-            <div className="text-[#a8c5b5] text-sm mr-2 w-24 text-right">
+      
+      {/* Date and Contact Section */}
+      <div className="bg-[#354f52] rounded-md border border-[#52796f] p-3 mt-3">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center">
+            <div className="text-[#a8c5b5] text-sm mr-2 w-24">
               Ημερομηνία:
             </div>
             <Input
@@ -49,10 +50,10 @@ const DialogHeaderSection = ({
           </div>
           
           <div className="flex items-center">
-            <div className="text-[#a8c5b5] text-sm mr-2 w-16 text-right">
+            <div className="text-[#a8c5b5] text-sm mr-2">
               Επαφή:
             </div>
-            <div className="w-56 flex items-center">
+            <div className="flex items-center w-80">
               <div className="flex-1 contact-dropdown">
                 <GlobalDropdown
                   options={contactOptions}
@@ -83,6 +84,7 @@ const DialogHeaderSection = ({
           </div>
         </div>
       </div>
+      
       <DialogDescription id="offer-dialog-description" className="sr-only">
         {isEditing ? "Φόρμα επεξεργασίας προσφοράς" : "Φόρμα δημιουργίας νέας προσφοράς"}
       </DialogDescription>

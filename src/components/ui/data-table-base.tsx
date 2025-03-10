@@ -57,6 +57,7 @@ interface DataTableBaseProps {
   highlightedRowId?: string;
   renderRow?: (row: any, index: number, defaultRow: React.ReactNode) => React.ReactNode;
   onSearchFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  showOfferMessage?: boolean;
 }
 
 export function DataTableBase({
@@ -76,6 +77,7 @@ export function DataTableBase({
   highlightedRowId,
   renderRow,
   onSearchFocus,
+  showOfferMessage = false,
 }: DataTableBaseProps) {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -566,7 +568,9 @@ export function DataTableBase({
       {/* Total records count */}
       <div className="mt-3 mb-1 text-sm text-[#84a98c] px-2 flex justify-between items-center font-medium pt-2">
         <div className="text-left italic text-xs">
-          Παρακαλώ πατήστε δεξί κλικ για να προσθέσετε προσφορά
+          {showOfferMessage && (
+            <span>Παρακαλώ πατήστε δεξί κλικ για να προσθέσετε προσφορά</span>
+          )}
         </div>
         <div>
           {isLoading ? (

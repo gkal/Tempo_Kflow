@@ -219,7 +219,7 @@ export function CustomerDialog({
               <DialogTitle className="text-[#cad2c5] text-xl mb-2">
                 {viewOnly
                   ? "Προβολή Πελάτη"
-                  : customerId || savedCustomerId
+                  : customer?.id
                     ? "Επεξεργασία Πελάτη"
                     : "Νέος Πελάτης"}
               </DialogTitle>

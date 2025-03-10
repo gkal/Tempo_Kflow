@@ -9,30 +9,10 @@ const RequirementsSection = () => {
     <div className="section-requirements bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
       <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
         <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-          ΑΠΑΙΤΗΣΕΙΣ
+          ΕΠΙΠΛΕΟΝ ΣΤΟΙΧΕΙΑ
         </h2>
       </div>
       <div className="p-3 space-y-3">
-        <div className="flex items-start">
-          <div className="w-1/6 text-[#a8c5b5] text-sm pr-1 pt-2">
-            Απαιτήσεις
-          </div>
-          <div className="w-5/6">
-            <textarea
-              id="requirements"
-              className="w-full bg-[#2f3e46] text-[#cad2c5] p-2 rounded-sm"
-              style={{
-                border: '1px solid #52796f',
-                outline: 'none',
-                fontSize: '0.875rem'
-              }}
-              placeholder="Απαιτήσεις του πελάτη προς εμάς"
-              rows={3}
-              {...register("requirements")}
-            ></textarea>
-          </div>
-        </div>
-        
         <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center">
             <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
@@ -62,10 +42,10 @@ const RequirementsSection = () => {
           </div>
 
           <div className="flex items-center">
-            <div className="w-1/2 text-[#a8c5b5] text-sm pr-1">
-              Πιστοποιητικό
+            <div className="w-1/5 text-[#a8c5b5] text-sm pr-0">
+              Βεβαίωση
             </div>
-            <div className="w-1/2">
+            <div className="w-4/5">
               <Input
                 id="certificate"
                 className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8"

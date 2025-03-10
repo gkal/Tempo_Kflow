@@ -30,7 +30,6 @@ import {
 // Import our new components
 import DialogHeaderSection from "./offer-dialog/DialogHeaderSection";
 import BasicInfoSection from "./offer-dialog/BasicInfoSection";
-import AddressSection from "./offer-dialog/AddressSection";
 import RequirementsSection from "./offer-dialog/RequirementsSection";
 import StatusSection from "./offer-dialog/StatusSection";
 import CommentsSection from "./offer-dialog/CommentsSection";
@@ -102,8 +101,8 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   // Format current date and time in ISO format for datetime-local input
-  const formatCurrentDateTimeForInput = () => {
-    const now = new Date();
+  const formatCurrentDateTimeForInput = (date?: string) => {
+    const now = date ? new Date(date) : new Date();
     // Format with timezone offset for Greece (UTC+3)
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -134,7 +133,8 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     { value: "none", label: "Επιλέξτε..." },
     { value: "success", label: "Επιτυχία" },
     { value: "failed", label: "Αποτυχία" },
-    { value: "cancel", label: "Ακύρωση" }
+    { value: "cancel", label: "Ακύρωση" },
+    { value: "waiting", label: "Αναμονή" }
   ];
 
   // Helper functions for source, status, and result
@@ -187,6 +187,19 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     return resultOptions.find(option => option.label === label)?.value || label;
   };
 
+  const defaultValues = useMemo(() => ({
+    offer_date: formatCurrentDateTimeForInput(),
+    source: defaultSource,
+    amount: "",
+    customer_comments: "",
+    our_comments: "",
+    offer_result: "wait_for_our_answer",
+    result: null,
+    assigned_to: user?.id || "",
+    hma: false,
+    certificate: "",
+  }), [defaultSource, user?.id]);
+
   const {
     register,
     handleSubmit,
@@ -195,22 +208,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     watch,
     formState: { errors },
   } = useForm({
-    defaultValues: {
-      source: defaultSource,
-      requirements: "",
-      amount: "",
-      customer_comments: "",
-      our_comments: "",
-      offer_result: "wait_for_our_answer",
-      result: "none",
-      assigned_to: user?.id || "",
-      address: "",
-      tk: "",
-      town: "",
-      hma: false,
-      certificate: "",
-      offer_date: currentDate,
-    },
+    defaultValues,
   });
   
   // Update source when defaultSource changes
@@ -265,7 +263,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       try {
         const { data, error } = await supabase
           .from("customers")
-          .select("company_name, address, postal_code, town")
+          .select("company_name")
           .eq("id", customerId)
           .single();
 
@@ -273,16 +271,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         
         if (data) {
           // Set customer name
-          if (data.company_name) {
-            setCustomerName(data.company_name);
-          }
-          
-          // Set address fields if not editing an existing offer
-          if (!offerId) {
-            setValue("address", data.address || "");
-            setValue("tk", data.postal_code || "");
-            setValue("town", data.town || "");
-          }
+          setCustomerName(data.company_name);
         }
       } catch (error) {
         console.error("Error fetching customer data:", error);
@@ -292,7 +281,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     if (customerId) {
       fetchCustomerData();
     }
-  }, [customerId, offerId, setValue]);
+  }, [customerId]);
 
   // Fetch offer data if editing
   useEffect(() => {
@@ -303,49 +292,29 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
           setLoading(true);
           const { data, error } = await supabase
             .from("offers")
-            .select("*")
+            .select("*, users!offers_assigned_to_fkey(fullname)")
             .eq("id", offerId)
             .single();
 
           if (error) throw error;
 
-          // Set form values
           if (data) {
-            setValue("source", data.source);
-            setValue("requirements", data.requirements || "");
+            setValue("offer_date", formatCurrentDateTimeForInput(data.created_at));
+            setValue("source", data.source || defaultSource);
             setValue("amount", data.amount || "");
             setValue("customer_comments", data.customer_comments || "");
             setValue("our_comments", data.our_comments || "");
             setValue("offer_result", data.offer_result || "wait_for_our_answer");
-            setValue("result", data.result || "none");
-            // For assigned_to, we store the ID but display the name
+            setValue("result", data.result || null);
             setValue("assigned_to", data.assigned_to || user?.id || "");
-            setValue("address", data.address || "");
-            setValue("tk", data.tk || "");
-            setValue("town", data.town || "");
             setValue("hma", data.hma || false);
             setValue("certificate", data.certificate || "");
             
-            // Set the contact ID if available
-            if (data.contact_id) {
-              setSelectedContactId(data.contact_id);
-            }
-            
-            // Format date for datetime-local input
-            if (data.created_at) {
-              const date = new Date(data.created_at);
-              setValue("offer_date", date.toISOString().slice(0, 16)); // Format as YYYY-MM-DDThh:mm
-            } else {
-              setValue("offer_date", currentDate);
-            }
+            setSelectedContactId(data.contact_id || null);
           }
         } catch (error) {
           console.error("Error fetching offer:", error);
-          toast({
-            title: "Σφάλμα",
-            description: "Δεν ήταν δυνατή η φόρτωση των δεδομένων της προσφοράς.",
-            variant: "destructive",
-          });
+          setError("Failed to load offer data");
         } finally {
           setLoading(false);
         }
@@ -354,22 +323,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       fetchOffer();
     } else {
       setIsEditing(false);
-      reset({
-        source: defaultSource,
-        requirements: "",
-        amount: "",
-        customer_comments: "",
-        our_comments: "",
-        offer_result: "wait_for_our_answer",
-        result: "none",
-        assigned_to: user?.id || "",
-        address: "",
-        tk: "",
-        town: "",
-        hma: false,
-        certificate: "",
-        offer_date: currentDate,
-      });
+      reset(defaultValues);
     }
   }, [offerId, open, defaultSource, currentDate, reset, setValue, user?.id]);
 
@@ -446,30 +400,24 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   const onSubmit = async (data) => {
     try {
       setLoading(true);
-      setError("");
-      setSuccess(false);
-
-      // Convert 'none' result value to null
-      const resultValue = data.result === 'none' ? null : data.result;
       
-      // Prepare the data object
+      // Validate required fields
+      if (!isFormValid()) {
+        return;
+      }
+      
       const offerData = {
+        customer_id: customerId,
         source: data.source,
-        requirements: data.requirements,
         amount: data.amount,
         customer_comments: data.customer_comments,
         our_comments: data.our_comments,
         offer_result: data.offer_result,
-        result: resultValue,
+        result: data.result,
         assigned_to: data.assigned_to,
-        address: data.address,
-        tk: data.tk,
-        town: data.town,
+        contact_id: selectedContactId,
         hma: data.hma,
         certificate: data.certificate,
-        updated_at: new Date().toISOString(),
-        created_at: data.offer_date ? new Date(data.offer_date).toISOString() : new Date().toISOString(),
-        contact_id: selectedContactId,
       };
 
       if (isEditing) {
@@ -503,7 +451,6 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
           .from("offers")
           .insert({
             ...offerData,
-            customer_id: customerId,
             created_by: user?.id,
           });
 
@@ -516,24 +463,6 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         
         setSuccess(true);
         
-        // Reset form
-        reset({
-          source: defaultSource,
-          requirements: "",
-          amount: "",
-          customer_comments: "",
-          our_comments: "",
-          offer_result: "wait_for_our_answer",
-          result: "none",
-          assigned_to: user?.id || "",
-          address: "",
-          tk: "",
-          town: "",
-          hma: false,
-          certificate: "",
-          offer_date: formatCurrentDateTimeForInput(),
-        });
-
         // Call onSave callback
         if (onSave) {
           onSave();
@@ -723,22 +652,12 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
             />
 
             <form onSubmit={handleSubmit(onSubmit)} className="p-4 flex flex-col">
-              <div className="grid grid-cols-2 gap-4">
-                {/* Left Column */}
-                <div className="space-y-4">
-                  <BasicInfoSection />
-                  <AddressSection />
-                </div>
-
-                {/* Right Column */}
-                <div className="space-y-4">
-                  <RequirementsSection />
-                  <StatusSection />
-                </div>
+              <div className="space-y-4 mb-4">
+                <BasicInfoSection />
+                <RequirementsSection />
+                <StatusSection />
+                <CommentsSection />
               </div>
-
-              {/* Comments Section - Full Width */}
-              <CommentsSection />
 
               <DialogFooterSection 
                 error={error}

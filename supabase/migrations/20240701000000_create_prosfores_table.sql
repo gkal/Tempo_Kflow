@@ -5,7 +5,7 @@ CREATE TYPE incoming_source AS ENUM ('Email', 'Phone', 'Site', 'Physical');
 CREATE TYPE offer_status AS ENUM ('wait_for_our_answer', 'wait_for_customer_answer', 'ready');
 
 -- Create enum for offer result
-CREATE TYPE offer_result AS ENUM ('success', 'failed', 'cancel');
+CREATE TYPE offer_result AS ENUM ('success', 'failed', 'cancel', 'waiting');
 
 -- Create offers table
 CREATE TABLE offers (
@@ -13,7 +13,6 @@ CREATE TABLE offers (
   customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   source incoming_source NOT NULL,
-  requirements TEXT,
   amount TEXT,
   customer_comments TEXT,
   our_comments TEXT,

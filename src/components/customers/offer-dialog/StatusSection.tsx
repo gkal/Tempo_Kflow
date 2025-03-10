@@ -18,6 +18,17 @@ const StatusSection = () => {
     watchOfferResult
   } = useContext(OfferDialogContext);
 
+  // Styles for consistent alignment
+  const assignedToStyle = {
+    width: 'calc(50% - 12px)',
+    marginLeft: '0'
+  };
+  
+  const statusStyle = {
+    width: 'calc(100% - 12px)',
+    marginLeft: '0'
+  };
+
   return (
     <div className="status-section bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
       <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
@@ -25,28 +36,14 @@ const StatusSection = () => {
           ΚΑΤΑΣΤΑΣΗ & ΑΝΑΘΕΣΗ
         </h2>
       </div>
-      <div className="p-3">
-        <div className="grid grid-cols-1 gap-3">
-          <div className="flex items-center">
-            <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-              Κατάσταση
-            </div>
-            <div className="w-2/3">
-              <GlobalDropdown
-                options={statusOptions.map(option => option.label)}
-                value={getStatusLabel(watch("offer_result"))}
-                onSelect={(label) => setValue("offer_result", getStatusValue(label))}
-                placeholder="Επιλέξτε κατάσταση"
-                className="dropdown-header"
-              />
-            </div>
+      <div className="p-3 space-y-3">
+        {/* First line - Ανάθεση σε */}
+        <div className="flex items-center">
+          <div className="w-24 text-[#a8c5b5] text-sm pr-1 flex justify-start">
+            Ανάθεση σε
           </div>
-
-          <div className="flex items-center">
-            <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-              Ανάθεση σε
-            </div>
-            <div className="w-2/3">
+          <div className="flex-1">
+            <div style={assignedToStyle}>
               <GlobalDropdown
                 options={userOptions}
                 value={getUserNameById(watch("assigned_to") || "")}
@@ -56,12 +53,32 @@ const StatusSection = () => {
               />
             </div>
           </div>
+        </div>
+
+        {/* Second line - Κατάσταση and Αποτέλεσμα */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex items-center">
+            <div className="w-24 text-[#a8c5b5] text-sm pr-1 flex justify-start">
+              Κατάσταση
+            </div>
+            <div className="flex-1">
+              <div style={statusStyle}>
+                <GlobalDropdown
+                  options={statusOptions.map(option => option.label)}
+                  value={getStatusLabel(watch("offer_result"))}
+                  onSelect={(label) => setValue("offer_result", getStatusValue(label))}
+                  placeholder="Επιλέξτε κατάσταση"
+                  className="dropdown-header"
+                />
+              </div>
+            </div>
+          </div>
 
           <div className="flex items-center">
-            <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
+            <div className="w-20 text-[#a8c5b5] text-sm pr-0 flex justify-start">
               Αποτέλεσμα
             </div>
-            <div className="w-2/3">
+            <div className="flex-1">
               <GlobalDropdown
                 options={resultOptions.map(option => option.label)}
                 value={getResultLabel(watch("result") || "none")}
