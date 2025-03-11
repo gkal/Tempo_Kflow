@@ -113,8 +113,8 @@ const CustomerRow = React.memo(({
   // Create the expanded row with the same data-customer-id attribute
   const expandedRow = isExpanded ? (
     <tr className="bg-[#2f3e46] border-t border-b border-[#52796f]" data-customer-id={row.id}>
-      <td colSpan={columns.length} className="p-0">
-        <div className="p-3 pl-8">
+      <td colSpan={columns.length}>
+        <div className="pl-[70px]">
           {isLoading ? (
             <div className="flex justify-center items-center py-4">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
@@ -124,92 +124,111 @@ const CustomerRow = React.memo(({
               Δεν υπάρχουν προσφορές για αυτόν τον πελάτη
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-[#3a5258] text-[#a8c5b5]">
-                    <th className="px-3 py-2 text-left text-xs font-medium">Ημερομηνία</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium">Πηγή</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium">Επαφή</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium">Απαιτήσεις</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium">Ποσό</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium">Κατάσταση</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium">Αποτέλεσμα</th>
-                    <th className="px-3 py-2 text-center text-xs font-medium w-10"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {offers.map((offer) => (
-                    <tr 
-                      key={offer.id} 
-                      className="border-t border-[#52796f]/30 hover:bg-[#354f52]/30 cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditOffer(row.id, offer.id);
-                      }}
-                    >
-                      <td className="px-3 py-2 text-xs text-[#cad2c5]">{formatDateTime(offer.created_at)}</td>
-                      <td className="px-3 py-2 text-xs text-[#cad2c5]">{formatSource(offer.source)}</td>
-                      <td className="px-3 py-2 text-xs text-[#cad2c5]">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-[#3a5258] text-[#a8c5b5]">
+                  <th className="px-2 py-2 text-left text-xs font-medium w-[160px]">Ημερομηνία</th>
+                  <th className="px-1 py-2 text-left text-xs font-medium w-[70px]">Πηγή</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Απαιτήσεις</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ποσό</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium w-[120px]">Επαφή</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium w-[140px]">Κατάσταση</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Αποτέλεσμα</th>
+                  <th className="px-3 py-2 text-center text-xs font-medium w-[50px]"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {offers.map((offer) => (
+                  <tr 
+                    key={offer.id} 
+                    className="border-t border-[#52796f]/30 hover:bg-[#354f52]/30 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditOffer(row.id, offer.id);
+                    }}
+                  >
+                    <td className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
+                    <td className="px-1 py-2 text-xs text-[#cad2c5] w-[70px]">{formatSource(offer.source)}</td>
+                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px] group relative">
+                      <div className="truncate">
+                        {offer.requirements || "-"}
+                      </div>
+                      {offer.requirements && offer.requirements.length > 15 && (
+                        <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal min-w-[200px] max-w-[300px] text-blue-400">
+                          {offer.requirements}
+                        </span>
+                      )}
+                      {offer.requirements && offer.requirements.length > 15 && (
+                        <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-400">...</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">{offer.amount || "-"}</td>
+                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[120px] group relative">
+                      <div className="truncate">
                         {offer.contact && offer.contact.length > 0 
                           ? offer.contact[0].position 
                             ? `${offer.contact[0].full_name} (${offer.contact[0].position})` 
                             : offer.contact[0].full_name
                           : "-"}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-[#cad2c5]">{offer.requirements || "-"}</td>
-                      <td className="px-3 py-2 text-xs text-[#cad2c5]">{offer.amount || "-"}</td>
-                      <td className="px-3 py-2 text-xs">
-                        <span className={`
-                          ${offer.offer_result === "wait_for_our_answer" ? "text-yellow-400" : 
-                            offer.offer_result === "wait_for_customer_answer" ? "text-blue-400" : 
-                            offer.offer_result === "ready" ? "text-green-400" : "text-gray-400"}
-                        `}>
-                          {formatStatus(offer.offer_result)}
+                      </div>
+                      {offer.contact && offer.contact.length > 0 && offer.contact[0].full_name.length > 15 && (
+                        <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal">
+                          {offer.contact[0].position 
+                            ? `${offer.contact[0].full_name} (${offer.contact[0].position})` 
+                            : offer.contact[0].full_name}
                         </span>
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        <span className={`
-                          ${offer.result === "success" ? "text-green-400" : 
-                            offer.result === "failed" ? "text-red-400" : 
-                            offer.result === "cancel" ? "text-yellow-400" :
-                            offer.result === "waiting" ? "text-purple-400" : "text-gray-400"}
-                        `}>
-                          {formatResult(offer.result)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-center">
-                        {isAdminOrSuperUser && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    // Just stop propagation - this is the most important part
-                                    e.stopPropagation();
-                                    
-                                    // Simple approach - directly call the handler
-                                    handleDeleteOffer(row.id, offer.id);
-                                  }}
-                                  className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
-                                <p>Διαγραφή προσφοράς</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                      {offer.contact && offer.contact.length > 0 && offer.contact[0].full_name.length > 15 && (
+                        <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-400">...</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-xs w-[140px]">
+                      <span className={`
+                        ${offer.offer_result === "wait_for_our_answer" ? "text-yellow-400" : 
+                          offer.offer_result === "wait_for_customer_answer" ? "text-blue-400" : 
+                          offer.offer_result === "ready" ? "text-green-400" : "text-gray-400"}
+                      `}>
+                        {formatStatus(offer.offer_result)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs w-[100px]">
+                      <span className={`
+                        ${offer.result === "success" ? "text-green-400" : 
+                          offer.result === "failed" ? "text-red-400" : 
+                          offer.result === "cancel" ? "text-yellow-400" :
+                          offer.result === "waiting" ? "text-purple-400" : "text-gray-400"}
+                      `}>
+                        {formatResult(offer.result)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-center w-[50px]">
+                      {isAdminOrSuperUser && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteOffer(row.id, offer.id);
+                                }}
+                                className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
+                              <p>Διαγραφή προσφοράς</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       </td>
@@ -334,7 +353,7 @@ export default function CustomersPage() {
           contact:contacts(full_name, position)
         `)
         .eq("customer_id", customerId)
-        .or('result.is.null,result.eq.pending') // Only fetch offers where result is null or 'pending'
+        .or('result.is.null,result.eq.pending,result.eq.') // Include null, pending, and empty string
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -630,9 +649,9 @@ export default function CustomersPage() {
   // Memoize the columns to prevent unnecessary re-renders
   const columns = useMemo(() => [
     {
-      header: "Προσφορές",
+      header: "ΠΡ",
       accessor: "expand",
-      width: "40px",
+      width: "30px",
       cell: (value, row) => {
         if (!row) return null;
         
@@ -658,7 +677,7 @@ export default function CustomersPage() {
               ) : (
                 <ChevronRight className="h-4 w-4 text-[#84a98c]" />
               )}
-              <span className="ml-1 text-xs text-[#84a98c]">{offersCount}</span>
+              <span className="ml-0.5 text-xs text-[#84a98c]">{offersCount}</span>
             </div>
           </div>
         );
@@ -667,7 +686,7 @@ export default function CustomersPage() {
     { 
       header: "Επωνυμία", 
       accessor: "company_name",
-      width: "20%"
+      width: "22%"
     },
     { 
       header: "Τύπος", 
@@ -687,7 +706,7 @@ export default function CustomersPage() {
     { 
       header: "Τηλέφωνο", 
       accessor: "telephone",
-      width: "12%"
+      width: "13%"
     },
     { 
       header: "Διεύθυνση", 

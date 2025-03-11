@@ -95,17 +95,26 @@ export function TaskItem({ task, onStatusChange }: TaskItemProps) {
             </div>
             <p className="text-sm text-[#84a98c] mt-1">{task.description}</p>
             
-            <div className="flex items-center mt-2 text-xs text-[#84a98c]">
-              <User className="h-3 w-3 mr-1" />
-              <span>
-                Assigned to: {task.assigned_user?.fullname || 'Unknown'}
-                {isAssignedToMe && ' (You)'}
-              </span>
-            </div>
-            
-            <div className="mt-2 text-xs text-[#84a98c]">
-              Due: {formatDate(task.due_date)}
-              {isOverdue && <span className="ml-2 text-red-400">Overdue</span>}
+            <div className="flex flex-col mt-2 space-y-1">
+              <div className="flex items-center text-xs text-[#84a98c]">
+                <User className="h-3 w-3 mr-1" />
+                <span>
+                  Assigned to: {task.assigned_user?.fullname || 'Unknown'}
+                  {isAssignedToMe && ' (You)'}
+                </span>
+              </div>
+              
+              <div className="flex items-center text-xs text-[#84a98c]">
+                <User className="h-3 w-3 mr-1" />
+                <span>
+                  Created by: {task.created_user?.fullname || 'Unknown'}
+                </span>
+              </div>
+              
+              <div className="text-xs text-[#84a98c]">
+                Due: {formatDate(task.due_date)}
+                {isOverdue && <span className="ml-2 text-red-400">Overdue</span>}
+              </div>
             </div>
           </div>
           

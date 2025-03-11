@@ -49,6 +49,34 @@ async function main() {
       console.log('Tasks table already exists.');
     }
 
+    // Check if notifications table exists
+    const { data: notificationsTableExists, error: notificationsTableError } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_name', 'notifications')
+      .eq('table_schema', 'public');
+
+    if (notificationsTableError) {
+      console.error('Error checking if notifications table exists:', notificationsTableError);
+      process.exit(1);
+    }
+
+    if (!notificationsTableExists || notificationsTableExists.length === 0) {
+      console.log('Notifications table does not exist. Creating it...');
+      
+      // Create notifications table
+      const { error: createNotificationsError } = await supabase.rpc('create_notifications_table');
+      
+      if (createNotificationsError) {
+        console.error('Error creating notifications table:', createNotificationsError);
+        process.exit(1);
+      }
+      
+      console.log('Notifications table created successfully.');
+    } else {
+      console.log('Notifications table already exists.');
+    }
+
     // Check if due_date column exists
     const { data: dueDateExists, error: dueDateError } = await supabase
       .from('information_schema.columns')
@@ -146,7 +174,7 @@ async function main() {
 
     console.log('Database schema update completed successfully.');
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Unexpected error during schema update:', error);
     process.exit(1);
   }
 }

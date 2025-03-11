@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { SearchBar } from "@/components/ui/search-bar";
 import { CloseButton } from "@/components/ui/close-button";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import OffersDialog from "./OffersDialog";
 import {
   AlertDialog,
@@ -47,6 +47,9 @@ export default function OffersTable({
   const [offerToDelete, setOfferToDelete] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [customerName, setCustomerName] = useState("");
+  const [expandedOffers, setExpandedOffers] = useState<Record<string, boolean>>({});
+  const [offerHistory, setOfferHistory] = useState<Record<string, any[]>>({});
+  const [loadingHistory, setLoadingHistory] = useState<Record<string, boolean>>({});
 
   // Define search columns
   const searchColumns = [
@@ -89,6 +92,7 @@ export default function OffersTable({
           created_user:users!created_by(fullname)
         `)
         .eq("customer_id", customerId)
+        .or('result.is.null,result.eq.pending')
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -258,8 +262,147 @@ export default function OffersTable({
     );
   };
 
+  // Add function to fetch offer history
+  const fetchOfferHistory = async (offerId: string) => {
+    try {
+      setLoadingHistory(prev => ({ ...prev, [offerId]: true }));
+      
+      const { data, error } = await supabase
+        .from('offer_history')
+        .select(`
+          *,
+          user:users!created_by(fullname)
+        `)
+        .eq('offer_id', offerId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setOfferHistory(prev => ({
+        ...prev,
+        [offerId]: data || []
+      }));
+    } catch (error) {
+      console.error('Error fetching offer history:', error);
+    } finally {
+      setLoadingHistory(prev => ({ ...prev, [offerId]: false }));
+    }
+  };
+
+  // Add function to toggle offer expansion
+  const toggleOfferExpanded = (offerId: string) => {
+    setExpandedOffers(prev => {
+      const newState = { ...prev, [offerId]: !prev[offerId] };
+      if (newState[offerId] && !offerHistory[offerId]) {
+        fetchOfferHistory(offerId);
+      }
+      return newState;
+    });
+  };
+
+  // Add function to format history entry
+  const formatHistoryEntry = (entry: any) => {
+    const timestamp = formatDateTime(entry.created_at);
+    const user = entry.user?.fullname || 'Unknown';
+    let description = '';
+
+    switch (entry.change_type) {
+      case 'created':
+        description = 'Δημιουργήθηκε η προσφορά';
+        break;
+      case 'status_changed':
+        description = `Η κατάσταση άλλαξε από "${formatStatus(entry.previous_data?.status)}" σε "${formatStatus(entry.new_data?.status)}"`;
+        break;
+      case 'amount_changed':
+        description = `Το ποσό άλλαξε από "${entry.previous_data?.amount || '-'}" σε "${entry.new_data?.amount || '-'}"`;
+        break;
+      case 'assigned_changed':
+        description = 'Άλλαξε η ανάθεση της προσφοράς';
+        break;
+      case 'comment_added':
+        description = `Προστέθηκε σχόλιο: "${entry.comments}"`;
+        break;
+      case 'updated':
+        description = 'Ενημερώθηκαν τα στοιχεία της προσφοράς';
+        break;
+      default:
+        description = 'Έγινε αλλαγή στην προσφορά';
+    }
+
+    return { timestamp, user, description };
+  };
+
+  // Modify the DataTableBase component to include custom row rendering
+  const renderCustomRow = (row: any, index: number, defaultRow: React.ReactElement) => {
+    const isExpanded = expandedOffers[row.id] || false;
+    const history = offerHistory[row.id] || [];
+    const isLoading = loadingHistory[row.id] || false;
+
+    return (
+      <div key={row.id}>
+        {defaultRow}
+        {isExpanded && (
+          <div className="bg-[#2f3e46] border-t border-b border-[#52796f]">
+            <div className="p-4 pl-12">
+              <h3 className="text-sm font-semibold text-[#a8c5b5] mb-4">Ιστορικό Προσφοράς</h3>
+              
+              {isLoading ? (
+                <div className="flex justify-center items-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#84a98c]" />
+                </div>
+              ) : history.length === 0 ? (
+                <div className="text-center py-4 text-[#84a98c]">
+                  Δεν υπάρχει διαθέσιμο ιστορικό
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {history.map((entry) => {
+                    const { timestamp, user, description } = formatHistoryEntry(entry);
+                    return (
+                      <div 
+                        key={entry.id}
+                        className="flex items-start space-x-3 text-sm"
+                      >
+                        <div className="w-32 flex-shrink-0 text-[#84a98c]">{timestamp}</div>
+                        <div className="w-40 flex-shrink-0 text-[#84a98c]">{user}</div>
+                        <div className="flex-1 text-[#cad2c5]">{description}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Define columns for the DataTable
   const columns = [
+    {
+      header: "",
+      accessor: "expand",
+      width: "40px",
+      cell: (value, row) => {
+        const isExpanded = expandedOffers[row.id] || false;
+        return (
+          <div 
+            className="flex items-center cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleOfferExpanded(row.id);
+            }}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 text-[#84a98c]" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-[#84a98c]" />
+            )}
+          </div>
+        );
+      }
+    },
     {
       header: "Ημ/νία Δημιουργίας",
       accessor: "created_at",
@@ -424,7 +567,8 @@ export default function OffersTable({
         searchTerm={searchTerm}
         searchColumn={searchColumn}
         containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden flex-1"
-        rowClassName="hover:bg-[#354f52]/50 cursor-pointer group"
+        rowClassName="hover:bg-[#354f52]/50 group"
+        renderRow={renderCustomRow}
       />
 
       {/* Offer Dialog */}

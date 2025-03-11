@@ -24,12 +24,12 @@ export default function Sidebar() {
   const location = useLocation();
 
   const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: Home },
-    { name: "Customers", href: "/customers", icon: Users },
-    { name: "Offers", href: "/offers", icon: FileText },
-    { name: "Tasks", href: "/tasks", icon: CheckSquare },
-    { name: "Calls", href: "/calls", icon: Phone },
-    { name: "Settings", href: "/dashboard/settings", icon: Settings },
+    { name: "Κεντρική Σελίδα", href: "/dashboard", icon: Home },
+    { name: "Πελάτες", href: "/customers", icon: Users },
+    { name: "Προσφορές", href: "/offers", icon: FileText },
+    { name: "Εργασίες", href: "/tasks", icon: CheckSquare },
+    { name: "Κλήσεις", href: "/calls", icon: Phone },
+    { name: "Ρυθμίσεις", href: "/dashboard/settings", icon: Settings },
   ];
 
   return (

@@ -77,9 +77,37 @@ export async function createTask({
     // Create notification for the assigned user
     if (task) {
       try {
+        // Get sender's fullname
+        const { data: senderData } = await supabase
+          .from('users')
+          .select('fullname')
+          .eq('id', createdBy)
+          .single();
+
+        // Get customer name if this task is related to an offer
+        let customerName = '';
+        if (offerId) {
+          const { data: offerData } = await supabase
+            .from('offers')
+            .select(`
+              customer:customer_id(
+                fullname
+              )
+            `)
+            .eq('id', offerId)
+            .single();
+          
+          if (offerData?.customer?.fullname) {
+            customerName = ` για τον πελάτη ${offerData.customer.fullname}`;
+          }
+        }
+
+        const senderName = senderData?.fullname || 'Άγνωστος χρήστης';
+        
         const notificationData = {
           user_id: assignedTo,
-          message: `New task assigned to you: ${title}`,
+          sender_id: createdBy,
+          message: `${senderName} → Νέα εργασία ανατέθηκε σε εσάς: ${title}${customerName}`,
           type: 'task_assigned',
           related_task_id: task.id,
           read: false,

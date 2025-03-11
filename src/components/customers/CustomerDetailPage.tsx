@@ -92,9 +92,12 @@ export default function CustomerDetailPage() {
 
   useEffect(() => {
     if (id) {
-      fetchCustomerData();
-      fetchContacts();
-      fetchRecentOffers();
+      const loadData = async () => {
+        await fetchCustomerData();
+        await fetchContacts();
+        await fetchRecentOffers();
+      };
+      loadData();
     }
   }, [id]);
 
@@ -396,6 +399,8 @@ export default function CustomerDetailPage() {
     
     try {
       setLoadingOffers(true);
+      console.log("Fetching offers for customer ID:", id);
+      console.log("Customer name:", customer?.company_name);
       
       const { data, error } = await supabase
         .from('offers')
@@ -406,13 +411,17 @@ export default function CustomerDetailPage() {
           contact:contacts(full_name, position)
         `)
         .eq("customer_id", id)
-        .order("created_at", { ascending: false })
-        .limit(5);
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
+      console.log("Found offers:", data?.length || 0);
+      console.log("First few offers customer_ids:", data?.slice(0, 3).map(o => o.customer_id));
+      console.log("Do all offers match this customer?", data?.every(o => o.customer_id === id));
+
       setRecentOffers(data || []);
     } catch (error) {
+      console.error("Error fetching offers:", error);
       toast({
         title: "Σφάλμα",
         description: "Δεν ήταν δυνατή η φόρτωση των προσφορών.",
@@ -984,7 +993,7 @@ export default function CustomerDetailPage() {
                       <div className="flex items-center justify-center h-[220px] text-[#84a98c]">
                         Δεν υπάρχουν προσφορές για αυτόν τον πελάτη.
                       </div>
-                    ) : (
+                    ) :
                       <div style={{ height: "280px", overflowY: "auto" }} className="custom-scrollbar">
                         <div className="space-y-4">
                           {recentOffers.map((offer) => (
@@ -994,10 +1003,12 @@ export default function CustomerDetailPage() {
                               onClick={() => handleEditOffer(offer.id)}
                             >
                               <div className="flex items-start justify-between">
-                                <div className="font-medium text-[#cad2c5] max-w-[70%]">
-                                  {truncateText(offer.amount ? offer.amount : "- -", 50)}
+                                <div className="flex items-center space-x-4">
+                                  <div className="font-medium text-[#cad2c5] truncate max-w-[600px]">
+                                    {offer.amount || "- -"}
+                                  </div>
                                 </div>
-                                <div className="flex-shrink-0 ml-2 flex space-x-2">
+                                <div className="flex items-center space-x-2">
                                   <span
                                     className={`px-2 py-1 rounded-full text-xs ${getStatusClass(offer.offer_result)}`}
                                   >
@@ -1010,27 +1021,14 @@ export default function CustomerDetailPage() {
                                   </span>
                                 </div>
                               </div>
-                              
-                              <div className="flex items-center justify-between mt-2 text-sm text-[#84a98c]">
-                                <div>
-                                  {offer.assigned_user?.fullname 
-                                    ? `Ανατέθηκε: ${offer.assigned_user.fullname}` 
-                                    : "Μη ανατεθειμένη"}
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <span>
-                                    {formatSource(offer.source)}
-                                  </span>
-                                  <span>
-                                    {formatDateTime(offer.created_at)}
-                                  </span>
-                                </div>
+                              <div className="mt-2 text-sm text-[#84a98c]">
+                                {offer.assigned_user?.fullname || "Μη ανατεθειμένη"}
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
-                    )}
+                    }
                   </CardContent>
                 </Card>
               </TabsContent>
