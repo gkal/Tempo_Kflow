@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { VERSION } from "@/lib/version";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -6,6 +6,7 @@ import { Settings, LogOut } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { CustomMenu, CustomMenuItem } from "@/components/ui/custom-menu";
 import { VersionHistory } from "@/components/ui/version-history";
+import { useFormContext } from "@/lib/FormContext";
 
 const getPageTitle = (pathname: string) => {
   switch (pathname) {
@@ -30,7 +31,10 @@ export default function TopBar() {
   const location = useLocation();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showVersionHistory, setShowVersionHistory] = useState(false);
-
+  
+  // Get form context
+  const { toggleFormInfo, registerForm, showFormInfo, currentForm } = useFormContext();
+  
   // Update current date every minute
   useEffect(() => {
     const timer = setInterval(() => {
@@ -76,6 +80,20 @@ export default function TopBar() {
     return `hsl(${hue}, 70%, 60%)`;
   };
 
+  // Keyboard event handler
+  const handleKClick = useCallback((event: KeyboardEvent) => {
+    if (event.key === 'k' || event.key === 'K') {
+      toggleFormInfo();
+    }
+  }, [toggleFormInfo]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKClick);
+    return () => {
+      document.removeEventListener('keydown', handleKClick);
+    };
+  }, [handleKClick]);
+
   return (
     <div className="h-32 bg-[#2f3e46] border-b border-[#52796f] flex items-center justify-between px-6">
       <div className="flex flex-col items-start">
@@ -85,7 +103,15 @@ export default function TopBar() {
           className="h-14 mb-1"
         />
         <div className="flex items-center space-x-2 ml-24">
-          <h1 className="text-2xl font-bold text-[#cad2c5]">K-Flow</h1>
+          <h1 className="text-2xl font-bold text-[#cad2c5]">
+            <span 
+              className="text-[#cad2c5] cursor-pointer"
+              style={{ userSelect: 'none' }}
+            >
+              K
+            </span>
+            -Flow
+          </h1>
           <div 
             className="px-2 py-0.5 rounded-full bg-[#84a98c]/10 text-[#84a98c] text-xs border border-[#84a98c]/20 ml-2 cursor-pointer hover:bg-[#84a98c]/20 transition-colors"
             onClick={() => setShowVersionHistory(true)}
@@ -93,6 +119,13 @@ export default function TopBar() {
           >
             v{VERSION}
           </div>
+          
+          {/* Form info popup - make it more visible */}
+          {showFormInfo && (
+            <div className="ml-4 bg-[#354f52] text-[#cad2c5] px-3 py-1 rounded-md text-sm">
+              {currentForm || "No form is currently open"}
+            </div>
+          )}
         </div>
       </div>
 

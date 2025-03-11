@@ -14,6 +14,7 @@ interface GlobalDropdownProps {
   disabled?: boolean;
   renderOption?: (option: string) => React.ReactNode;
   onContextMenu?: (e: React.MouseEvent) => void;
+  showEditButton?: boolean;
 }
 
 export function GlobalDropdown({
@@ -27,6 +28,7 @@ export function GlobalDropdown({
   disabled = false,
   renderOption,
   onContextMenu,
+  showEditButton = false,
 }: GlobalDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | undefined>(value);
@@ -131,7 +133,7 @@ export function GlobalDropdown({
           >
             <div className="flex justify-between items-center w-full pr-2">
               <span>{renderOption ? renderOption(option) : option}</span>
-              {hoveredItem === option && option !== "add_new_position" && (
+              {hoveredItem === option && option !== "add_new_position" && showEditButton && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

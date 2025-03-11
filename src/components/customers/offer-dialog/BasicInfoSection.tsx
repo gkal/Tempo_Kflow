@@ -19,14 +19,14 @@ const BasicInfoSection = () => {
   };
 
   return (
-    <div className="section-basic-info bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+    <div className="-mt-3 section-basic-info bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
       <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
         <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
           ΒΑΣΙΚΑ ΣΤΟΙΧΕΙΑ
         </h2>
       </div>
-      <div className="p-3">
-        <div className="space-y-3">
+      <div className="p-2">
+        <div className="space-y-2">
           <div className="flex items-center">
             <div className="w-1/6 text-[#a8c5b5] text-sm pr-0">
               Πηγή Αιτήματος
@@ -57,7 +57,7 @@ const BasicInfoSection = () => {
                   fontSize: '0.875rem'
                 }}
                 placeholder="Ζήτηση πελάτη"
-                rows={5}
+                rows={3}
                 {...register("amount")}
               ></textarea>
             </div>

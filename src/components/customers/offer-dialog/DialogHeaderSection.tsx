@@ -19,7 +19,7 @@ const DialogHeaderSection = ({
   contacts
 }) => {
   return (
-    <DialogHeader className="p-5 border-b border-[#52796f] bg-[#3a5258]">
+    <DialogHeader className="p-3">
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center gap-3">
           <div className="text-[#a8c5b5] text-base font-medium mr-2">
@@ -35,8 +35,8 @@ const DialogHeaderSection = ({
       </div>
       
       {/* Date and Contact Section */}
-      <div className="bg-[#354f52] rounded-md border border-[#52796f] p-3 mt-3">
-        <div className="flex items-center space-x-4">
+      <div className="bg-[#354f52] rounded-md p-2 mt-0.5 w-[99.5%] border border-[#52796f]">
+        <div className="flex items-center justify-center space-x-4">
           <div className="flex items-center">
             <div className="text-[#a8c5b5] text-sm mr-2 w-24">
               Ημερομηνία:

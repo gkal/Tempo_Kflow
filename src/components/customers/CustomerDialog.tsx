@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/lib/supabase";
 import { PlusIcon } from "lucide-react";
+import { useFormRegistration } from '@/lib/FormContext';
+import { useFormContext } from '@/lib/FormContext';
 
 interface CustomerFormData {
   company_name?: string;
@@ -78,11 +80,10 @@ export function CustomerDialog({
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const formRef = useRef(null);
+  const { registerForm } = useFormContext();
 
   useEffect(() => {
     if (open) {
-      console.log("Dialog opened, resetting states");
-      console.log("Customer data:", customer);
       setSaving(false);
       setSuccess(false);
       setError(null);
@@ -93,51 +94,56 @@ export function CustomerDialog({
     }
   }, [open, customer]);
 
-  const handleSave = (newCustomerId?: string, companyName?: string) => {
-    console.log("handleSave called with:", { newCustomerId, companyName });
+  useEffect(() => {
+    // Format a more user-friendly form name
+    const formName = customer?.name 
+      ? `Customer: ${customer.name}`
+      : customer?.company 
+        ? `Customer: ${customer.company}`
+        : 'New Customer';
+        
+    registerForm(formName);
     
+    return () => registerForm(null);
+  }, [customer, registerForm]);
+
+  useEffect(() => {
+    registerForm('CustomerDialog');
+    return () => registerForm(null);
+  }, [registerForm]);
+
+  const handleSave = (newCustomerId?: string, companyName?: string) => {
     if (newCustomerId) {
-      console.log("Customer saved successfully, ID:", newCustomerId);
       setSavedCustomerId(typeof newCustomerId === 'string' ? newCustomerId : String(newCustomerId));
       setSuccess(true);
       setSaving(false);
       
       if (isNewCustomer) {
-        console.log("New customer created, keeping dialog open");
         if (refreshData) {
           try {
-            console.log("Calling refreshData");
             refreshData();
           } catch (err) {
-            console.error("Error refreshing data:", err);
+            // Error handling without logging
           }
         }
       } else {
-        console.log("Existing customer updated, will close dialog after delay");
         setTimeout(() => {
           onOpenChange(false);
           if (refreshData) {
             try {
-              console.log("Calling refreshData after dialog close");
               setTimeout(refreshData, 100);
             } catch (err) {
-              console.error("Error refreshing data:", err);
+              // Error handling without logging
             }
           }
         }, 1500);
       }
     } else {
-      console.error("No customer ID returned from save operation");
-      
-      console.log("Attempting to trigger form submission manually");
-      
       const form = document.getElementById('customer-form') as HTMLFormElement;
       if (form) {
-        console.log("Found customer form, submitting");
         form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
         return;
       } else {
-        console.error("Could not find customer form element");
         setError("Αποτυχία αποθήκευσης πελάτη. Παρακαλώ δοκιμάστε ξανά.");
         setSaving(false);
       }
@@ -145,12 +151,10 @@ export function CustomerDialog({
   };
 
   const handleCancel = () => {
-    console.log("Cancel button clicked");
     onOpenChange(false);
   };
 
   const handleError = (errorMsg: string) => {
-    console.error("Error received from form:", errorMsg);
     if (errorMsg === "Failed to save customer. Please try again.") {
       setError("Αποτυχία αποθήκευσης πελάτη. Παρακαλώ δοκιμάστε ξανά.");
     } else if (errorMsg === "Failed to save customer. No ID returned.") {
@@ -165,15 +169,11 @@ export function CustomerDialog({
                             (user as any)?.user_metadata?.role === 'super_user';
 
   const handleFormSave = (newCustomerId?: string, companyName?: string) => {
-    console.log("CustomerDialog: handleFormSave called with", newCustomerId, companyName);
-    
     if (newCustomerId && !customerId) {
-      console.log("CustomerDialog: setting savedCustomerId to", newCustomerId);
       setSavedCustomerId(newCustomerId);
     }
     
     if (onSave) {
-      console.log("CustomerDialog: calling parent onSave");
       onSave(newCustomerId, companyName);
     }
   };
@@ -187,20 +187,15 @@ export function CustomerDialog({
   };
 
   const handleDelete = () => {
-    console.log("Delete button clicked, showing confirmation dialog");
     setShowDeleteConfirmation(true);
   };
 
   const confirmDelete = async () => {
-    console.log("Confirm delete triggered");
     setIsDeleting(true);
     try {
-      console.log("Delete operation would happen here");
-      
       setShowDeleteConfirmation(false);
       onOpenChange(false);
     } catch (error) {
-      console.error("Delete operation failed:", error);
       setError("Failed to delete customer");
     } finally {
       setIsDeleting(false);
@@ -292,7 +287,7 @@ export function CustomerDialog({
                   onClick={handleCancel}
                   className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52]/20"
                 >
-                  Κλείσιμο
+                  Ακύρωση
                 </Button>
               </div>
             </div>
@@ -307,7 +302,7 @@ export function CustomerDialog({
                     try {
                       refreshData();
                     } catch (err) {
-                      console.error("Error refreshing data:", err);
+                      // Error handling without logging
                     }
                   }
                 }}
@@ -345,13 +340,6 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({ isOpen, onClose
         </AlertDialogHeader>
         <div className="flex justify-end space-x-4 mt-6">
           <Button
-            variant="outline"
-            onClick={onClose}
-            className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
-          >
-            Άκυρο
-          </Button>
-          <Button
             variant="destructive"
             onClick={onConfirm}
             disabled={isDeleting}
@@ -365,6 +353,13 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({ isOpen, onClose
             ) : (
               canDelete ? "Διαγραφή" : "Απενεργοποίηση"
             )}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
+          >
+            Άκυρο
           </Button>
         </div>
       </AlertDialogContent>

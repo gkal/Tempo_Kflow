@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useFormRegistration } from '@/lib/FormContext';
 
 // Import our new components
 import DialogHeaderSection from "./offer-dialog/DialogHeaderSection";
@@ -99,6 +100,14 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
+  // Register this form when it's open
+  useFormRegistration(
+    isEditing 
+      ? `Επεξεργασία Προσφοράς: ${customerName || customerId}`
+      : `Νέα Προσφορά: ${customerName || customerId}`, 
+    open
+  );
   
   // Format current date and time in ISO format for datetime-local input
   const formatCurrentDateTimeForInput = (date?: string) => {
@@ -749,14 +758,6 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
                 <div className="flex justify-end space-x-2 mt-4">
                   <Button
                     type="button"
-                    variant="outline"
-                    onClick={() => setShowDeleteDialog(false)}
-                    className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
                     onClick={() => {
                       // Handle delete logic here
                       setShowDeleteDialog(false);
@@ -764,6 +765,14 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
                     className="bg-red-600 hover:bg-red-700 text-white"
                   >
                     Delete
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowDeleteDialog(false)}
+                    className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
+                  >
+                    Cancel
                   </Button>
                 </div>
               </AlertDialogContent>

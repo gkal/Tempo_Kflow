@@ -1,15 +1,14 @@
-import { ContactDialog } from "@/components/contacts/ContactDialog"; 
+import React, { useEffect } from 'react';
 import { useFormContext } from '../../lib/FormContext';
-import { useEffect } from "react";
 
-function OffersDialog({ /* props */ }) {
+function OfferDialogManager({ /* props */ }) {
   const { registerForm } = useFormContext();
   
   useEffect(() => {
-    registerForm('OffersDialog');
+    registerForm('OfferDialogManager');
     return () => registerForm(null);
   }, [registerForm]);
   // ... rest of component
 }
 
-export default OffersDialog; 
+export default OfferDialogManager; 

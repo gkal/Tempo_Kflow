@@ -20,7 +20,7 @@ const StatusSection = () => {
 
   // Styles for consistent alignment
   const assignedToStyle = {
-    width: 'calc(50% - 12px)',
+    width: 'calc(42% - 12px)',
     marginLeft: '0'
   };
   
@@ -36,7 +36,7 @@ const StatusSection = () => {
           ΚΑΤΑΣΤΑΣΗ & ΑΝΑΘΕΣΗ
         </h2>
       </div>
-      <div className="p-3 space-y-3">
+      <div className="p-2 space-y-2">
         {/* First line - Ανάθεση σε */}
         <div className="flex items-center">
           <div className="w-24 text-[#a8c5b5] text-sm pr-1 flex justify-start">

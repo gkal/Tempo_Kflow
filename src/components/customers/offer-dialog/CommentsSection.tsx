@@ -27,7 +27,7 @@ const CommentsSection = () => {
                   fontSize: '0.875rem'
                 }}
                 placeholder="Σχόλια πελάτη..."
-                rows={3}
+                rows={2}
                 {...register("customer_comments")}
               ></textarea>
             </div>
@@ -45,7 +45,7 @@ const CommentsSection = () => {
                   fontSize: '0.875rem'
                 }}
                 placeholder="Δικά μας σχόλια..."
-                rows={3}
+                rows={2}
                 {...register("our_comments")}
               ></textarea>
             </div>

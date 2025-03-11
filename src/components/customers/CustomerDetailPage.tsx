@@ -395,7 +395,6 @@ export default function CustomerDetailPage() {
     if (!id) return;
     
     try {
-      console.log("Fetching recent offers for customer:", id);
       setLoadingOffers(true);
       
       const { data, error } = await supabase
@@ -413,9 +412,7 @@ export default function CustomerDetailPage() {
       if (error) throw error;
 
       setRecentOffers(data || []);
-      console.log("Recent offers fetched:", data);
     } catch (error) {
-      console.error("Error fetching recent offers:", error);
       toast({
         title: "Σφάλμα",
         description: "Δεν ήταν δυνατή η φόρτωση των προσφορών.",

@@ -446,15 +446,15 @@ export default function OffersTable({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]">
-              Άκυρο
-            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteOffer}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Διαγραφή
             </AlertDialogAction>
+            <AlertDialogCancel className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]">
+              Άκυρο
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

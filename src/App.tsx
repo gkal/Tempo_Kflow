@@ -1,5 +1,5 @@
 import { Suspense, useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, BrowserRouter } from "react-router-dom";
 import Home from "./components/home";
 import LoginForm from "./components/auth/LoginForm";
 import SettingsPage from "./components/settings/SettingsPage";
@@ -8,6 +8,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import "./components/ui/dropdown.css";
 import { OfferDialogContainer } from './components/customers/OfferDialogManager';
 import GlobalOffersDialog from './components/customers/GlobalOffersDialog';
+import { FormProvider } from '@/lib/FormContext';
+import { routes } from './routes.ts'
 // import { fixDropdowns } from './lib/fixDropdowns';
 
 function App() {
@@ -106,65 +108,67 @@ function App() {
   }
 
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#2f3e46]">
-          <div className="flex items-center justify-center space-x-2">
-            <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce" />
-            <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.2s]" />
-            <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.4s]" />
+    <FormProvider>
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center bg-[#2f3e46]">
+            <div className="flex items-center justify-center space-x-2">
+              <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce" />
+              <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.2s]" />
+              <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.4s]" />
+            </div>
           </div>
-        </div>
-      }
-    >
-      <Routes>
-        <Route
-          path="/"
-          element={
-            user ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route
-          path="/login"
-          element={user ? <Navigate to="/dashboard" replace /> : <LoginForm />}
-        />
-        <Route
-          path="/dashboard/*"
-          element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/customers"
-          element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/customers/:id"
-          element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          }
-        />
+        }
+      >
+        <Routes>
+          <Route
+            path="/"
+            element={
+              user ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/login"
+            element={user ? <Navigate to="/dashboard" replace /> : <LoginForm />}
+          />
+          <Route
+            path="/dashboard/*"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customers"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customers/:id"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
 
-        {import.meta.env.VITE_TEMPO === "true" && (
-          <Route path="/tempobook/*" element={<div />} />
-        )}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <OfferDialogContainer />
-      <GlobalOffersDialog />
-    </Suspense>
+          {import.meta.env.VITE_TEMPO === "true" && (
+            <Route path="/tempobook/*" element={<div />} />
+          )}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <OfferDialogContainer />
+        <GlobalOffersDialog />
+      </Suspense>
+    </FormProvider>
   );
 }
 

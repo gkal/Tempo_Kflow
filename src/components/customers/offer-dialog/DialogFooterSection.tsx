@@ -13,7 +13,7 @@ const DialogFooterSection = ({
   onOpenChange
 }) => {
   return (
-    <DialogFooter className="mt-6 flex items-center justify-between">
+    <DialogFooter className="mt-4 flex items-center justify-between">
       <div className="flex-1 mr-4">
         {error && (
           <div className="bg-red-500/10 text-red-400 p-2 rounded-md text-sm">
@@ -37,7 +37,7 @@ const DialogFooterSection = ({
           disabled={loading || !isFormValid()}
           className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
         >
-          {isEditing ? "Ενημέρωση" : "Αποθήκευση"}
+          Αποθήκευση
         </Button>
         <Button
           type="button"

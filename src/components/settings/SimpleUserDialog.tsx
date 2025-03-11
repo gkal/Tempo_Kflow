@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useFormRegistration } from '@/lib/FormContext';
 
 interface SimpleUserDialogProps {
   open: boolean;
@@ -214,6 +215,14 @@ export default function SimpleUserDialog({
   const canEditDepartment = true; // All users can edit department
   const canEditRole = isAdmin || (isSuperUser && user?.role !== "Admin" && user?.role?.toLowerCase() !== "admin");
   const canEditStatus = true; // All users can edit status
+
+  // Register this form when it's open
+  useFormRegistration(
+    user?.id 
+      ? `Επεξεργασία Χρήστη: ${user?.fullname || user?.username}` 
+      : "Νέος Χρήστης", 
+    open
+  );
 
   return (
     <Dialog

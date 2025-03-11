@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useFormRegistration } from '@/lib/FormContext';
 
 interface DeleteCustomerDialogProps {
   open: boolean;
@@ -22,6 +23,12 @@ export default function DeleteCustomerDialog({
   onConfirmDelete,
   customerName = "this customer"
 }: DeleteCustomerDialogProps) {
+  // Register this form when it's open
+  useFormRegistration(
+    `Διαγραφή Πελάτη: ${customerName}`, 
+    open
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -35,13 +42,6 @@ export default function DeleteCustomerDialog({
         <DialogFooter className="mt-4 flex justify-end space-x-2">
           <Button
             type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
             variant="destructive"
             onClick={() => {
               onConfirmDelete();
@@ -49,6 +49,13 @@ export default function DeleteCustomerDialog({
             }}
           >
             Delete
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
           </Button>
         </DialogFooter>
       </DialogContent>

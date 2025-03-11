@@ -9,6 +9,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { X, Star, Check, Plus, Edit } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
 import { PositionDialog } from "./PositionDialog";
+import { useFormRegistration } from '@/lib/FormContext';
 
 interface ContactDialogProps {
   open: boolean;
@@ -52,6 +53,14 @@ export function ContactDialog({
     : typeof customerId === 'object' && customerId !== null 
       ? (customerId as any).id ? String((customerId as any).id) : String(customerId)
       : String(customerId);
+
+  // Register this form when it's open
+  useFormRegistration(
+    contactId 
+      ? "Επεξεργασία Επαφής" 
+      : "Νέα Επαφή", 
+    open
+  );
 
   // Reset form when dialog opens/closes
   useEffect(() => {
@@ -420,6 +429,7 @@ export function ContactDialog({
                         placeholder="Επιλέξτε θέση"
                         className="w-full"
                         renderOption={renderPositionOption}
+                        showEditButton={true}
                       />
                     </div>
                   </div>
@@ -491,15 +501,6 @@ export function ContactDialog({
               )}
               
               <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52]"
-              >
-                Ακύρωση
-              </Button>
-              
-              <Button
                 type="submit"
                 disabled={isSubmitting || !isFormValid()}
                 className="bg-[#52796f] text-white hover:bg-[#52796f]/90"
@@ -512,6 +513,15 @@ export function ContactDialog({
                 ) : (
                   "Αποθήκευση"
                 )}
+              </Button>
+              
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52]"
+              >
+                Ακύρωση
               </Button>
             </div>
           </form>

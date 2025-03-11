@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useFormRegistration } from '@/lib/FormContext';
 
 interface PositionDialogProps {
   open: boolean;
@@ -24,6 +25,14 @@ export function PositionDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Register this form when it's open
+  useFormRegistration(
+    position 
+      ? `Επεξεργασία Θέσης: ${position}` 
+      : "Νέα Θέση", 
+    open
+  );
 
   // Reset form when dialog opens/closes
   useEffect(() => {
@@ -175,15 +184,6 @@ export function PositionDialog({
             )}
             
             <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52]"
-            >
-              Ακύρωση
-            </Button>
-            
-            <Button
               type="submit"
               disabled={isSubmitting || !name.trim()}
               className="bg-[#52796f] text-white hover:bg-[#52796f]/90"
@@ -196,6 +196,15 @@ export function PositionDialog({
               ) : (
                 "Αποθήκευση"
               )}
+            </Button>
+            
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52]"
+            >
+              Ακύρωση
             </Button>
           </div>
         </form>
