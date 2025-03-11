@@ -45,7 +45,7 @@ export const searchBarStyles = deepFreeze({
   inputClasses:
     "bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c] pl-8 pr-[200px]",
   iconClasses: "absolute left-2 top-2.5 h-4 w-4 text-[#84a98c]",
-}) as const;
+})
 
 export type SearchBarStyles = typeof searchBarStyles;
 

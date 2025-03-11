@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useFormRegistration } from '@/lib/FormContext';
+import { createTask } from '@/components/tasks/createTask';
 
 // Import our new components
 import DialogHeaderSection from "./offer-dialog/DialogHeaderSection";
@@ -445,12 +446,31 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         
         setSuccess(true);
         
+        // Create a task for the updated offer if status changed to "ready"
+        if (data.offer_result === "ready") {
+          try {
+            const result = await createTask({
+              title: `Follow up on completed offer for ${customerName}`,
+              description: `The offer has been marked as ready. Follow up with the customer.`,
+              assignedTo: data.assigned_to,
+              createdBy: user?.id,
+              offerId
+            });
+            
+            if (!result.success) {
+              console.error("Failed to create task for offer:", result.error);
+            }
+          } catch (taskError) {
+            console.error("Error creating task for offer:", taskError);
+          }
+        }
+        
         // Call onSave callback
         if (onSave) {
           onSave();
         }
         
-        // Close dialog after successful save (same as for new offers)
+        // Close dialog after successful save
         setTimeout(() => {
           onOpenChange(false);
         }, 1500);
@@ -471,6 +491,35 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         });
         
         setSuccess(true);
+        
+        // Get the offer ID from the response
+        const { data: newOfferData, error: fetchError } = await supabase
+          .from("offers")
+          .select("id")
+          .eq("customer_id", customerId)
+          .eq("created_by", user?.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (!fetchError && newOfferData) {
+          // Create a task for the new offer
+          try {
+            const result = await createTask({
+              title: `Review offer for ${customerName}`,
+              description: `Review the offer details and follow up with the customer.`,
+              assignedTo: data.assigned_to,
+              createdBy: user?.id,
+              offerId: newOfferData.id
+            });
+            
+            if (!result.success) {
+              console.error("Failed to create task for new offer:", result.error);
+            }
+          } catch (taskError) {
+            console.error("Error creating task for new offer:", taskError);
+          }
+        }
         
         // Call onSave callback
         if (onSave) {

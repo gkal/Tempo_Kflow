@@ -91,7 +91,7 @@ export const dataTableStyles = deepFreeze({
     "bg-[#354f52] border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]",
   selectClasses:
     "border-0 bg-transparent text-[#84a98c] rounded-l-none focus:ring-0 hover:bg-transparent",
-}) as const;
+});
 
 /**
  * Type definition for the datatable styles to ensure type safety

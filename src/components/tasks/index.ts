@@ -1,3 +1,4 @@
-export * from './TaskList';
+export * from './TaskDialog';
 export * from './TaskItem';
-export * from './TaskDialog'; 
+export * from './TaskList';
+export * from './TasksPage'; 

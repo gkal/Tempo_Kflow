@@ -87,7 +87,7 @@ function App() {
 
   // Check if running in StrictMode
   useEffect(() => {
-    const isStrictMode = process.env.NODE_ENV === 'development';
+    const isStrictMode = import.meta.env.DEV;
     console.log("Running in StrictMode:", isStrictMode);
     
     if (isStrictMode) {
@@ -153,6 +153,24 @@ function App() {
           />
           <Route
             path="/customers/:id"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/tasks"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/offers"
             element={
               <ProtectedRoute>
                 <Home />

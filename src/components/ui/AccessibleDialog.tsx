@@ -6,9 +6,12 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogProps,
-  DialogContentProps
 } from "@/components/ui/dialog";
+import { ComponentPropsWithoutRef } from "react";
+
+// Define the props types manually
+type DialogProps = ComponentPropsWithoutRef<typeof Dialog>;
+type DialogContentProps = ComponentPropsWithoutRef<typeof DialogContent>;
 
 interface AccessibleDialogProps extends DialogProps {
   title: string;

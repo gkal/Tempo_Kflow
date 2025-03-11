@@ -52,7 +52,7 @@ export const closeButtonStyles = deepFreeze({
     "p-0 rounded-full flex items-center justify-center transition-colors",
   defaultClasses:
     "h-9 w-9 p-0 rounded-full bg-[#354f52] text-[#cad2c5] hover:bg-[#52796f]/20 flex items-center justify-center border border-[#84a98c]/50",
-}) as const;
+});
 
 export type CloseButtonStyles = typeof closeButtonStyles;
 

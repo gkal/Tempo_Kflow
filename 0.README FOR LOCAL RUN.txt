@@ -1,36 +1,23 @@
 Κατέβασε και εγκατάστησε το Node.js από https://nodejs.org/en
-
 Go to c:\
-
 git clone https://github.com/gkal/Tempo_Kflow
 cd Tempo_Kflow
-
 npm ci
-
 δημιούργησε ένα νέο αρχείο .env στην ίδια τοποθεσία και πρόσθεσε τις απαραίτητες μεταβλητές.
-
 VITE_SUPABASE_URL=https://upbxwrjsxkiyqgqzihei.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwYnh3cmpzeGtpeXFncXppaGVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAxOTg4MzMsImV4cCI6MjA1NTc3NDgzM30.n3ROVGXoZRGD8yqppwOnvoSrpI6NK-6CqyDQg9bAmfU
-
-
 npm run dev
-
 Run for all network computers
-
 npm run dev -- --host
 --------------------------
 how to push code to gitub
 --------------------------
 check to see how many files have changed
 git status
-
 to push the files that shown as changed
 git add .
-
 git commit -m ""
-
 git push
-
 -----------------------------
 How to pull code from github
 -----------------------------
@@ -38,3 +25,15 @@ cd C:\Tempo_Kflow
 git status
 git fetch origin
 git reset --hard origin/main
+
+-------------------------
+Build for production and development
+------------------------------------
+production	1.npm run build		2. npm run serve
+----------
+database schema changes
+----------------------
+npm run update-schema
+Development server
+------------------
+npm run dev

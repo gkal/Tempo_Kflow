@@ -239,3 +239,40 @@ export function getRememberedUser() {
   }
   return null;
 }
+
+export async function getCurrentUserToken(): Promise<string | null> {
+  try {
+    // Get the user ID from session storage
+    const userId = sessionStorage.getItem("userId");
+    if (!userId) {
+      console.error("No user ID found in session storage");
+      return null;
+    }
+    
+    // Get the user data from Supabase
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, role")
+      .eq("id", userId)
+      .eq("status", "active")
+      .single();
+      
+    if (error || !data) {
+      console.error("Error getting user data:", error);
+      return null;
+    }
+    
+    // Create a custom JWT token with the user's ID and role
+    // This is a simplified approach - in a real app, you would use a proper JWT library
+    const token = btoa(JSON.stringify({
+      sub: data.id,
+      role: data.role,
+      exp: Math.floor(Date.now() / 1000) + 3600 // 1 hour expiration
+    }));
+    
+    return token;
+  } catch (error) {
+    console.error("Error getting current user token:", error);
+    return null;
+  }
+}

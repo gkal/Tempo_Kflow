@@ -6,9 +6,12 @@ import {
   AlertDialogDescription,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogProps,
-  AlertDialogContentProps
 } from "@/components/ui/alert-dialog";
+import { ComponentPropsWithoutRef } from "react";
+
+// Define the props types manually
+type AlertDialogProps = ComponentPropsWithoutRef<typeof AlertDialog>;
+type AlertDialogContentProps = ComponentPropsWithoutRef<typeof AlertDialogContent>;
 
 interface AccessibleAlertDialogProps extends AlertDialogProps {
   title: string;
