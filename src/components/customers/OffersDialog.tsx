@@ -29,6 +29,7 @@ import {
 import { useFormRegistration } from '@/lib/FormContext';
 import { createTask } from '@/components/tasks/createTask';
 import { OffersTableRef } from './OffersTable';
+import { useRealtimeSubscription } from '@/lib/useRealtimeSubscription';
 
 // Import our new components
 import DialogHeaderSection from "./offer-dialog/DialogHeaderSection";
@@ -105,6 +106,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   const [success, setSuccess] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteOldOffer, setDeleteOldOffer] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Register this form when it's open
   useFormRegistration(
@@ -428,7 +430,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
 
   const onSubmit = async (data) => {
     try {
-      setLoading(true);
+      setIsSubmitting(true);
       
       // Validate required fields
       if (!isFormValid()) {
@@ -475,61 +477,80 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       if (isEditing) {
         // Update existing offer
         try {
-          // Instead of updating the existing offer, we'll create a new one with the same data
-          // and then delete the old one if needed
-          console.log("Creating a new offer instead of updating to bypass trigger issues");
+          console.log("Updating existing offer:", offerId);
           
-          // Create a new offer with the same data but updated fields
-          const newOfferData = {
-            ...offerData,
-            created_by: user?.id,
-            created_at: new Date().toISOString()
-          };
-          
-          // Insert the new offer
-          const { data: newOffer, error: insertError } = await supabase
+          // First, get the current offer data to check for changes
+          const { data: currentOffer, error: fetchError } = await supabase
             .from("offers")
-            .insert(newOfferData)
+            .select("*, users!offers_assigned_to_fkey(fullname), customers(company_name)")
+            .eq("id", offerId)
+            .single();
+            
+          if (fetchError) throw fetchError;
+          
+          // Check if assigned user has changed
+          const assignedUserChanged = currentOffer && currentOffer.assigned_to !== offerData.assigned_to;
+          
+          // Update the offer
+          const { data: updatedOffer, error: updateError } = await supabase
+            .from("offers")
+            .update(offerData)
+            .eq("id", offerId)
             .select()
             .single();
             
-          if (insertError) {
-            console.error("Error creating replacement offer:", insertError);
-            throw insertError;
+          if (updateError) {
+            console.error("Error updating offer:", updateError);
+            throw updateError;
           }
           
-          console.log("Successfully created new offer:", newOffer);
+          console.log("Successfully updated offer:", updatedOffer);
           
-          // Optionally delete the old offer (disabled by default)
-          if (deleteOldOffer) {
+          // If assigned user has changed, create a task for the new assignee
+          if (assignedUserChanged && offerData.assigned_to) {
+            const companyName = currentOffer.customers?.company_name || "Unknown Company";
+            const newAssigneeName = userMap[offerData.assigned_to] || 'Unknown User';
+            const oldAssigneeName = userMap[currentOffer.assigned_to] || 'Unknown User';
+            
+            // Show notification about user assignment change
+            toast({
+              title: "Αλλαγή ανάθεσης",
+              description: `Η προσφορά ανατέθηκε από τον/την ${oldAssigneeName} στον/την ${newAssigneeName}`,
+              variant: "default",
+            });
+            
+            // Show additional notification if the current user assigned the offer to themselves
+            if (offerData.assigned_to === user.id) {
+              toast({
+                title: "Προσφορά ανατέθηκε σε εσάς",
+                description: `Αναλάβατε την προσφορά για ${companyName}`,
+                variant: "default",
+              });
+            }
+            
+            // Create a task for the new assignee using the createTask helper function
             try {
-              console.log("Deleting old offer:", offerId);
-              const { error: deleteError } = await supabase
-                .from("offers")
-                .delete()
-                .eq("id", offerId);
-                
-              if (deleteError) {
-                console.error("Error deleting old offer:", deleteError);
-                // Continue even if deletion fails
-              } else {
-                console.log("Successfully deleted old offer");
+              const result = await createTask({
+                title: `Offer assigned for ${companyName}`,
+                description: `You have been assigned an offer for ${companyName}. Please review and take appropriate action.`,
+                assignedTo: offerData.assigned_to,
+                createdBy: user.id,
+                offerId: offerId,
+                dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Due in 7 days
+              });
+              
+              if (!result.success) {
+                console.error("Failed to create task for new assignee:", result.error);
               }
-            } catch (deleteError) {
-              console.error("Exception deleting old offer:", deleteError);
-              // Continue even if deletion fails
+            } catch (taskError) {
+              console.error("Error creating task for new assignee:", taskError);
+              // Don't throw here, we don't want to fail the offer update if task creation fails
             }
           }
           
           // Use the tableRef for optimistic updates if available
-          if (tableRef?.current) {
-            // Add the new offer to the table
-            tableRef.current.addOfferToList(newOffer);
-            
-            // If we're deleting the old offer, remove it from the table
-            if (deleteOldOffer && offerId) {
-              tableRef.current.removeOfferFromList(offerId);
-            }
+          if (tableRef?.current && updatedOffer) {
+            tableRef.current.updateOfferInList(updatedOffer);
           }
           
           toast({
@@ -547,7 +568,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
                 description: `The offer has been marked as ready. Follow up with the customer.`,
                 assignedTo: data.assigned_to,
                 createdBy: user?.id,
-                offerId: newOffer.id // Use the new offer ID
+                offerId: offerId
               });
               
               if (!result.success) {
@@ -649,7 +670,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -737,6 +758,34 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     });
     setContactDisplayMap(displayMap);
   }, [contacts]);
+
+  // Set up real-time subscription for this specific offer
+  useRealtimeSubscription(
+    { 
+      table: 'offers',
+      filter: offerId ? `id=eq.${offerId}` : null
+    },
+    (payload) => {
+      if (payload.eventType === 'UPDATE' && offerId) {
+        // Only update if we're not the one making the change
+        // This prevents conflicts with local form state
+        if (!isSubmitting) {
+          const updatedOffer = payload.new;
+          
+          // Show a notification that the offer was updated by someone else
+          toast({
+            title: "Offer Updated",
+            description: "This offer has been updated by another user",
+            variant: "default",
+          });
+          
+          // You might want to refresh the form data or show a confirmation dialog
+          // asking if the user wants to load the latest changes
+        }
+      }
+    },
+    [offerId, isSubmitting]
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

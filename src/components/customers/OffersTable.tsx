@@ -25,6 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 
 // Add a ref type for the component
 export interface OffersTableRef {
@@ -60,6 +61,37 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
   const [offerHistory, setOfferHistory] = useState<Record<string, any[]>>({});
   const [loadingHistory, setLoadingHistory] = useState<Record<string, boolean>>({});
 
+  // Set up real-time subscription for offers
+  useRealtimeSubscription(
+    {
+      table: 'offers',
+      filter: `customer_id=eq.${customerId}`,
+      event: '*',
+    },
+    (payload) => {
+      if (payload.eventType === 'INSERT') {
+        if (payload.new) {
+          addOfferToList(payload.new);
+        } else {
+          refreshData();
+        }
+      } else if (payload.eventType === 'UPDATE') {
+        if (payload.new) {
+          updateOfferInList(payload.new);
+        } else {
+          refreshData();
+        }
+      } else if (payload.eventType === 'DELETE') {
+        if (payload.old && payload.old.id) {
+          removeOfferFromList(payload.old.id);
+        } else {
+          refreshData();
+        }
+      }
+    },
+    [customerId]
+  );
+
   // Define search columns
   const searchColumns = [
     { value: "requirements", label: "Απαιτήσεις" },
@@ -92,11 +124,7 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
 
   const fetchOffers = async () => {
     try {
-      console.log("OffersTable: Fetching offers for customer:", customerId);
       setLoading(true);
-      
-      // Log the filter condition
-      console.log("OffersTable: Using filter condition:", 'result.is.null,result.eq.pending,result.eq.,result.eq.none');
       
       const { data, error } = await supabase
         .from("offers")
@@ -112,9 +140,6 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
       if (error) {
         throw error;
       }
-
-      console.log("OffersTable: Fetched offers:", data?.length, "offers");
-      console.log("OffersTable: Offer results:", data);
       
       // Preserve expanded state for existing offers
       const currentExpandedState = { ...expandedOffers };
@@ -122,8 +147,6 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
       // Update offers without losing expanded state
       setOffers(data || []);
       setFilteredOffers(data || []);
-      
-      console.log("OffersTable: Offers count:", data?.length);
     } catch (error) {
       console.error("Error fetching offers:", error);
     } finally {
@@ -190,18 +213,8 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
 
         // Remove the offer from the list without a full refresh
         removeOfferFromList(offerToDelete);
-
-        toast({
-          title: "Επιτυχής διαγραφή",
-          description: "Η προσφορά διαγράφηκε με επιτυχία.",
-        });
       } catch (error) {
         console.error("Error deleting offer:", error);
-        toast({
-          title: "Σφάλμα",
-          description: "Δεν ήταν δυνατή η διαγραφή της προσφοράς.",
-          variant: "destructive",
-        });
       } finally {
         setShowDeleteDialog(false);
         setOfferToDelete(null);

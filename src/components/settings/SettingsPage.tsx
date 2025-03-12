@@ -18,6 +18,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import './settings-cursor-fix.css'; // Import the CSS fix
+import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
+import { toast } from "@/components/ui/use-toast";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -32,6 +34,20 @@ export default function SettingsPage() {
 
   const isAdmin = user?.role?.toLowerCase() === "admin";
   const isSuperUser = user?.role === "Super User" || user?.role?.toLowerCase() === "super user";
+
+  // Set up real-time subscription for users
+  useRealtimeSubscription(
+    {
+      table: 'users',
+      event: '*',
+    },
+    (payload) => {
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+        fetchUsers(); // Refresh the user list
+      }
+    },
+    []
+  );
 
   // Define the full columns array for the admin view
   const columns = [

@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/tooltip";
 import { openNewOfferDialog, openEditOfferDialog } from './OfferDialogManager';
 import { CustomerDialog } from "./CustomerDialog";
+import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -90,6 +91,78 @@ export default function CustomerDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
   const offersTableRef = useRef<OffersTableRef>(null);
+
+  // Set up real-time subscription for customer data
+  useRealtimeSubscription(
+    {
+      table: 'customers',
+      filter: `id=eq.${id}`,
+      event: '*',
+    },
+    (payload) => {
+      if (payload.eventType === 'UPDATE' && payload.new) {
+        setCustomer(payload.new);
+      } else if (payload.eventType === 'DELETE') {
+        navigate('/customers');
+      }
+    },
+    [id, navigate]
+  );
+
+  // Set up real-time subscription for contacts
+  useRealtimeSubscription(
+    {
+      table: 'contacts',
+      filter: `customer_id=eq.${id}`,
+      event: '*',
+    },
+    (payload) => {
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+        fetchContacts();
+      }
+    },
+    [id]
+  );
+
+  // Set up real-time subscription for offers
+  useRealtimeSubscription(
+    {
+      table: 'offers',
+      filter: `customer_id=eq.${id}`,
+      event: '*',
+    },
+    (payload) => {
+      if (payload.eventType === 'INSERT') {
+        // Add the new offer to the list
+        if (payload.new) {
+          setRecentOffers(prev => [payload.new, ...prev]);
+        } else {
+          fetchRecentOffers();
+        }
+      } else if (payload.eventType === 'UPDATE') {
+        // Update the offer in the list
+        if (payload.new) {
+          setRecentOffers(prev => 
+            prev.map(offer => 
+              offer.id === payload.new.id ? payload.new : offer
+            )
+          );
+        } else {
+          fetchRecentOffers();
+        }
+      } else if (payload.eventType === 'DELETE') {
+        // Remove the offer from the list
+        if (payload.old && payload.old.id) {
+          setRecentOffers(prev => 
+            prev.filter(offer => offer.id !== payload.old.id)
+          );
+        } else {
+          fetchRecentOffers();
+        }
+      }
+    },
+    [id]
+  );
 
   useEffect(() => {
     if (id) {
@@ -227,20 +300,8 @@ export default function CustomerDetailPage() {
       
       // Increment the key to force only this component to re-render
       setContactsKey(prev => prev + 1);
-      
-      // Show success toast
-      toast({
-        title: "Επιτυχία",
-        description: "Η κύρια επαφή ενημερώθηκε με επιτυχία.",
-        variant: "default",
-      });
     } catch (error) {
       console.error("Error setting primary contact:", error);
-      toast({
-        title: "Σφάλμα",
-        description: "Προέκυψε σφάλμα κατά την ενημέρωση της κύριας επαφής.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -307,12 +368,6 @@ export default function CustomerDetailPage() {
           .eq('id', id);
         
         if (customerError) throw customerError;
-        
-        toast({
-          title: "Επιτυχής διαγραφή",
-          description: "Ο πελάτης και όλες οι επαφές του διαγράφηκαν οριστικά.",
-          variant: "default",
-        });
       } else {
         // For regular users: Just mark as inactive
         const { error } = await supabase
@@ -325,23 +380,12 @@ export default function CustomerDetailPage() {
           .eq('id', id);
         
         if (error) throw error;
-        
-        toast({
-          title: "Επιτυχής απενεργοποίηση",
-          description: "Ο πελάτης έχει απενεργοποιηθεί.",
-          variant: "default",
-        });
       }
       
       // Redirect to customers list
       navigate('/customers');
     } catch (error) {
       console.error('Error deleting customer:', error);
-      toast({
-        title: "Σφάλμα",
-        description: "Υπήρξε πρόβλημα κατά τη διαγραφή του πελάτη.",
-        variant: "destructive",
-      });
     } finally {
       setIsDeleting(false);
     }
@@ -373,20 +417,8 @@ export default function CustomerDetailPage() {
       
       // Refresh contacts list
       await fetchContacts();
-      
-      // Show success message
-      toast({
-        title: "Επιτυχία",
-        description: "Η επαφή διαγράφηκε με επιτυχία.",
-        variant: "default",
-      });
     } catch (error) {
       console.error("Error deleting contact:", error);
-      toast({
-        title: "Σφάλμα",
-        description: "Προέκυψε σφάλμα κατά τη διαγραφή της επαφής.",
-        variant: "destructive",
-      });
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
@@ -400,8 +432,6 @@ export default function CustomerDetailPage() {
     
     try {
       setLoadingOffers(true);
-      console.log("Fetching offers for customer ID:", id);
-      console.log("Customer name:", customer?.company_name);
       
       const { data, error } = await supabase
         .from('offers')
@@ -416,18 +446,9 @@ export default function CustomerDetailPage() {
 
       if (error) throw error;
 
-      console.log("Found offers:", data?.length || 0);
-      console.log("First few offers customer_ids:", data?.slice(0, 3).map(o => o.customer_id));
-      console.log("Do all offers match this customer?", data?.every(o => o.customer_id === id));
-
       setRecentOffers(data || []);
     } catch (error) {
       console.error("Error fetching offers:", error);
-      toast({
-        title: "Σφάλμα",
-        description: "Δεν ήταν δυνατή η φόρτωση των προσφορών.",
-        variant: "destructive",
-      });
     } finally {
       setLoadingOffers(false);
     }
@@ -716,194 +737,27 @@ export default function CustomerDetailPage() {
                 </button>
               </div>
               
-              {/* Simple fixed height container with single scrollbar */}
-              <div style={{ height: "120px", overflowY: "auto" }} className="custom-scrollbar rounded-md border border-[#52796f] bg-[#2f3e46] p-2">
-                {contacts.length === 0 ? (
-                  <div className="text-center py-4 text-[#84a98c]">
-                    Δεν υπάρχουν επαφές για αυτόν τον πελάτη
-                  </div>
-                ) : (
-                  <>
-                    {/* First render the primary contact if it exists */}
-                    {contacts
-                      .filter(contact => contact.id === customer?.primary_contact_id)
-                      .map(contact => (
-                    <div 
-                      key={contact.id}
-                          className="flex items-center p-2 bg-[#2f3e46]/50 rounded-md cursor-pointer mb-1 group"
-                        >
-                          <div className="flex-shrink-0 mr-3">
-                            <div 
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm bg-yellow-500"
-                      onClick={() => {
-                        setSelectedContact(contact);
-                        setShowContactDialog(true);
-                      }}
-                        >
-                          {contact.full_name ? contact.full_name.charAt(0).toUpperCase() : '?'}
-                        </div>
-                      </div>
-                          <div 
-                            className="flex-1 min-w-0"
-                            onClick={() => {
-                              setSelectedContact(contact);
-                              setShowContactDialog(true);
-                            }}
-                          >
-                        <div className="flex items-center">
-                          <p className="text-sm font-medium text-[#cad2c5] truncate">
-                            {contact.full_name}
-                          </p>
-                            <span className="ml-2 text-xs text-yellow-400">
-                              ✓ Κύρια
-                            </span>
-                        </div>
-                        {contact.position && (
-                          <p className="text-xs text-[#84a98c] truncate">
-                            {contact.position}
-                          </p>
-                        )}
-                        <div className="flex items-center text-xs text-[#84a98c]">
-                          {contact.phone && (
-                            <span className="flex items-center mr-2 truncate">
-                              <Phone className="h-3 w-3 mr-1" />
-                              {contact.phone}
-                            </span>
-                          )}
-                          {contact.email && (
-                            <span className="flex items-center truncate">
-                              <Mail className="h-3 w-3 mr-1" />
-                              {contact.email}
-                            </span>
-                )}
-              </div>
-            </div>
-
-                          {/* Delete button for primary contact */}
-                          <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <TooltipProvider delayDuration={100}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                              className="h-6 w-6 p-0 text-red-400 hover:text-red-300 hover:bg-[#2f3e46] rounded-full flex items-center justify-center"
-                            onClick={() => {
-                            setContactToDelete(contact);
-                            setShowDeleteDialog(true);
-                          }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
-                                  <p>Διαγραφή επαφής</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        </div>
-                      ))}
-                      
-                    {/* Then render all other contacts */}
-                    {contacts
-                      .filter(contact => contact.id !== customer?.primary_contact_id)
-                      .map(contact => (
-                        <div 
-                          key={contact.id}
-                          className="flex items-center p-2 hover:bg-[#2f3e46] rounded-md cursor-pointer mb-1 group"
-                        >
-                          <div className="flex-shrink-0 mr-3">
-                            <div 
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm bg-blue-500"
-                              onClick={() => {
-                                setSelectedContact(contact);
-                                setShowContactDialog(true);
-                              }}
-                            >
-                              {contact.full_name ? contact.full_name.charAt(0).toUpperCase() : '?'}
-                            </div>
-                          </div>
-                          <div 
-                            className="flex-1 min-w-0"
-                            onClick={() => {
-                              setSelectedContact(contact);
-                              setShowContactDialog(true);
-                            }}
-                          >
-                            <div className="flex items-center">
-                              <p className="text-sm font-medium text-[#cad2c5] truncate">
-                                {contact.full_name}
-                              </p>
-                            </div>
-                            {contact.position && (
-                              <p className="text-xs text-[#84a98c] truncate">
-                                {contact.position}
-                              </p>
-                            )}
-                            <div className="flex items-center text-xs text-[#84a98c]">
-                              {contact.phone && (
-                                <span className="flex items-center mr-2 truncate">
-                                  <Phone className="h-3 w-3 mr-1" />
-                                  {contact.phone}
-                                </span>
-                              )}
-                              {contact.email && (
-                                <span className="flex items-center truncate">
-                                  <Mail className="h-3 w-3 mr-1" />
-                                  {contact.email}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Action buttons */}
-                          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {/* Set as primary contact button */}
-                            <TooltipProvider delayDuration={100}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="h-6 w-6 p-0 text-[#84a98c] hover:text-[#cad2c5] hover:bg-[#2f3e46] rounded-full flex items-center justify-center"
-                                    onClick={() => setPrimaryContact(contact.id)}
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                                    </svg>
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
-                                  <p>Ορισμός ως κύρια επαφή</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                            
-                            {/* Delete contact button */}
-                            <TooltipProvider delayDuration={100}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="h-6 w-6 p-0 text-red-400 hover:text-red-300 hover:bg-[#2f3e46] rounded-full flex items-center justify-center"
-                                    onClick={() => {
-                                      setContactToDelete(contact);
-                                      setShowDeleteDialog(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
-                                  <p>Διαγραφή επαφής</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        </div>
-                      ))}
-                  </>
-                )}
-              </div>
+              {/* Use the enhanced ContactList component */}
+              <ContactList 
+                contacts={contacts}
+                primaryContactId={customer?.primary_contact_id}
+                onContactClick={(contact) => {
+                  setSelectedContact(contact);
+                  setShowContactDialog(true);
+                }}
+                onAddContact={() => {
+                  setSelectedContact(null);
+                  setShowContactDialog(true);
+                }}
+                onSetPrimary={(contactId) => setPrimaryContact(contactId)}
+                onDeleteContact={(contact) => {
+                  setContactToDelete(contact);
+                  setShowDeleteDialog(true);
+                }}
+                customerId={id}
+                onRefresh={fetchContacts}
+                className="mt-2"
+              />
             </div>
 
             <Card className="bg-[#354f52] border-[#52796f] contact-info-section">

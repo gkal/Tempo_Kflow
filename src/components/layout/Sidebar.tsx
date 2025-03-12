@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   CheckSquare,
+  RotateCcw,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -18,10 +19,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
+  
+  // Check if user is admin
+  const isAdmin = user?.role?.toLowerCase() === "admin";
 
   const navigation = [
     { name: "Κεντρική Σελίδα", href: "/dashboard", icon: Home },
@@ -31,6 +37,15 @@ export default function Sidebar() {
     { name: "Κλήσεις", href: "/calls", icon: Phone },
     { name: "Ρυθμίσεις", href: "/dashboard/settings", icon: Settings },
   ];
+  
+  // Add the recovery page link for admin users only
+  if (isAdmin) {
+    navigation.push({ 
+      name: "Ανάκτηση Δεδομένων", 
+      href: "/admin/recovery", 
+      icon: RotateCcw 
+    });
+  }
 
   return (
     <div

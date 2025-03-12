@@ -46,6 +46,7 @@ interface Customer {
   first_name?: string;
   last_name?: string;
   status: string;
+  offers_count?: number;
   [key: string]: any;
   offers?: any[]; // Add offers array to store customer offers
   isExpanded?: boolean; // Track expanded state
@@ -148,18 +149,28 @@ const CustomerRow = React.memo(({
                     <td className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
                     <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px] group relative">
                       <div className="truncate">
-                        {offer.requirements || "-"}
+                        {offer.requirements && offer.requirements.length > 50 
+                          ? <>{offer.requirements.substring(0, 50)}<span className="text-blue-400">....</span></>
+                          : offer.requirements || "-"}
                       </div>
-                      {offer.requirements && offer.requirements.length > 15 && (
-                        <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal min-w-[200px] max-w-[300px] text-blue-400">
+                      {offer.requirements && offer.requirements.length > 50 && (
+                        <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal min-w-[200px] max-w-[300px] text-[#cad2c5]">
                           {offer.requirements}
                         </span>
                       )}
-                      {offer.requirements && offer.requirements.length > 15 && (
-                        <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-400">...</span>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px] group relative">
+                      <div className="truncate">
+                        {offer.amount && offer.amount.length > 50 
+                          ? <>{offer.amount.substring(0, 50)}<span className="text-blue-400">...</span></>
+                          : offer.amount || "-"}
+                      </div>
+                      {offer.amount && offer.amount.length > 50 && (
+                        <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal min-w-[200px] max-w-[300px] text-[#cad2c5]">
+                          {offer.amount}
+                        </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">{offer.amount || "-"}</td>
                     <td className="px-3 py-2 text-xs w-[140px]">
                       <span className={`
                         ${offer.offer_result === "wait_for_our_answer" ? "text-yellow-400" : 
@@ -317,68 +328,216 @@ export default function CustomersPage() {
   // Add a new ref to track the scroll position
   const scrollPositionRef = useRef(0);
   
-  // Define fetchCustomerOffers function first
-  const fetchCustomerOffers = useCallback(async (customerId: string) => {
+  // Add these near the top of the component with other state declarations
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+  
+  // Add these near the top of the component with other state declarations
+  const [realtimeEnabled, setRealtimeEnabled] = useState(true);
+  
+  // Add a function to set up real-time subscriptions
+  const setupRealtimeSubscriptions = useCallback(() => {
+    if (!realtimeEnabled) return;
+    
+    // Subscribe to changes in the offers table
+    const offersSubscription = supabase
+      .channel('offers-changes')
+      .on('postgres_changes', {
+        event: '*', 
+        schema: 'public',
+        table: 'offers'
+      }, (payload) => {
+        // Handle different types of changes
+        if (payload.eventType === 'INSERT') {
+          // A new offer was created
+          const newOffer = payload.new;
+          if (newOffer.customer_id) {
+            // Refresh offers for this customer if it's expanded
+            if (expandedCustomers[newOffer.customer_id]) {
+              fetchCustomerOffers(newOffer.customer_id, true);
+            }
+            
+            // Update the offers count for this customer
+            updateCustomerOffersCount(newOffer.customer_id);
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          // An offer was updated
+          const updatedOffer = payload.new;
+          if (updatedOffer.customer_id) {
+            // Refresh offers for this customer if it's expanded
+            if (expandedCustomers[updatedOffer.customer_id]) {
+              fetchCustomerOffers(updatedOffer.customer_id, true);
+            }
+          }
+        } else if (payload.eventType === 'DELETE') {
+          // An offer was deleted
+          const deletedOffer = payload.old;
+          if (deletedOffer.customer_id) {
+            // Refresh offers for this customer if it's expanded
+            if (expandedCustomers[deletedOffer.customer_id]) {
+              fetchCustomerOffers(deletedOffer.customer_id, true);
+            }
+            
+            // Update the offers count for this customer
+            updateCustomerOffersCount(deletedOffer.customer_id);
+          }
+        }
+      })
+      .subscribe();
+    
+    // Subscribe to changes in the customers table
+    const customersSubscription = supabase
+      .channel('customers-changes')
+      .on('postgres_changes', {
+        event: '*', 
+        schema: 'public',
+        table: 'customers'
+      }, (payload) => {
+        // Handle different types of changes
+        if (payload.eventType === 'UPDATE') {
+          // A customer was updated
+          const updatedCustomer = payload.new;
+          
+          // Update the customer in our local state
+          setCustomers(prev => 
+            prev.map(customer => 
+              customer.id === updatedCustomer.id 
+                ? { ...customer, ...updatedCustomer, isExpanded: customer.isExpanded } 
+                : customer
+            )
+          );
+          
+          setFilteredCustomers(prev => 
+            prev.map(customer => 
+              customer.id === updatedCustomer.id 
+                ? { ...customer, ...updatedCustomer, isExpanded: customer.isExpanded } 
+                : customer
+            )
+          );
+          
+          // Highlight the updated customer
+          setLastUpdatedCustomerId(updatedCustomer.id);
+          
+          // Clear the highlight after 2 seconds
+          setTimeout(() => {
+            setLastUpdatedCustomerId(null);
+          }, 2000);
+        } else if (payload.eventType === 'INSERT') {
+          // A new customer was created
+          fetchCustomers();
+        } else if (payload.eventType === 'DELETE') {
+          // A customer was deleted
+          const deletedCustomer = payload.old;
+          
+          // Remove the customer from our local state
+          setCustomers(prev => 
+            prev.filter(customer => customer.id !== deletedCustomer.id)
+          );
+          
+          setFilteredCustomers(prev => 
+            prev.filter(customer => customer.id !== deletedCustomer.id)
+          );
+        }
+      })
+      .subscribe();
+    
+    // Return a cleanup function to unsubscribe when component unmounts
+    return () => {
+      supabase.removeChannel(offersSubscription);
+      supabase.removeChannel(customersSubscription);
+    };
+  }, [expandedCustomers, realtimeEnabled]);
+  
+  // Add a function to update customer offers count
+  const updateCustomerOffersCount = useCallback(async (customerId) => {
     try {
-      console.log("Fetching offers for customer:", customerId);
-      setLoadingOffers(prev => ({ ...prev, [customerId]: true }));
+      // Get the count of active offers for this customer
+      const { data, error } = await supabase
+        .from("offers")
+        .select("id")
+        .eq("customer_id", customerId)
+        .or('result.is.null,result.eq.pending,result.eq.,result.eq.none');
       
-      // Log the filter condition
-      console.log("Using filter condition:", 'result.is.null,result.eq.pending,result.eq.,result.eq.none');
+      if (error) throw error;
+      
+      const offersCount = data?.length || 0;
+      
+      // Update the customer in our local state
+      setCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, offersCount } 
+            : customer
+        )
+      );
+      
+      setFilteredCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, offersCount } 
+            : customer
+        )
+      );
+    } catch (error) {
+      console.error("Error updating customer offers count:", error);
+    }
+  }, []);
+  
+  // Set up real-time subscriptions when component mounts
+  useEffect(() => {
+    const cleanup = setupRealtimeSubscriptions();
+    return cleanup;
+  }, [setupRealtimeSubscriptions]);
+
+  // Update the fetchCustomerOffers function to be more efficient
+  const fetchCustomerOffers = useCallback(async (customerId: string, forceRefresh = false) => {
+    try {
+      // Only use cache if we have data and don't need a force refresh
+      if (!forceRefresh && customerOffers[customerId]) {
+        return;
+      }
+
+      setLoadingOffers(prev => ({ ...prev, [customerId]: true }));
       
       const { data, error } = await supabase
         .from('offers')
         .select(`
-          *,
+          id,
+          created_at,
+          requirements,
+          amount,
+          offer_result,
+          result,
           assigned_user:users!assigned_to(fullname),
           created_user:users!created_by(fullname),
           contact:contacts(full_name, position)
         `)
         .eq("customer_id", customerId)
-        .or('result.is.null,result.eq.pending,result.eq.,result.eq.none') // Include null, pending, empty string, and none
+        .or('result.is.null,result.eq.pending,result.eq.,result.eq.none')
         .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("Error fetching offers:", error);
-        throw error;
-      }
+      if (error) throw error;
       
-      // Log the fetched data
-      console.log("Fetched offers:", data ? data.length : 0, "offers");
-      console.log("Offer results:", data ? data.map(offer => ({ id: offer.id, result: offer.result })) : []);
-      
-      // Store the offers in state
       setCustomerOffers(prev => ({
         ...prev,
         [customerId]: data || []
       }));
       
-      // Update the offersCount for this customer without triggering a full reload
       const offersCount = data?.length || 0;
-      console.log("Offers count:", offersCount);
       
-      // If there are no offers, automatically collapse the row
-      if (offersCount === 0) {
-        setExpandedCustomers(prev => ({
-          ...prev,
-          [customerId]: false
-        }));
-      }
-      
-      // Update customers state with the new offersCount
       setCustomers(prev => 
         prev.map(customer => 
           customer.id === customerId 
-            ? { ...customer, offersCount, isExpanded: offersCount > 0 ? customer.isExpanded : false } 
+            ? { ...customer, offersCount } 
             : customer
         )
       );
       
-      // Update filteredCustomers state with the new offersCount
       setFilteredCustomers(prev => 
         prev.map(customer => 
           customer.id === customerId 
-            ? { ...customer, offersCount, isExpanded: offersCount > 0 ? customer.isExpanded : false } 
+            ? { ...customer, offersCount } 
             : customer
         )
       );
@@ -393,95 +552,107 @@ export default function CustomersPage() {
     } finally {
       setLoadingOffers(prev => ({ ...prev, [customerId]: false }));
     }
-  }, []);
-  
-  // Define refreshCustomers early in the component
-  function refreshCustomers() {
-    fetchCustomers();
-  }
-  
-  // Update the handleCreateOffer function to expand the row after adding an offer
-  function handleCreateOffer(customerId, source = "Email") {
-    // Open the dialog
-    openNewOfferDialog(customerId, source, () => {
-      // Update the offers for this specific customer
-      fetchCustomerOffers(customerId);
+  }, [customerOffers]);
+
+  // Update fetchCustomers to prefetch offers for visible customers
+  const fetchCustomers = async (customersToExpand: string[] = []) => {
+    try {
+      setLoading(true);
       
-      // Set the expanded state to true for this customer
-      setExpandedCustomers(prev => ({
-        ...prev,
-        [customerId]: true
-      }));
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
       
-      // Also update the expanded state in the customers and filteredCustomers arrays
-      setCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, isExpanded: true } 
-            : customer
-        )
-      );
+      // First get all customers with their active offers count
+      let query = supabase
+        .from("customers")
+        .select(`
+          *,
+          offers:offers(
+            id,
+            result
+          )
+        `, { count: "exact" });
       
-      setFilteredCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, isExpanded: true } 
-            : customer
-        )
-      );
-    });
-  }
-  
-  function handleEditOffer(customerId, offerId) {
-    openEditOfferDialog(customerId, offerId, () => {
-      // Instead of refreshing all customers, just fetch the offers for this specific customer
-      fetchCustomerOffers(customerId);
+      if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter);
+      }
       
-      // Make sure the row is expanded to show the updated offer
-      setExpandedCustomers(prev => ({
-        ...prev,
-        [customerId]: true
-      }));
+      if (searchTerm) {
+        query = query.ilike(`${searchColumn}`, `%${searchTerm}%`);
+      }
       
-      // Also update the expanded state in the customers and filteredCustomers arrays
-      setCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, isExpanded: true } 
-            : customer
-        )
-      );
+      const { data: customersData, count, error: customersError } = await query
+        .range(from, to)
+        .order('company_name', { ascending: true });
+
+      if (customersError) throw customersError;
+
+      // Filter active offers client-side
+      const customersWithData = (customersData as Customer[])?.map(customer => {
+        const activeOffers = customer.offers?.filter(offer => 
+          !offer.result || 
+          offer.result === 'pending' || 
+          offer.result === '' || 
+          offer.result === 'none'
+        ) || [];
+
+        return {
+          ...customer,
+          isExpanded: expandedCustomers[customer.id] || customersToExpand.includes(customer.id),
+          offers: customerOffers[customer.id] || [],
+          offersCount: activeOffers.length
+        };
+      }) || [];
       
-      setFilteredCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, isExpanded: true } 
-            : customer
-        )
-      );
-    });
-  }
-  
-  // Replace the handleSaveOffer function
-  const handleSaveOffer = useCallback(() => {
-    // Just refresh all customers
-    refreshCustomers();
-  }, []);
-  
-  // Replace the handleCloseOfferDialog function
-  const handleCloseOfferDialog = useCallback(() => {
-    // Nothing needed here since the dialog manager handles closing
-  }, []);
-  
-  // Replace the handleOpenOfferDialog function
-  const handleOpenOfferDialog = useCallback((customerId: string, source: string = "Email", offerId?: string) => {
-    if (offerId) {
-      openEditOfferDialog(customerId, offerId, refreshCustomers);
-    } else {
-      openNewOfferDialog(customerId, source, refreshCustomers);
+      setCustomers(customersWithData);
+      setFilteredCustomers(customersWithData);
+      setTotalCount(count || 0);
+      
+      // Prefetch offers for all visible customers with active offers
+      customersWithData.forEach(customer => {
+        if (customer.offersCount > 0) {
+          fetchCustomerOffers(customer.id);
+        }
+      });
+      
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+    } finally {
+      setLoading(false);
     }
-  }, [refreshCustomers]);
-  
+  };
+
+  // Update toggleCustomerExpanded to use cached data
+  const toggleCustomerExpanded = async (customerId: string) => {
+    const isCurrentlyExpanded = expandedCustomers[customerId] || false;
+    
+    // If we're expanding and don't have offers yet, fetch them
+    if (!isCurrentlyExpanded && !customerOffers[customerId]) {
+      await fetchCustomerOffers(customerId);
+    }
+    
+    setExpandedCustomers(prev => ({
+      ...prev,
+      [customerId]: !isCurrentlyExpanded
+    }));
+    
+    setCustomers(prev => 
+      prev.map(customer => 
+        customer.id === customerId 
+          ? { ...customer, isExpanded: !isCurrentlyExpanded } 
+          : customer
+      )
+    );
+    
+    setFilteredCustomers(prev => 
+      prev.map(customer => 
+        customer.id === customerId 
+          ? { ...customer, isExpanded: !isCurrentlyExpanded } 
+          : customer
+      )
+    );
+  };
+
   // Format status for display
   const formatStatus = (status: string) => {
     switch (status) {
@@ -531,41 +702,6 @@ export default function CustomersPage() {
       default:
         return source;
     }
-  };
-
-  // Function to toggle expanded state without causing a full reload
-  const toggleCustomerExpanded = async (customerId: string) => {
-    // If we're about to expand and don't have offers yet, fetch them first
-    const isCurrentlyExpanded = expandedCustomers[customerId] || false;
-    const hasOffers = customerOffers[customerId]?.length > 0;
-    
-    if (!isCurrentlyExpanded && !hasOffers) {
-      await fetchCustomerOffers(customerId);
-    }
-    
-    // Then toggle expanded state
-    setExpandedCustomers(prev => ({
-      ...prev,
-      [customerId]: !isCurrentlyExpanded
-    }));
-    
-    // Update the expanded state in the customers array without triggering a full reload
-    setCustomers(prev => 
-      prev.map(customer => 
-        customer.id === customerId 
-          ? { ...customer, isExpanded: !isCurrentlyExpanded } 
-          : customer
-      )
-    );
-    
-    // Update the expanded state in the filtered customers array
-    setFilteredCustomers(prev => 
-      prev.map(customer => 
-        customer.id === customerId 
-          ? { ...customer, isExpanded: !isCurrentlyExpanded } 
-          : customer
-      )
-    );
   };
 
   // Move toggleCustomerStatus function before columns definition
@@ -656,14 +792,15 @@ export default function CustomersPage() {
         }
         
         return (
-          <div className="flex items-center">
-            <div 
-              className="flex items-center cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleCustomerExpanded(row.id);
-              }}
-            >
+          <div 
+            className="flex items-center justify-center w-full h-full cursor-pointer"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleCustomerExpanded(row.id);
+            }}
+          >
+            <div className="flex items-center">
               {isExpanded ? (
                 <ChevronDown className="h-4 w-4 text-[#84a98c]" />
               ) : (
@@ -801,21 +938,36 @@ export default function CustomersPage() {
       
       if (error) throw error;
       
-      // Update the offers list for this customer
-      await fetchCustomerOffers(offerToDelete.customerId);
-      
-      toast({
-        title: "Επιτυχής διαγραφή",
-        description: "Η προσφορά διαγράφηκε με επιτυχία!",
-        variant: "default",
+      // Immediately update the UI by removing the offer from the state
+      setCustomerOffers(prev => {
+        const updatedOffers = { ...prev };
+        if (updatedOffers[offerToDelete.customerId]) {
+          updatedOffers[offerToDelete.customerId] = updatedOffers[offerToDelete.customerId]
+            .filter(offer => offer.id !== offerToDelete.offerId);
+        }
+        return updatedOffers;
       });
+      
+      // Update the offers count in the customers list
+      const newOffersCount = (customerOffers[offerToDelete.customerId]?.length || 1) - 1;
+      
+      setCustomers(prev => 
+        prev.map(customer => 
+          customer.id === offerToDelete.customerId 
+            ? { ...customer, offersCount: newOffersCount } 
+            : customer
+        )
+      );
+      
+      setFilteredCustomers(prev => 
+        prev.map(customer => 
+          customer.id === offerToDelete.customerId 
+            ? { ...customer, offersCount: newOffersCount } 
+            : customer
+        )
+      );
     } catch (error) {
       console.error("Error deleting offer:", error);
-      toast({
-        title: "Σφάλμα",
-        description: "Δεν ήταν δυνατή η διαγραφή της προσφοράς.",
-        variant: "destructive",
-      });
     } finally {
       setShowDeleteOfferDialog(false);
       setOfferToDelete(null);
@@ -871,127 +1023,6 @@ export default function CustomersPage() {
       fetchCustomers();
     }
   }, [user, refreshTrigger, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Update the fetchCustomers function to accept a parameter for customers to expand
-  const fetchCustomers = async (customersToExpand: string[] = []) => {
-    try {
-      setLoading(true);
-      
-      // Add pagination parameters
-      const pageSize = 50; // Number of records per page
-      const pageIndex = 0; // First page (0-indexed)
-      
-      // Build the query based on the status filter with pagination
-      let query = supabase.from("customers").select("*");
-      
-      if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
-      }
-      
-      // Add pagination
-      query = query
-        .range(pageIndex * pageSize, (pageIndex + 1) * pageSize - 1)
-        .order('company_name', { ascending: true });
-      
-      const { data: customersData, error: customersError } = await query;
-
-      if (customersError) throw customersError;
-
-      // Use server-side aggregation to get offer counts efficiently
-      // This query counts pending offers grouped by customer_id
-      const { data: offerCounts, error: countsError } = await supabase
-        .rpc('count_pending_offers_by_customer');
-      
-      if (countsError) {
-        console.error("Error fetching offer counts:", countsError);
-        // Fallback to client-side counting if the RPC function doesn't exist
-        const { data: offersData, error: offersError } = await supabase
-          .from('offers')
-          .select('customer_id, result');
-        
-        if (offersError) throw offersError;
-        
-        // Filter offers with pending status or null result
-        const pendingOffers = offersData.filter(offer => 
-          offer.result === null || offer.result === 'pending'
-        );
-        
-        // Count offers by customer ID
-        const countsMap = {};
-        pendingOffers.forEach(offer => {
-          countsMap[offer.customer_id] = (countsMap[offer.customer_id] || 0) + 1;
-        });
-        
-        // Add isExpanded property and offersCount to each customer in a single step
-        const customersWithData = customersData?.map(customer => {
-          // Check if this customer should be expanded (either from current state or from parameter)
-          const shouldBeExpanded = expandedCustomers[customer.id] || customersToExpand.includes(customer.id);
-          const offersCount = countsMap[customer.id] || 0;
-          
-          return {
-            ...customer,
-            isExpanded: shouldBeExpanded,
-            offers: customerOffers[customer.id] || [],
-            offersCount
-          };
-        }) || [];
-        
-        // Update both states at once
-        setCustomers(customersWithData);
-        setFilteredCustomers(customersWithData);
-        
-        // Also update the expandedCustomers state to include any newly expanded customers
-        if (customersToExpand.length > 0) {
-          setExpandedCustomers(prev => {
-            const newState = { ...prev };
-            customersToExpand.forEach(id => {
-              newState[id] = true;
-            });
-            return newState;
-          });
-        }
-      } else {
-        // Convert the array of counts to a map for easier lookup
-        const countsMap = {};
-        offerCounts?.forEach(item => {
-          countsMap[item.customer_id] = item.count;
-        });
-
-        // Add isExpanded property and offersCount to each customer in a single step
-        const customersWithData = customersData?.map(customer => {
-          // Check if this customer should be expanded (either from current state or from parameter)
-          const shouldBeExpanded = expandedCustomers[customer.id] || customersToExpand.includes(customer.id);
-          const offersCount = countsMap[customer.id] || 0;
-          
-          return {
-            ...customer,
-            isExpanded: shouldBeExpanded,
-            offers: customerOffers[customer.id] || [],
-            offersCount
-          };
-        }) || [];
-        
-        // Update both states at once
-        setCustomers(customersWithData);
-        setFilteredCustomers(customersWithData);
-        
-        // Also update the expandedCustomers state to include any newly expanded customers
-        if (customersToExpand.length > 0) {
-          setExpandedCustomers(prev => {
-            const newState = { ...prev };
-            customersToExpand.forEach(id => {
-              newState[id] = true;
-            });
-            return newState;
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching customers:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Initialize dropdown options once on component mount
   useEffect(() => {
@@ -1182,6 +1213,89 @@ export default function CustomersPage() {
       fetchCustomers();
     }
   };
+
+  // Define refreshCustomers early in the component
+  function refreshCustomers() {
+    fetchCustomers();
+  }
+  
+  // Update the handleCreateOffer function to expand the row after adding an offer
+  function handleCreateOffer(customerId, source = "Email") {
+    // Open the dialog
+    openNewOfferDialog(customerId, source, () => {
+      // Update the offers for this specific customer
+      fetchCustomerOffers(customerId);
+      
+      // Set the expanded state to true for this customer
+      setExpandedCustomers(prev => ({
+        ...prev,
+        [customerId]: true
+      }));
+      
+      setCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, isExpanded: true } 
+            : customer
+        )
+      );
+      
+      setFilteredCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, isExpanded: true } 
+            : customer
+        )
+      );
+    });
+  }
+  
+  function handleEditOffer(customerId, offerId) {
+    openEditOfferDialog(customerId, offerId, async () => {
+      // Force refresh the offers after edit
+      await fetchCustomerOffers(customerId, true);
+      
+      setExpandedCustomers(prev => ({
+        ...prev,
+        [customerId]: true
+      }));
+      
+      setCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, isExpanded: true } 
+            : customer
+        )
+      );
+      
+      setFilteredCustomers(prev => 
+        prev.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, isExpanded: true } 
+            : customer
+        )
+      );
+    });
+  }
+  
+  // Replace the handleSaveOffer function
+  const handleSaveOffer = useCallback(() => {
+    refreshCustomers();
+  }, []);
+  
+  // Replace the handleCloseOfferDialog function
+  const handleCloseOfferDialog = useCallback(() => {
+    // Nothing needed here since the dialog manager handles closing
+  }, []);
+  
+  // Replace the handleOpenOfferDialog function
+  const handleOpenOfferDialog = useCallback((customerId: string, source: string = "Email", offerId?: string) => {
+    if (offerId) {
+      openEditOfferDialog(customerId, offerId, refreshCustomers);
+    } else {
+      openNewOfferDialog(customerId, source, refreshCustomers);
+    }
+  }, [refreshCustomers]);
 
   // If showing the form, render it instead of the customer list
   return (

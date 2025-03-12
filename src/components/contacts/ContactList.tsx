@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { ContactCard } from "./ContactCard";
+import { useRealtimeSubscription } from '@/lib/useRealtimeSubscription';
+import { toast } from "@/components/ui/use-toast";
 
 interface ContactListProps {
   contacts: any[];
@@ -9,6 +11,8 @@ interface ContactListProps {
   onDeleteContact?: (contact: any) => void;
   className?: string;
   maxHeight?: string;
+  customerId?: string;
+  onRefresh?: () => void;
 }
 
 export function ContactList({
@@ -20,7 +24,33 @@ export function ContactList({
   onDeleteContact,
   className = "",
   maxHeight = "max-h-[300px]",
+  customerId,
+  onRefresh,
 }: ContactListProps & { onSetPrimary?: (contactId: string) => void }) {
+  
+  // Function to handle contact updates
+  const handleContactUpdate = useCallback(() => {
+    if (onRefresh) {
+      onRefresh();
+    }
+  }, [onRefresh]);
+
+  // Add real-time subscription for contacts if customerId is provided
+  useRealtimeSubscription(
+    customerId ? {
+      table: 'contacts',
+      filter: `customer_id=eq.${customerId}`,
+      event: '*',
+    } : { table: 'contacts' },
+    (payload) => {
+      // Handle different types of changes
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+        handleContactUpdate();
+      }
+    },
+    [customerId, handleContactUpdate]
+  );
+
   // Sort contacts: primary contact first, then alphabetically by name
   const sortedContacts = [...contacts].sort((a, b) => {
     if (a.id === primaryContactId) return -1;
