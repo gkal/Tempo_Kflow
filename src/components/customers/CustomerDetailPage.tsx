@@ -40,7 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import OffersTable from "./OffersTable";
+import OffersTable, { OffersTableRef } from "./OffersTable";
 import {
   Tooltip,
   TooltipContent,
@@ -89,6 +89,7 @@ export default function CustomerDetailPage() {
   const [showCustomerDialog, setShowCustomerDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  const offersTableRef = useRef<OffersTableRef>(null);
 
   useEffect(() => {
     if (id) {
@@ -435,8 +436,25 @@ export default function CustomerDetailPage() {
   // Function to handle editing an offer
   const handleEditOffer = (offerId: string) => {
     openEditOfferDialog(id, offerId, () => {
-      fetchRecentOffers();
-    });
+      // Use the ref to refresh the data instead of fetching all offers again
+      if (offersTableRef.current) {
+        offersTableRef.current.refreshData();
+      } else {
+        fetchRecentOffers();
+      }
+    }, offersTableRef);
+  };
+  
+  // Add a function to handle adding a new offer
+  const handleAddOffer = (source: string = 'Email') => {
+    openNewOfferDialog(id, source, () => {
+      // Use the ref to refresh the data instead of fetching all offers again
+      if (offersTableRef.current) {
+        offersTableRef.current.refreshData();
+      } else {
+        fetchRecentOffers();
+      }
+    }, offersTableRef);
   };
   
   // Function to format offer status
@@ -466,6 +484,8 @@ export default function CustomerDetailPage() {
         return "Σε εξέλιξη";
       case "waiting":
         return "Αναμονή";
+      case "none":
+        return "Κανένα";
       default:
         return result || "—";
     }
@@ -498,6 +518,8 @@ export default function CustomerDetailPage() {
         return "bg-blue-500/20 text-blue-400";
       case "waiting":
         return "bg-purple-500/20 text-purple-400";
+      case "none":
+        return "bg-gray-500/20 text-gray-400";
       default:
         return "bg-gray-500/20 text-gray-400";
     }
@@ -1005,7 +1027,7 @@ export default function CustomerDetailPage() {
                               <div className="flex items-start justify-between">
                                 <div className="flex items-center space-x-4">
                                   <div className="font-medium text-[#cad2c5] truncate max-w-[600px]">
-                                    {offer.amount || "- -"}
+                                    {truncateText(offer.amount || "- -", 50)}
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
@@ -1021,8 +1043,13 @@ export default function CustomerDetailPage() {
                                   </span>
                                 </div>
                               </div>
-                              <div className="mt-2 text-sm text-[#84a98c]">
-                                {offer.assigned_user?.fullname || "Μη ανατεθειμένη"}
+                              <div className="mt-2 text-sm text-[#84a98c] flex items-center">
+                                <span>{offer.assigned_user?.fullname || "Μη ανατεθειμένη"}</span>
+                                {offer.created_at && (
+                                  <span className="ml-2 text-xs text-[#84a98c]/70">
+                                    • {formatDateTime(offer.created_at)}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1364,6 +1391,7 @@ export default function CustomerDetailPage() {
             </div>
             <div className="flex-1 overflow-auto">
               <OffersTable 
+                ref={offersTableRef}
                 customerId={id || ""} 
                 onClose={() => {
                   setShowOffersTable(false);

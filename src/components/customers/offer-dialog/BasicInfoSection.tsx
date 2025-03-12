@@ -19,48 +19,31 @@ const BasicInfoSection = () => {
   };
 
   return (
-    <div className="-mt-3 section-basic-info bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+    <div className="-mt-3 section-basic-info bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full">
       <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
         <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
           ΒΑΣΙΚΑ ΣΤΟΙΧΕΙΑ
         </h2>
       </div>
       <div className="p-2">
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <div className="w-1/6 text-[#a8c5b5] text-sm pr-0">
-              Πηγή Αιτήματος
-            </div>
-            <div className="w-5/6" style={inputContainerStyle}>
-              <div className="w-1/4">
-                <GlobalDropdown
-                  options={sourceOptions.map(option => option.label)}
-                  value={getSourceLabel(watch("source"))}
-                  onSelect={(label) => setValue("source", getSourceValue(label))}
-                  placeholder="Επιλέξτε πηγή"
-                />
-              </div>
-            </div>
+        <div className="flex flex-wrap justify-between gap-2">
+          <div className="flex flex-col gap-2 w-full md:w-[48%]">
+            <label className="text-[#a8c5b5] text-xs font-medium">Ζήτηση Πελάτη:</label>
+            <textarea
+              {...register("requirements")}
+              className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] rounded-md p-1 text-xs resize-none w-full hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] focus:shadow-[0_0_0_2px_#52796f] focus:outline-none transition-all duration-200"
+              rows={2}
+              placeholder="Εισάγετε τη ζήτηση πελάτη"
+            />
           </div>
-
-          <div className="flex items-start">
-            <div className="w-1/6 text-[#a8c5b5] text-sm pr-0 pt-2">
-              Ζήτηση
-            </div>
-            <div className="w-5/6" style={inputContainerStyle}>
-              <textarea
-                id="amount"
-                className="w-full bg-[#2f3e46] text-[#cad2c5] p-2 rounded-sm"
-                style={{
-                  border: '1px solid #52796f',
-                  outline: 'none',
-                  fontSize: '0.875rem'
-                }}
-                placeholder="Ζήτηση πελάτη"
-                rows={3}
-                {...register("amount")}
-              ></textarea>
-            </div>
+          <div className="flex flex-col gap-2 w-full md:w-[48%]">
+            <label className="text-[#a8c5b5] text-xs font-medium">Ποσό:</label>
+            <textarea
+              {...register("amount")}
+              className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] rounded-md p-1 text-xs resize-none w-full hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] focus:shadow-[0_0_0_2px_#52796f] focus:outline-none transition-all duration-200"
+              rows={2}
+              placeholder="Εισάγετε το ποσό"
+            />
           </div>
         </div>
       </div>

@@ -47,9 +47,13 @@ const StatusSection = () => {
               <GlobalDropdown
                 options={userOptions}
                 value={getUserNameById(watch("assigned_to") || "")}
-                onSelect={(value) => setValue("assigned_to", getUserIdByName(value))}
+                onSelect={(value) => {
+                  const userId = getUserIdByName(value);
+                  console.log(`Setting assigned_to to: ${userId} (from name: ${value})`);
+                  setValue("assigned_to", userId);
+                }}
                 placeholder="Επιλέξτε χρήστη"
-                className="dropdown-header"
+                className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-xs truncate hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] transition-all duration-200"
               />
             </div>
           </div>
@@ -68,7 +72,7 @@ const StatusSection = () => {
                   value={getStatusLabel(watch("offer_result"))}
                   onSelect={(label) => setValue("offer_result", getStatusValue(label))}
                   placeholder="Επιλέξτε κατάσταση"
-                  className="dropdown-header"
+                  className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-xs truncate hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] transition-all duration-200"
                 />
               </div>
             </div>
@@ -85,7 +89,7 @@ const StatusSection = () => {
                 onSelect={(label) => setValue("result", getResultValue(label))}
                 placeholder="Επιλέξτε αποτέλεσμα"
                 disabled={watchOfferResult !== "ready"}
-                className="dropdown-header"
+                className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-xs truncate hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] transition-all duration-200"
               />
             </div>
           </div>

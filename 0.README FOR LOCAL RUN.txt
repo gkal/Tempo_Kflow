@@ -23,8 +23,8 @@ How to pull code from github
 -----------------------------
 cd C:\Tempo_Kflow
 git status
-git fetch origin
-git reset --hard origin/main
+git pull origin main
+
 
 -------------------------
 Build for production and development

@@ -75,67 +75,100 @@ export async function createTask({
     }
 
     // Create notification for the assigned user
-    if (task) {
-      try {
-        // Get sender's fullname
-        const { data: senderData } = await supabase
-          .from('users')
-          .select('fullname')
-          .eq('id', createdBy)
-          .single();
+    try {
+      // Always create a notification, regardless of who the task is assigned to
+      console.log("Creating notification for task assignment");
+      
+      // Get sender's fullname
+      const { data: senderData, error: senderError } = await supabase
+        .from('users')
+        .select('fullname')
+        .eq('id', createdBy)
+        .single();
+        
+      if (senderError) {
+        console.error("Error fetching sender data for notification:", senderError);
+      }
 
-        // Get customer name if this task is related to an offer
-        let customerName = '';
-        if (offerId) {
-          const { data: offerData } = await supabase
+      // Get customer name if this task is related to an offer
+      let customerName = '';
+      if (offerId) {
+        try {
+          const { data: offerData, error: offerError } = await supabase
             .from('offers')
             .select(`
-              customer:customer_id(
-                fullname
+              customer_id,
+              customers:customer_id(
+                company_name
               )
             `)
             .eq('id', offerId)
             .single();
           
-          if (offerData?.customer?.fullname) {
-            customerName = ` για τον πελάτη ${offerData.customer.fullname}`;
+          if (offerError) {
+            console.error("Error fetching offer data for task:", offerError);
+          } else if (offerData) {
+            if (offerData?.customers && Array.isArray(offerData.customers) && offerData.customers.length > 0) {
+              const customerCompanyName = offerData.customers[0]?.company_name;
+              if (customerCompanyName) {
+                customerName = ` για τον πελάτη ${customerCompanyName}`;
+              }
+            } else if (offerData?.customers && typeof offerData.customers === 'object' && 'company_name' in offerData.customers) {
+              customerName = ` για τον πελάτη ${offerData.customers.company_name}`;
+            }
           }
+        } catch (error) {
+          console.error("Exception fetching offer data for task:", error);
+          // Continue with task creation even if we can't get the customer name
         }
-
-        const senderName = senderData?.fullname || 'Άγνωστος χρήστης';
-        
-        const notificationData = {
-          user_id: assignedTo,
-          sender_id: createdBy,
-          message: `${senderName} → Νέα εργασία ανατέθηκε σε εσάς: ${title}${customerName}`,
-          type: 'task_assigned',
-          related_task_id: task.id,
-          read: false,
-          created_at: new Date().toISOString()
-        };
-        
-        const { data: notification, error: notificationError } = await supabase
-          .from('notifications')
-          .insert(notificationData)
-          .select()
-          .single();
-
-        if (notificationError) {
-          console.error("Error creating notification:", notificationError);
-        } else if (notification) {
-          // Dispatch the notification event
-          console.log("Dispatching notification event for new task");
-          notifyNewNotification(notification, assignedTo);
-        }
-      } catch (notificationError) {
-        console.error("Exception creating notification:", notificationError);
-        // Continue even if notification creation fails
       }
 
-      return { success: true, task };
+      const senderName = senderData?.fullname || 'Άγνωστος χρήστης';
+      
+      // Create a different message if the task is self-assigned
+      let notificationMessage = '';
+      if (assignedTo === createdBy) {
+        notificationMessage = `Νέα εργασία που δημιουργήσατε: ${title}${customerName}`;
+      } else {
+        notificationMessage = `${senderName} → Νέα εργασία ανατέθηκε σε εσάς: ${title}${customerName}`;
+      }
+      
+      const notificationData = {
+        user_id: assignedTo,
+        sender_id: createdBy, // Add back the sender_id field
+        message: notificationMessage,
+        type: 'task_assigned',
+        related_task_id: task.id,
+        read: false,
+        created_at: new Date().toISOString()
+      };
+      
+      console.log("Notification data:", notificationData);
+      
+      const { data: notification, error: notificationError } = await supabase
+        .from('notifications')
+        .insert(notificationData)
+        .select()
+        .single();
+
+      if (notificationError) {
+        console.error("Error creating notification:", notificationError);
+      } else if (notification) {
+        // Dispatch the notification event
+        console.log("Notification created successfully:", notification);
+        if (typeof notifyNewNotification === 'function') {
+          console.log("Dispatching notification event for new task");
+          notifyNewNotification(notification, assignedTo);
+        } else {
+          console.warn("notifyNewNotification function not available");
+        }
+      }
+    } catch (notificationError) {
+      console.error("Exception creating notification:", notificationError);
+      // Continue even if notification creation fails
     }
 
-    return { success: false, error: new Error('Task created but no data returned') };
+    return { success: true, task };
   } catch (error) {
     console.error("Exception creating task:", error);
     return { success: false, error };

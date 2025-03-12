@@ -6,14 +6,26 @@ const RequirementsSection = () => {
   const { register, watch, setValue, watchHma } = useContext(OfferDialogContext);
 
   return (
-    <div className="section-requirements bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+    <div className="section-requirements bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full">
       <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
         <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
           ΕΠΙΠΛΕΟΝ ΣΤΟΙΧΕΙΑ
         </h2>
       </div>
       <div className="p-2 space-y-2">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-2">
+          {/* Remove the following lines
+          <label className="text-sm font-medium">Ζήτηση Πελάτη:</label>
+          <textarea
+            {...register("requirements")}
+            className="border rounded-md p-1 text-sm resize-none w-full"
+            rows={2}
+            placeholder="Εισάγετε τη ζήτηση πελάτη"
+          />
+          */}
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="flex items-center">
             <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
               ΗΜΑ

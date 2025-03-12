@@ -128,10 +128,8 @@ const CustomerRow = React.memo(({
               <thead>
                 <tr className="bg-[#3a5258] text-[#a8c5b5]">
                   <th className="px-2 py-2 text-left text-xs font-medium w-[160px]">Ημερομηνία</th>
-                  <th className="px-1 py-2 text-left text-xs font-medium w-[70px]">Πηγή</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Απαιτήσεις</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ζήτηση Πελάτη</th>
                   <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ποσό</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium w-[120px]">Επαφή</th>
                   <th className="px-3 py-2 text-left text-xs font-medium w-[140px]">Κατάσταση</th>
                   <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Αποτέλεσμα</th>
                   <th className="px-3 py-2 text-center text-xs font-medium w-[50px]"></th>
@@ -148,7 +146,6 @@ const CustomerRow = React.memo(({
                     }}
                   >
                     <td className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
-                    <td className="px-1 py-2 text-xs text-[#cad2c5] w-[70px]">{formatSource(offer.source)}</td>
                     <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px] group relative">
                       <div className="truncate">
                         {offer.requirements || "-"}
@@ -163,25 +160,6 @@ const CustomerRow = React.memo(({
                       )}
                     </td>
                     <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">{offer.amount || "-"}</td>
-                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[120px] group relative">
-                      <div className="truncate">
-                        {offer.contact && offer.contact.length > 0 
-                          ? offer.contact[0].position 
-                            ? `${offer.contact[0].full_name} (${offer.contact[0].position})` 
-                            : offer.contact[0].full_name
-                          : "-"}
-                      </div>
-                      {offer.contact && offer.contact.length > 0 && offer.contact[0].full_name.length > 15 && (
-                        <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal">
-                          {offer.contact[0].position 
-                            ? `${offer.contact[0].full_name} (${offer.contact[0].position})` 
-                            : offer.contact[0].full_name}
-                        </span>
-                      )}
-                      {offer.contact && offer.contact.length > 0 && offer.contact[0].full_name.length > 15 && (
-                        <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-blue-400">...</span>
-                      )}
-                    </td>
                     <td className="px-3 py-2 text-xs w-[140px]">
                       <span className={`
                         ${offer.offer_result === "wait_for_our_answer" ? "text-yellow-400" : 
@@ -342,7 +320,11 @@ export default function CustomersPage() {
   // Define fetchCustomerOffers function first
   const fetchCustomerOffers = useCallback(async (customerId: string) => {
     try {
+      console.log("Fetching offers for customer:", customerId);
       setLoadingOffers(prev => ({ ...prev, [customerId]: true }));
+      
+      // Log the filter condition
+      console.log("Using filter condition:", 'result.is.null,result.eq.pending,result.eq.,result.eq.none');
       
       const { data, error } = await supabase
         .from('offers')
@@ -353,10 +335,17 @@ export default function CustomersPage() {
           contact:contacts(full_name, position)
         `)
         .eq("customer_id", customerId)
-        .or('result.is.null,result.eq.pending,result.eq.') // Include null, pending, and empty string
+        .or('result.is.null,result.eq.pending,result.eq.,result.eq.none') // Include null, pending, empty string, and none
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching offers:", error);
+        throw error;
+      }
+      
+      // Log the fetched data
+      console.log("Fetched offers:", data ? data.length : 0, "offers");
+      console.log("Offer results:", data ? data.map(offer => ({ id: offer.id, result: offer.result })) : []);
       
       // Store the offers in state
       setCustomerOffers(prev => ({
@@ -366,6 +355,7 @@ export default function CustomersPage() {
       
       // Update the offersCount for this customer without triggering a full reload
       const offersCount = data?.length || 0;
+      console.log("Offers count:", offersCount);
       
       // If there are no offers, automatically collapse the row
       if (offersCount === 0) {
@@ -517,6 +507,8 @@ export default function CustomersPage() {
         return "Ακύρωση";
       case "waiting":
         return "Αναμονή";
+      case "none":
+        return "Κανένα";
       default:
         return result || "—";
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { formatDateTime } from "@/lib/utils";
@@ -26,15 +26,24 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+// Add a ref type for the component
+export interface OffersTableRef {
+  refreshData: () => void;
+  updateOfferInList: (updatedOffer: any) => void;
+  removeOfferFromList: (offerId: string) => void;
+  addOfferToList: (newOffer: any) => void;
+}
+
 interface OffersTableProps {
   customerId: string;
   onClose: () => void;
 }
 
-export default function OffersTable({
+// Convert to forwardRef to expose methods
+const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
   customerId,
   onClose,
-}: OffersTableProps) {
+}, ref) => {
   const { user } = useAuth();
   const [offers, setOffers] = useState<any[]>([]);
   const [filteredOffers, setFilteredOffers] = useState<any[]>([]);
@@ -83,7 +92,12 @@ export default function OffersTable({
 
   const fetchOffers = async () => {
     try {
+      console.log("OffersTable: Fetching offers for customer:", customerId);
       setLoading(true);
+      
+      // Log the filter condition
+      console.log("OffersTable: Using filter condition:", 'result.is.null,result.eq.pending,result.eq.,result.eq.none');
+      
       const { data, error } = await supabase
         .from("offers")
         .select(`
@@ -92,19 +106,26 @@ export default function OffersTable({
           created_user:users!created_by(fullname)
         `)
         .eq("customer_id", customerId)
-        .or('result.is.null,result.eq.pending')
+        .or('result.is.null,result.eq.pending,result.eq.,result.eq.none')
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
+
+      console.log("OffersTable: Fetched offers:", data?.length, "offers");
+      console.log("OffersTable: Offer results:", data);
+      
+      // Preserve expanded state for existing offers
+      const currentExpandedState = { ...expandedOffers };
+      
+      // Update offers without losing expanded state
       setOffers(data || []);
       setFilteredOffers(data || []);
+      
+      console.log("OffersTable: Offers count:", data?.length);
     } catch (error) {
       console.error("Error fetching offers:", error);
-      toast({
-        title: "Σφάλμα",
-        description: "Δεν ήταν δυνατή η φόρτωση των προσφορών.",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -158,38 +179,66 @@ export default function OffersTable({
   };
 
   const handleDeleteOffer = async () => {
-    if (!offerToDelete) return;
+    if (offerToDelete) {
+      try {
+        const { error } = await supabase
+          .from("offers")
+          .delete()
+          .eq("id", offerToDelete);
 
-    try {
-      const { error } = await supabase
-        .from("offers")
-        .delete()
-        .eq("id", offerToDelete);
+        if (error) throw error;
 
-      if (error) throw error;
+        // Remove the offer from the list without a full refresh
+        removeOfferFromList(offerToDelete);
 
-      toast({
-        title: "Επιτυχής διαγραφή",
-        description: "Η προσφορά διαγράφηκε με επιτυχία.",
-      });
-
-      // Refresh data
-      setRefreshTrigger((prev) => prev + 1);
-    } catch (error) {
-      console.error("Error deleting offer:", error);
-      toast({
-        title: "Σφάλμα",
-        description: "Δεν ήταν δυνατή η διαγραφή της προσφοράς.",
-        variant: "destructive",
-      });
-    } finally {
-      setShowDeleteDialog(false);
-      setOfferToDelete(null);
+        toast({
+          title: "Επιτυχής διαγραφή",
+          description: "Η προσφορά διαγράφηκε με επιτυχία.",
+        });
+      } catch (error) {
+        console.error("Error deleting offer:", error);
+        toast({
+          title: "Σφάλμα",
+          description: "Δεν ήταν δυνατή η διαγραφή της προσφοράς.",
+          variant: "destructive",
+        });
+      } finally {
+        setShowDeleteDialog(false);
+        setOfferToDelete(null);
+      }
     }
   };
 
   const refreshData = () => {
+    // Increment the refresh trigger to fetch new data
     setRefreshTrigger((prev) => prev + 1);
+  };
+
+  // Add a function to update a specific offer without refreshing the entire list
+  const updateOfferInList = (updatedOffer) => {
+    setOffers(prevOffers => 
+      prevOffers.map(offer => 
+        offer.id === updatedOffer.id ? updatedOffer : offer
+      )
+    );
+    
+    setFilteredOffers(prevOffers => 
+      prevOffers.map(offer => 
+        offer.id === updatedOffer.id ? updatedOffer : offer
+      )
+    );
+  };
+
+  // Add a function to remove a specific offer without refreshing the entire list
+  const removeOfferFromList = (offerId) => {
+    setOffers(prevOffers => prevOffers.filter(offer => offer.id !== offerId));
+    setFilteredOffers(prevOffers => prevOffers.filter(offer => offer.id !== offerId));
+  };
+
+  // Add a function to add a new offer to the list
+  const addOfferToList = (newOffer) => {
+    setOffers(prevOffers => [newOffer, ...prevOffers]);
+    setFilteredOffers(prevOffers => [newOffer, ...prevOffers]);
   };
 
   // Format status for display
@@ -217,6 +266,10 @@ export default function OffersTable({
         return "Ακύρωση";
       case "pending":
         return "Σε εξέλιξη";
+      case "waiting":
+        return "Αναμονή";
+      case "none":
+        return "Κανένα";
       default:
         return "-";
     }
@@ -320,7 +373,8 @@ export default function OffersTable({
         description = 'Άλλαξε η ανάθεση της προσφοράς';
         break;
       case 'comment_added':
-        description = `Προστέθηκε σχόλιο: "${entry.comments}"`;
+        const comment = entry.comments || '';
+        description = `Προστέθηκε σχόλιο: "${comment.length > 30 ? comment.substring(0, 30) + '...' : comment}"`;
         break;
       case 'updated':
         description = 'Ενημερώθηκαν τα στοιχεία της προσφοράς';
@@ -365,7 +419,7 @@ export default function OffersTable({
                       >
                         <div className="w-32 flex-shrink-0 text-[#84a98c]">{timestamp}</div>
                         <div className="w-40 flex-shrink-0 text-[#84a98c]">{user}</div>
-                        <div className="flex-1 text-[#cad2c5]">{description}</div>
+                        <div className="flex-1 text-[#cad2c5]">{truncateText(description, 50)}</div>
                       </div>
                     );
                   })}
@@ -424,7 +478,7 @@ export default function OffersTable({
     {
       header: "Ποσό",
       accessor: "amount",
-      cell: (value) => value || "-",
+      cell: (value) => truncateText(value, 50),
       width: "80px"
     },
     {
@@ -472,6 +526,12 @@ export default function OffersTable({
             break;
           case "pending":
             resultClass = "text-blue-400";
+            break;
+          case "waiting":
+            resultClass = "text-purple-400";
+            break;
+          case "none":
+            resultClass = "text-gray-400";
             break;
           default:
             resultClass = "text-gray-400";
@@ -537,6 +597,14 @@ export default function OffersTable({
       ),
     },
   ];
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    refreshData,
+    updateOfferInList,
+    removeOfferFromList,
+    addOfferToList
+  }));
 
   return (
     <div className="w-full h-full flex flex-col p-4">
@@ -604,4 +672,6 @@ export default function OffersTable({
       </AlertDialog>
     </div>
   );
-} 
+});
+
+export default OffersTable; 

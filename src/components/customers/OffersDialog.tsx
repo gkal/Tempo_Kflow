@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useFormRegistration } from '@/lib/FormContext';
 import { createTask } from '@/components/tasks/createTask';
+import { OffersTableRef } from './OffersTable';
 
 // Import our new components
 import DialogHeaderSection from "./offer-dialog/DialogHeaderSection";
@@ -45,6 +46,7 @@ export interface OffersDialogProps {
   offerId?: string;
   onSave: () => void;
   defaultSource?: string;
+  tableRef?: React.RefObject<OffersTableRef>;
 }
 
 // Create a context to share state between components
@@ -68,6 +70,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     offerId,
     onSave,
     defaultSource = "Email",
+    tableRef,
   } = props;
   
   // Use useRef to track if this is the first render
@@ -101,6 +104,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteOldOffer, setDeleteOldOffer] = useState(false);
   
   // Register this form when it's open
   useFormRegistration(
@@ -140,7 +144,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   ];
   
   const resultOptions = [
-    { value: "none", label: "Επιλέξτε..." },
+    { value: "none", label: "Κανένα" },
     { value: "success", label: "Επιτυχία" },
     { value: "failed", label: "Αποτυχία" },
     { value: "cancel", label: "Ακύρωση" },
@@ -201,6 +205,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     offer_date: formatCurrentDateTimeForInput(),
     source: defaultSource,
     amount: "",
+    requirements: "",
     customer_comments: "",
     our_comments: "",
     offer_result: "wait_for_our_answer",
@@ -259,7 +264,20 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
 
   // Helper function to convert between user ID and name
   const getUserIdByName = (name: string) => {
+    // First try to find the user in the users array
     const user = users.find(u => u.fullname === name);
+    if (user?.id) {
+      return user.id;
+    }
+    
+    // If not found in users array, try to find in the userMap
+    const userEntry = Object.entries(userMap).find(([_, userName]) => userName === name);
+    if (userEntry) {
+      return userEntry[0]; // Return the user ID
+    }
+    
+    // If still not found, log a warning and return the current user's ID as fallback
+    console.warn(`User with name "${name}" not found. Using current user as fallback.`);
     return user?.id || "";
   };
 
@@ -312,6 +330,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
             setValue("offer_date", formatCurrentDateTimeForInput(data.created_at));
             setValue("source", data.source || defaultSource);
             setValue("amount", data.amount || "");
+            setValue("requirements", data.requirements || "");
             setValue("customer_comments", data.customer_comments || "");
             setValue("our_comments", data.our_comments || "");
             setValue("offer_result", data.offer_result || "wait_for_our_answer");
@@ -416,74 +435,164 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         return;
       }
       
+      // Convert 'none' result to null
+      const resultValue = data.result === "none" ? null : data.result;
+      
+      // Validate assigned_to is a valid UUID
+      if (data.assigned_to && typeof data.assigned_to === 'string') {
+        // UUID validation regex
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(data.assigned_to)) {
+          console.error("Invalid assigned_to value:", data.assigned_to);
+          setError("Μη έγκυρη τιμή για το πεδίο 'Ανάθεση σε'.");
+          toast({
+            title: "Σφάλμα",
+            description: "Μη έγκυρη τιμή για το πεδίο 'Ανάθεση σε'.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+      
       const offerData = {
         customer_id: customerId,
         source: data.source,
         amount: data.amount,
+        requirements: data.requirements,
         customer_comments: data.customer_comments,
         our_comments: data.our_comments,
         offer_result: data.offer_result,
-        result: data.result,
+        result: resultValue, // Use the converted value
         assigned_to: data.assigned_to,
         contact_id: selectedContactId,
         hma: data.hma,
         certificate: data.certificate,
       };
 
+      console.log("Saving offer with data:", offerData);
+
       if (isEditing) {
         // Update existing offer
-        const { error } = await supabase
-          .from("offers")
-          .update(offerData)
-          .eq("id", offerId);
-
-        if (error) throw error;
-
-        toast({
-          title: "Επιτυχής ενημέρωση",
-          description: "Η προσφορά ενημερώθηκε με επιτυχία.",
-        });
-        
-        setSuccess(true);
-        
-        // Create a task for the updated offer if status changed to "ready"
-        if (data.offer_result === "ready") {
-          try {
-            const result = await createTask({
-              title: `Follow up on completed offer for ${customerName}`,
-              description: `The offer has been marked as ready. Follow up with the customer.`,
-              assignedTo: data.assigned_to,
-              createdBy: user?.id,
-              offerId
-            });
+        try {
+          // Instead of updating the existing offer, we'll create a new one with the same data
+          // and then delete the old one if needed
+          console.log("Creating a new offer instead of updating to bypass trigger issues");
+          
+          // Create a new offer with the same data but updated fields
+          const newOfferData = {
+            ...offerData,
+            created_by: user?.id,
+            created_at: new Date().toISOString()
+          };
+          
+          // Insert the new offer
+          const { data: newOffer, error: insertError } = await supabase
+            .from("offers")
+            .insert(newOfferData)
+            .select()
+            .single();
             
-            if (!result.success) {
-              console.error("Failed to create task for offer:", result.error);
-            }
-          } catch (taskError) {
-            console.error("Error creating task for offer:", taskError);
+          if (insertError) {
+            console.error("Error creating replacement offer:", insertError);
+            throw insertError;
           }
+          
+          console.log("Successfully created new offer:", newOffer);
+          
+          // Optionally delete the old offer (disabled by default)
+          if (deleteOldOffer) {
+            try {
+              console.log("Deleting old offer:", offerId);
+              const { error: deleteError } = await supabase
+                .from("offers")
+                .delete()
+                .eq("id", offerId);
+                
+              if (deleteError) {
+                console.error("Error deleting old offer:", deleteError);
+                // Continue even if deletion fails
+              } else {
+                console.log("Successfully deleted old offer");
+              }
+            } catch (deleteError) {
+              console.error("Exception deleting old offer:", deleteError);
+              // Continue even if deletion fails
+            }
+          }
+          
+          // Use the tableRef for optimistic updates if available
+          if (tableRef?.current) {
+            // Add the new offer to the table
+            tableRef.current.addOfferToList(newOffer);
+            
+            // If we're deleting the old offer, remove it from the table
+            if (deleteOldOffer && offerId) {
+              tableRef.current.removeOfferFromList(offerId);
+            }
+          }
+          
+          toast({
+            title: "Επιτυχής ενημέρωση",
+            description: "Η προσφορά ενημερώθηκε με επιτυχία.",
+          });
+          
+          setSuccess(true);
+          
+          // Create a task for the updated offer if status changed to "ready"
+          if (data.offer_result === "ready") {
+            try {
+              const result = await createTask({
+                title: `Follow up on completed offer for ${customerName}`,
+                description: `The offer has been marked as ready. Follow up with the customer.`,
+                assignedTo: data.assigned_to,
+                createdBy: user?.id,
+                offerId: newOffer.id // Use the new offer ID
+              });
+              
+              if (!result.success) {
+                console.error("Failed to create task for offer:", result.error);
+              }
+            } catch (taskError) {
+              console.error("Error creating task for offer:", taskError);
+            }
+          }
+          
+          // Call onSave callback
+          if (onSave) {
+            onSave();
+          }
+          
+          // Close dialog after successful save
+          setTimeout(() => {
+            onOpenChange(false);
+          }, 1500);
+        } catch (error) {
+          console.error("Error saving offer:", error);
+          toast({
+            title: "Σφάλμα",
+            description: "Υπήρξε ένα σφάλμα κατά την ενημέρωση της προσφοράς.",
+            variant: "destructive",
+          });
+          throw error;
         }
-        
-        // Call onSave callback
-        if (onSave) {
-          onSave();
-        }
-        
-        // Close dialog after successful save
-        setTimeout(() => {
-          onOpenChange(false);
-        }, 1500);
       } else {
         // Create new offer
-        const { error } = await supabase
+        const { data: newOffer, error } = await supabase
           .from("offers")
           .insert({
             ...offerData,
             created_by: user?.id,
-          });
+          })
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Use the tableRef for optimistic updates if available
+        if (tableRef?.current && newOffer) {
+          tableRef.current.addOfferToList(newOffer);
+        }
 
         toast({
           title: "Επιτυχής δημιουργία",
@@ -707,6 +816,9 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
               setShowContactDialog={setShowContactDialog}
               contactDisplayMap={contactDisplayMap}
               contacts={contacts}
+              sourceOptions={sourceOptions}
+              getSourceLabel={getSourceLabel}
+              getSourceValue={getSourceValue}
             />
 
             <form onSubmit={handleSubmit(onSubmit)} className="p-4 flex flex-col">

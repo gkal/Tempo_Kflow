@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import OffersDialog, { OffersDialogProps } from './OffersDialog';
+import { OffersTableRef } from './OffersTable';
 
 // Define the interface for dialog props (can be a subset of OffersDialogProps)
 interface DialogProps {
@@ -7,6 +8,7 @@ interface DialogProps {
   offerId?: string;
   defaultSource?: string;
   onSave: () => void;
+  tableRef?: React.RefObject<OffersTableRef>;
 }
 
 // Create a global singleton for managing the dialog
@@ -93,23 +95,36 @@ export function OfferDialogContainer() {
       offerId={dialogProps.offerId}
       defaultSource={dialogProps.defaultSource || 'Email'}
       onSave={dialogProps.onSave}
+      tableRef={dialogProps.tableRef}
     />
   );
 }
 
 // Helper functions to open dialogs
-export function openNewOfferDialog(customerId: string, source: string = 'Email', onSave?: () => void) {
+export function openNewOfferDialog(
+  customerId: string, 
+  source: string = 'Email', 
+  onSave?: () => void,
+  tableRef?: React.RefObject<OffersTableRef>
+) {
   dialogManager.openDialog({
     customerId,
     defaultSource: source,
-    onSave: onSave || (() => {})
+    onSave: onSave || (() => {}),
+    tableRef
   });
 }
 
-export function openEditOfferDialog(customerId: string, offerId: string, onSave?: () => void) {
+export function openEditOfferDialog(
+  customerId: string, 
+  offerId: string, 
+  onSave?: () => void,
+  tableRef?: React.RefObject<OffersTableRef>
+) {
   dialogManager.openDialog({
     customerId,
     offerId,
-    onSave: onSave || (() => {})
+    onSave: onSave || (() => {}),
+    tableRef
   });
 } 
