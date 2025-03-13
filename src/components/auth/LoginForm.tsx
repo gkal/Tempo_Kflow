@@ -9,7 +9,6 @@ import {
 } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { motion } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertCircle, CheckCircle } from "lucide-react";
 import type { User } from "@/types/auth";
@@ -131,9 +130,7 @@ export default function LoginForm() {
           }
         `}
       </style>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+      <div
         className="w-full max-w-md p-8 rounded-xl space-y-6"
         style={{
           background: "rgba(53, 79, 82, 0.7)",
@@ -142,9 +139,7 @@ export default function LoginForm() {
         }}
       >
         <div className="text-center space-y-2">
-          <motion.img
-            initial={{ scale: 0.5 }}
-            animate={{ scale: 1 }}
+          <img
             src="https://kronoseco.gr/favicon.ico"
             alt="K-Flow Logo"
             className="h-16 w-16 mx-auto mb-4"
@@ -246,9 +241,7 @@ export default function LoginForm() {
           </div>
 
           {(error || success) && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
+            <div
               className={`flex items-center space-x-2 ${success ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"} text-sm p-3 rounded-md`}
             >
               {success ? (
@@ -265,7 +258,7 @@ export default function LoginForm() {
                   <p>{error}</p>
                 </>
               )}
-            </motion.div>
+            </div>
           )}
 
           <Button
@@ -275,21 +268,9 @@ export default function LoginForm() {
           >
             {isLoading ? (
               <div className="flex items-center justify-center space-x-2">
-                <motion.div
-                  className="h-2 w-2 bg-[#cad2c5] rounded-full"
-                  animate={{ scale: [1, 0.5, 1] }}
-                  transition={{ duration: 0.5, repeat: Infinity }}
-                />
-                <motion.div
-                  className="h-2 w-2 bg-[#cad2c5] rounded-full"
-                  animate={{ scale: [1, 0.5, 1] }}
-                  transition={{ duration: 0.5, repeat: Infinity, delay: 0.1 }}
-                />
-                <motion.div
-                  className="h-2 w-2 bg-[#cad2c5] rounded-full"
-                  animate={{ scale: [1, 0.5, 1] }}
-                  transition={{ duration: 0.5, repeat: Infinity, delay: 0.2 }}
-                />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full" />
               </div>
             ) : isFirstUser ? (
               "Δημιουργία Διαχειριστή"
@@ -298,7 +279,7 @@ export default function LoginForm() {
             )}
           </Button>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 }

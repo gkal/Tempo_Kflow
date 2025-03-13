@@ -41,7 +41,7 @@ const Home = () => {
 
     if (path === "/tasks") {
       const TasksPage = React.lazy(
-        () => import("./tasks/TasksPage").then(module => ({ default: module.TasksPage })),
+        () => import("./tasks/TasksPage"),
       );
       return (
         <React.Suspense
@@ -98,6 +98,27 @@ const Home = () => {
           }
         >
           <CustomerDetailPage />
+        </React.Suspense>
+      );
+    }
+
+    if (path === "/offers") {
+      const OffersPage = React.lazy(
+        () => import("./offers/improved/CustomerOffersPage"),
+      );
+      return (
+        <React.Suspense
+          fallback={
+            <div className="flex items-center justify-center p-8">
+              <div className="flex items-center justify-center space-x-2">
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.2s]" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.4s]" />
+              </div>
+            </div>
+          }
+        >
+          <OffersPage />
         </React.Suspense>
       );
     }
