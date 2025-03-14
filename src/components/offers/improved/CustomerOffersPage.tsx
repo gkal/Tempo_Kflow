@@ -54,6 +54,18 @@ interface Offer {
   [key: string]: any;
 }
 
+// Define interface for OfferTableRow props
+interface OfferTableRowProps {
+  offer: any;
+  customerId: string;
+  onEdit: (customerId: string, offerId: string) => void;
+  formatDateTime: (date: string | Date) => string;
+  formatStatus: (status: string) => string;
+  formatResult: (result: string) => string;
+  isAdminOrSuperUser: boolean;
+  onDelete: (customerId: string, offerId: string) => void;
+}
+
 export default function CustomerOffersPage() {
   const { user } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -199,17 +211,26 @@ export default function CustomerOffersPage() {
     }
   }, [customers]);
 
-  // Fetch customer offers
+  // Fetch customer offers - optimized version
   const fetchCustomerOffers = useCallback(async (customerId: string, forceRefresh = false, statusFilter: string, resultFilter: string) => {
     try {
-      // Only use cache if we have data and don't need a force refresh
-      if (!forceRefresh && customerOffers[customerId]) {
+      // Create a cache key based on the customer ID and filters
+      const cacheKey = `${customerId}-${statusFilter}-${resultFilter}`;
+      
+      // Check if we have cached data for this specific combination
+      if (!forceRefresh && customerOffers[cacheKey]) {
+        // Use cached data but still update the UI to show it's associated with this customer
+        setCustomerOffers(prev => ({
+          ...prev,
+          [customerId]: customerOffers[cacheKey]
+        }));
         return;
       }
 
+      // Show loading state
       setLoadingOffers(prev => ({ ...prev, [customerId]: true }));
       
-      // Start with a basic query
+      // Prepare the query - use a more efficient select with fewer fields
       let query = supabase
         .from('offers')
         .select(`
@@ -226,7 +247,7 @@ export default function CustomerOffersPage() {
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
       
-      // Apply filters - important to use separate if statements to ensure both filters are applied
+      // Apply filters efficiently
       if (statusFilter && statusFilter !== "all") {
         query = query.eq("offer_result", statusFilter);
       }
@@ -242,27 +263,23 @@ export default function CustomerOffersPage() {
         throw error;
       }
       
+      // Store the result in the cache using both the customer ID and the cache key
+      const offersData = data || [];
       setCustomerOffers(prev => ({
         ...prev,
-        [customerId]: data || []
+        [customerId]: offersData,
+        [cacheKey]: offersData // Cache with the filter-specific key
       }));
       
-      // Update the customer's offer count only when expanded
-      setCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, offersCount: data?.length || 0 } 
-            : customer
-        )
-      );
+      // Update customer counts in a single batch update
+      const offersCount = offersData.length || 0;
+      const updateCustomer = (customer) => 
+        customer.id === customerId 
+          ? { ...customer, offersCount } 
+          : customer;
       
-      setFilteredCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId && prev.some(c => c.id === customerId)
-            ? { ...customer, offersCount: data?.length || 0 } 
-            : customer
-        )
-      );
+      setCustomers(prev => prev.map(updateCustomer));
+      setFilteredCustomers(prev => prev.map(updateCustomer));
       
     } catch (error) {
       showError("Σφάλμα", "Δεν ήταν δυνατή η φόρτωση των προσφορών.");
@@ -368,34 +385,32 @@ export default function CustomerOffersPage() {
     }
   };
 
-  // Toggle customer expanded state
-  const toggleCustomerExpanded = async (customerId: string) => {
+  // Toggle customer expanded state - optimized version
+  const toggleCustomerExpanded = useCallback((customerId: string) => {
     const isCurrentlyExpanded = expandedCustomers[customerId] || false;
+    const newExpandedState = !isCurrentlyExpanded;
     
-    // Update expanded state
+    // Batch all state updates together
     setExpandedCustomers(prev => ({
       ...prev,
-      [customerId]: !isCurrentlyExpanded
+      [customerId]: newExpandedState
     }));
     
-    // Update customers state
-    setCustomers(prev => 
-      prev.map(customer => 
-        customer.id === customerId 
-          ? { ...customer, isExpanded: !isCurrentlyExpanded } 
-          : customer
-      )
-    );
+    // Use a single function for both updates to ensure consistency
+    const updateCustomerExpanded = (customer) => 
+      customer.id === customerId 
+        ? { ...customer, isExpanded: newExpandedState } 
+        : customer;
     
-    // Update filtered customers state
-    setFilteredCustomers(prev => 
-      prev.map(customer => 
-        customer.id === customerId 
-          ? { ...customer, isExpanded: !isCurrentlyExpanded } 
-          : customer
-      )
-    );
-  };
+    setCustomers(prev => prev.map(updateCustomerExpanded));
+    setFilteredCustomers(prev => prev.map(updateCustomerExpanded));
+    
+    // Prefetch data if expanding
+    if (newExpandedState) {
+      // Use the current filter values
+      fetchCustomerOffers(customerId, false, offerStatusFilter, offerResultFilter);
+    }
+  }, [expandedCustomers, offerStatusFilter, offerResultFilter, fetchCustomerOffers]);
 
   // Handle search
   const handleSearch = (value: string) => {
@@ -621,135 +636,150 @@ export default function CustomerOffersPage() {
     { value: "telephone", label: "Τηλέφωνο" }
   ];
 
-  // Define the customer row renderer
-  const renderCustomerRow = (row: any, index: number, defaultRow: React.ReactNode) => {
+  // Define the customer row renderer - optimized version without hooks
+  const renderCustomerRow = useCallback((row: any, index: number, defaultRow: React.ReactNode) => {
     if (!row) return defaultRow;
     
     const isExpanded = row.isExpanded || false;
+    
+    // Only create the expanded row if the row is actually expanded
+    if (!isExpanded) {
+      return defaultRow;
+    }
+    
     const offers = customerOffers[row.id] || [];
     const isLoadingOffers = loadingOffers[row.id] || false;
     
+    // Create the content based on loading state and offers
+    let content;
+    if (isLoadingOffers) {
+      content = (
+        <div className="flex justify-center items-center py-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
+        </div>
+      );
+    } else if (offers.length === 0) {
+      content = (
+        <div className="text-center py-4 text-[#84a98c]">
+          Δεν υπάρχουν προσφορές για αυτόν τον πελάτη
+        </div>
+      );
+    } else {
+      content = (
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-[#3a5258] text-[#a8c5b5]">
+              <th key="date-header" className="px-2 py-2 text-left text-xs font-medium w-[160px]">Ημερομηνία</th>
+              <th key="request-header" className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ζήτηση Πελάτη</th>
+              <th key="amount-header" className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ποσό</th>
+              <th key="status-header" className="px-3 py-2 text-left text-xs font-medium w-[140px]">Κατάσταση</th>
+              <th key="result-header" className="px-3 py-2 text-left text-xs font-medium w-[100px]">Αποτέλεσμα</th>
+              <th key="actions-header" className="px-3 py-2 text-center text-xs font-medium w-[50px]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {offers.map((offer) => (
+              <tr 
+                key={`offer-row-${offer.id}`}
+                className="border-t border-[#52796f]/30 hover:bg-[#354f52]/30 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEditOffer(row.id, offer.id);
+                }}
+              >
+                <td key={`date-${offer.id}`} className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
+                <td key={`request-${offer.id}`} className="px-3 py-2 text-xs text-[#cad2c5] w-[100px] group relative">
+                  <div className="truncate">
+                    {offer.requirements && offer.requirements.length > 50 
+                      ? <React.Fragment key={`req-trunc-${offer.id}`}>{offer.requirements.substring(0, 50)}<span className="text-blue-400">....</span></React.Fragment>
+                      : offer.requirements || "-"}
+                  </div>
+                  {offer.requirements && offer.requirements.length > 50 && (
+                    <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal min-w-[200px] max-w-[300px] text-[#cad2c5]">
+                      {offer.requirements}
+                    </span>
+                  )}
+                </td>
+                <td key={`amount-${offer.id}`} className="px-3 py-2 text-xs text-[#cad2c5] w-[100px] group relative">
+                  <div className="truncate">
+                    {offer.amount && offer.amount.length > 50 
+                      ? <React.Fragment key={`amount-trunc-${offer.id}`}>{offer.amount.substring(0, 50)}<span className="text-blue-400">...</span></React.Fragment>
+                      : offer.amount || "-"}
+                  </div>
+                  {offer.amount && offer.amount.length > 50 && (
+                    <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal min-w-[200px] max-w-[300px] text-[#cad2c5]">
+                      {offer.amount}
+                    </span>
+                  )}
+                </td>
+                <td key={`status-${offer.id}`} className="px-3 py-2 text-xs w-[140px]">
+                  <span className={`
+                    ${offer.offer_result === "wait_for_our_answer" ? "text-yellow-400" : 
+                      offer.offer_result === "wait_for_customer_answer" ? "text-blue-400" : 
+                      offer.offer_result === "ready" ? "text-green-400" : "text-gray-400"}
+                  `}>
+                    {formatStatus(offer.offer_result)}
+                  </span>
+                </td>
+                <td key={`result-${offer.id}`} className="px-3 py-2 text-xs w-[100px]">
+                  <span className={`
+                    ${offer.result === "success" ? "text-green-400" : 
+                      offer.result === "failed" ? "text-red-400" : 
+                      offer.result === "cancel" ? "text-yellow-400" :
+                      offer.result === "waiting" ? "text-purple-400" : "text-gray-400"}
+                  `}>
+                    {formatResult(offer.result)}
+                  </span>
+                </td>
+                <td key={`actions-${offer.id}`} className="px-3 py-2 text-xs text-center w-[50px]">
+                  {isAdminOrSuperUser && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(row.id, offer.id);
+                            }}
+                            className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
+                          <p>Διαγραφή προσφοράς</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+    
     // Create the expanded row with the same data-customer-id attribute
-    const expandedRow = isExpanded ? (
-      <tr className="bg-[#2f3e46] border-t border-b border-[#52796f]" data-customer-id={row.id}>
-        <td colSpan={4}>
+    const expandedRow = (
+      <tr key={`expanded-row-${row.id}`} className="bg-[#2f3e46] border-t border-b border-[#52796f]" data-customer-id={row.id}>
+        <td key={`expanded-cell-${row.id}`} colSpan={4}>
           <div className="pl-[70px]">
-            {isLoadingOffers ? (
-              <div className="flex justify-center items-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
-              </div>
-            ) : offers.length === 0 ? (
-              <div className="text-center py-4 text-[#84a98c]">
-                Δεν υπάρχουν προσφορές για αυτόν τον πελάτη
-              </div>
-            ) : (
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-[#3a5258] text-[#a8c5b5]">
-                    <th className="px-2 py-2 text-left text-xs font-medium w-[160px]">Ημερομηνία</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ζήτηση Πελάτη</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ποσό</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium w-[140px]">Κατάσταση</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Αποτέλεσμα</th>
-                    <th className="px-3 py-2 text-center text-xs font-medium w-[50px]"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {offers.map((offer) => (
-                    <tr 
-                      key={offer.id} 
-                      className="border-t border-[#52796f]/30 hover:bg-[#354f52]/30 cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditOffer(row.id, offer.id);
-                      }}
-                    >
-                      <td className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
-                      <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px] group relative">
-                        <div className="truncate">
-                          {offer.requirements && offer.requirements.length > 50 
-                            ? <>{offer.requirements.substring(0, 50)}<span className="text-blue-400">....</span></>
-                            : offer.requirements || "-"}
-                        </div>
-                        {offer.requirements && offer.requirements.length > 50 && (
-                          <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal min-w-[200px] max-w-[300px] text-[#cad2c5]">
-                            {offer.requirements}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px] group relative">
-                        <div className="truncate">
-                          {offer.amount && offer.amount.length > 50 
-                            ? <>{offer.amount.substring(0, 50)}<span className="text-blue-400">...</span></>
-                            : offer.amount || "-"}
-                        </div>
-                        {offer.amount && offer.amount.length > 50 && (
-                          <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal min-w-[200px] max-w-[300px] text-[#cad2c5]">
-                            {offer.amount}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-xs w-[140px]">
-                        <span className={`
-                          ${offer.offer_result === "wait_for_our_answer" ? "text-yellow-400" : 
-                            offer.offer_result === "wait_for_customer_answer" ? "text-blue-400" : 
-                            offer.offer_result === "ready" ? "text-green-400" : "text-gray-400"}
-                        `}>
-                          {formatStatus(offer.offer_result)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-xs w-[100px]">
-                        <span className={`
-                          ${offer.result === "success" ? "text-green-400" : 
-                            offer.result === "failed" ? "text-red-400" : 
-                            offer.result === "cancel" ? "text-yellow-400" :
-                            offer.result === "waiting" ? "text-purple-400" : "text-gray-400"}
-                        `}>
-                          {formatResult(offer.result)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-center w-[50px]">
-                        {isAdminOrSuperUser && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteClick(row.id, offer.id);
-                                  }}
-                                  className="h-6 w-6 hover:bg-[#354f52] text-red-400"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Διαγραφή</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            {content}
           </div>
         </td>
       </tr>
-    ) : null;
+    );
     
-    // Return both the default row and the expanded row
     return (
-      <React.Fragment key={row.id}>
+      <React.Fragment key={`row-group-${row.id}`}>
         {defaultRow}
         {expandedRow}
       </React.Fragment>
     );
-  };
+  }, [customerOffers, loadingOffers, handleEditOffer, formatDateTime, formatStatus, formatResult, isAdminOrSuperUser, handleDeleteClick]);
 
   // Define columns for the data table
   const columns = useMemo(() => [
@@ -763,32 +793,26 @@ export default function CustomerOffersPage() {
         const isExpanded = row.isExpanded || false;
         
         return (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Capture current filter values when the button is clicked
-              const currentStatusFilter = offerStatusFilter;
-              const currentResultFilter = offerResultFilter;
-              
-              // Use a timeout to ensure this runs after state updates
-              if (!row.isExpanded) {
-                setTimeout(() => {
-                  fetchCustomerOffers(row.id, true, currentStatusFilter, currentResultFilter);
-                }, 0);
-              }
-              
-              toggleCustomerExpanded(row.id);
-            }}
-            className="h-8 w-8 hover:bg-[#354f52] text-[#cad2c5]"
-          >
-            {isExpanded ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </Button>
+          <div className="flex items-center justify-center w-full h-full">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                // No need for setTimeout - directly toggle the expanded state
+                // The fetchCustomerOffers is now called inside toggleCustomerExpanded
+                toggleCustomerExpanded(row.id);
+              }}
+              className="h-8 w-8 hover:bg-[#52796f]/60 hover:text-white transition-colors duration-200 rounded-full text-[#cad2c5] flex items-center justify-center relative group"
+            >
+              <span className="absolute inset-0 rounded-full bg-[#52796f]/0 group-hover:bg-[#52796f]/30 transition-colors duration-200"></span>
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 relative z-10" />
+              ) : (
+                <ChevronRight className="h-4 w-4 relative z-10" />
+              )}
+            </Button>
+          </div>
         );
       },
     },
@@ -986,25 +1010,12 @@ export default function CustomerOffersPage() {
         searchColumn={searchColumn}
         onRowClick={(row) => {
           if (row && row.id) {
-            const isCurrentlyExpanded = expandedCustomers[row.id] || false;
-            
-            // Capture current filter values
-            const currentStatusFilter = offerStatusFilter;
-            const currentResultFilter = offerResultFilter;
-            
-            // If we're expanding, fetch offers with current filters
-            if (!isCurrentlyExpanded) {
-              setTimeout(() => {
-                fetchCustomerOffers(row.id, true, currentStatusFilter, currentResultFilter);
-              }, 0);
-            }
-            
-            // Toggle expanded state
+            // Simplified row click handler - just call toggleCustomerExpanded
             toggleCustomerExpanded(row.id);
           }
         }}
         containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
-        rowClassName="hover:bg-[#354f52]/50 cursor-pointer"
+        rowClassName="hover:bg-[#52796f]/20 cursor-pointer transition-colors duration-200"
         renderRow={renderCustomerRow}
       />
 

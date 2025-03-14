@@ -28,15 +28,32 @@ interface Task {
 interface TaskListProps {
   offerId?: string;
   showAssignedToMe?: boolean;
+  tasks?: Task[];
+  loading?: boolean;
+  onTaskStatusChange?: (taskId: string, newStatus: string) => Promise<void>;
+  onTaskDelete?: (taskId: string) => Promise<void>;
 }
 
-export function TaskList({ offerId, showAssignedToMe = false }: TaskListProps) {
+export function TaskList({ 
+  offerId, 
+  showAssignedToMe = false, 
+  tasks: propTasks, 
+  loading: propLoading, 
+  onTaskStatusChange, 
+  onTaskDelete 
+}: TaskListProps) {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [localTasks, setLocalTasks] = useState<Task[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Use provided tasks if available, otherwise fetch them
+  const tasks = propTasks || localTasks;
+  const loading = propLoading !== undefined ? propLoading : isLoading;
+
   const fetchTasks = async () => {
+    // Skip fetching if tasks are provided via props
+    if (propTasks !== undefined) return;
     if (!user) return;
     
     setIsLoading(true);
@@ -63,7 +80,7 @@ export function TaskList({ offerId, showAssignedToMe = false }: TaskListProps) {
     const { data, error } = await query;
     
     if (data && !error) {
-      setTasks(data);
+      setLocalTasks(data);
     }
     
     setIsLoading(false);
@@ -145,7 +162,7 @@ export function TaskList({ offerId, showAssignedToMe = false }: TaskListProps) {
         </Button>
       </div>
       
-      {isLoading ? (
+      {loading ? (
         <div className="flex justify-center p-4">
           <div className="flex items-center justify-center space-x-2">
             <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce" />
@@ -163,7 +180,12 @@ export function TaskList({ offerId, showAssignedToMe = false }: TaskListProps) {
             <TaskItem 
               key={task.id} 
               task={task} 
-              onStatusChange={() => fetchTasks()}
+              onStatusChange={onTaskStatusChange 
+                ? () => onTaskStatusChange(task.id, task.status) 
+                : () => fetchTasks()}
+              onDelete={onTaskDelete 
+                ? () => onTaskDelete(task.id) 
+                : undefined}
             />
           ))}
         </div>

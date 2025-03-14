@@ -793,20 +793,23 @@ export default function CustomersPage() {
         
         return (
           <div 
-            className="flex items-center justify-center w-full h-full cursor-pointer"
+            className="flex items-center justify-center w-full h-full"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               toggleCustomerExpanded(row.id);
             }}
           >
-            <div className="flex items-center">
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4 text-[#84a98c]" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-[#84a98c]" />
-              )}
-              <span className="ml-0.5 text-xs text-[#84a98c]">{offersCount}</span>
+            <div className="flex items-center justify-center relative group cursor-pointer hover:bg-[#52796f]/60 rounded-full w-10 h-7 transition-colors duration-200">
+              <span className="absolute inset-0 rounded-full bg-[#52796f]/0 group-hover:bg-[#52796f]/30 transition-colors duration-200"></span>
+              <div className="flex items-center justify-center">
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-[#84a98c] group-hover:text-white relative z-10" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-[#84a98c] group-hover:text-white relative z-10" />
+                )}
+                <span className="ml-0.5 text-xs text-[#84a98c] group-hover:text-white relative z-10">{offersCount}</span>
+              </div>
             </div>
           </div>
         );

@@ -38,6 +38,8 @@ import RequirementsSection from "./offer-dialog/RequirementsSection";
 import StatusSection from "./offer-dialog/StatusSection";
 import CommentsSection from "./offer-dialog/CommentsSection";
 import DialogFooterSection from "./offer-dialog/DialogFooterSection";
+import TabsContainer from "./offer-dialog/TabsContainer";
+import DetailsTab from "./offer-dialog/DetailsTab";
 
 // Export the props interface so it can be imported by other files
 export interface OffersDialogProps {
@@ -95,6 +97,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   const [userOptions, setUserOptions] = useState<string[]>([]);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactOptions, setContactOptions] = useState<string[]>([]);
   const [contactMap, setContactMap] = useState<Record<string, string>>({});
@@ -291,17 +294,31 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   useEffect(() => {
     const fetchCustomerData = async () => {
       try {
+        console.log("Fetching customer data for ID:", customerId);
+        
+        // Validate customerId format (should be a UUID)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(customerId)) {
+          console.error("Invalid customerId format:", customerId);
+          return;
+        }
+        
+        // Try a different approach with the query
         const { data, error } = await supabase
           .from("customers")
-          .select("company_name")
+          .select("*")  // Select all columns first
           .eq("id", customerId)
           .single();
+
+        console.log("Customer data response:", { data, error });
 
         if (error) throw error;
         
         if (data) {
-          // Set customer name
+          // Set customer name and phone
           setCustomerName(data.company_name);
+          setCustomerPhone(data.telephone || "");
+          console.log("Customer data set:", { name: data.company_name, phone: data.telephone });
         }
       } catch (error) {
         console.error("Error fetching customer data:", error);
@@ -310,6 +327,8 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
 
     if (customerId) {
       fetchCustomerData();
+    } else {
+      console.warn("No customerId provided to OffersDialog");
     }
   }, [customerId]);
 
@@ -447,12 +466,6 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         if (!uuidRegex.test(data.assigned_to)) {
           console.error("Invalid assigned_to value:", data.assigned_to);
           setError("Μη έγκυρη τιμή για το πεδίο 'Ανάθεση σε'.");
-          toast({
-            title: "Σφάλμα",
-            description: "Μη έγκυρη τιμή για το πεδίο 'Ανάθεση σε'.",
-            variant: "destructive",
-          });
-          setLoading(false);
           return;
         }
       }
@@ -506,95 +519,62 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
           
           console.log("Successfully updated offer:", updatedOffer);
           
-          // If assigned user has changed, create a task for the new assignee
-          if (assignedUserChanged && offerData.assigned_to) {
-            const companyName = currentOffer.customers?.company_name || "Unknown Company";
-            const newAssigneeName = userMap[offerData.assigned_to] || 'Unknown User';
-            const oldAssigneeName = userMap[currentOffer.assigned_to] || 'Unknown User';
-            
-            // Show notification about user assignment change
-            toast({
-              title: "Αλλαγή ανάθεσης",
-              description: `Η προσφορά ανατέθηκε από τον/την ${oldAssigneeName} στον/την ${newAssigneeName}`,
-              variant: "default",
-            });
-            
-            // Show additional notification if the current user assigned the offer to themselves
-            if (offerData.assigned_to === user.id) {
-              toast({
-                title: "Προσφορά ανατέθηκε σε εσάς",
-                description: `Αναλάβατε την προσφορά για ${companyName}`,
-                variant: "default",
-              });
-            }
-            
-            // Create a task for the new assignee using the createTask helper function
-            try {
-              const result = await createTask({
-                title: `Offer assigned for ${companyName}`,
-                description: `You have been assigned an offer for ${companyName}. Please review and take appropriate action.`,
-                assignedTo: offerData.assigned_to,
-                createdBy: user.id,
-                offerId: offerId,
-                dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Due in 7 days
-              });
-              
-              if (!result.success) {
-                console.error("Failed to create task for new assignee:", result.error);
-              }
-            } catch (taskError) {
-              console.error("Error creating task for new assignee:", taskError);
-              // Don't throw here, we don't want to fail the offer update if task creation fails
-            }
-          }
-          
           // Use the tableRef for optimistic updates if available
           if (tableRef?.current && updatedOffer) {
             tableRef.current.updateOfferInList(updatedOffer);
           }
           
-          toast({
-            title: "Επιτυχής ενημέρωση",
-            description: "Η προσφορά ενημερώθηκε με επιτυχία.",
-          });
-          
           setSuccess(true);
-          
-          // Create a task for the updated offer if status changed to "ready"
-          if (data.offer_result === "ready") {
-            try {
-              const result = await createTask({
-                title: `Follow up on completed offer for ${customerName}`,
-                description: `The offer has been marked as ready. Follow up with the customer.`,
-                assignedTo: data.assigned_to,
-                createdBy: user?.id,
-                offerId: offerId
-              });
-              
-              if (!result.success) {
-                console.error("Failed to create task for offer:", result.error);
-              }
-            } catch (taskError) {
-              console.error("Error creating task for offer:", taskError);
-            }
-          }
           
           // Call onSave callback
           if (onSave) {
             onSave();
           }
           
-          // Close dialog after successful save
+          // Close dialog after successful save - reduced delay
           setTimeout(() => {
             onOpenChange(false);
-          }, 1500);
+          }, 500);
+          
+          // Create tasks and notifications asynchronously after closing the dialog
+          // This prevents the user from waiting for these operations
+          setTimeout(() => {
+            // If assigned user has changed, create a task for the new assignee
+            if (assignedUserChanged && offerData.assigned_to) {
+              const companyName = currentOffer.customers?.company_name || "Unknown Company";
+              const newAssigneeName = userMap[offerData.assigned_to] || 'Unknown User';
+              const oldAssigneeName = userMap[currentOffer.assigned_to] || 'Unknown User';
+              
+              // Create a task for the new assignee using the createTask helper function
+              createTask({
+                title: `Offer assigned for ${companyName}`,
+                description: `You have been assigned an offer for ${companyName}. Please review and take appropriate action.`,
+                assignedTo: offerData.assigned_to,
+                createdBy: user.id,
+                offerId: offerId,
+                dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Due in 7 days
+              }).catch(taskError => {
+                console.error("Error creating task for new assignee:", taskError);
+              });
+            }
+            
+            // Create a task for the updated offer if status changed to "ready"
+            if (data.offer_result === "ready") {
+              createTask({
+                title: `Follow up on completed offer for ${customerName}`,
+                description: `The offer has been marked as ready. Follow up with the customer.`,
+                assignedTo: data.assigned_to,
+                createdBy: user?.id,
+                offerId: offerId
+              }).catch(taskError => {
+                console.error("Error creating task for offer:", taskError);
+              });
+            }
+          }, 100);
+          
         } catch (error) {
           console.error("Error saving offer:", error);
-          toast({
-            title: "Σφάλμα",
-            description: "Υπήρξε ένα σφάλμα κατά την ενημέρωση της προσφοράς.",
-            variant: "destructive",
-          });
+          setError("Υπήρξε ένα σφάλμα κατά την ενημέρωση της προσφοράς.");
           throw error;
         }
       } else {
@@ -614,61 +594,52 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         if (tableRef?.current && newOffer) {
           tableRef.current.addOfferToList(newOffer);
         }
-
-        toast({
-          title: "Επιτυχής δημιουργία",
-          description: "Η προσφορά δημιουργήθηκε με επιτυχία.",
-        });
         
         setSuccess(true);
-        
-        // Get the offer ID from the response
-        const { data: newOfferData, error: fetchError } = await supabase
-          .from("offers")
-          .select("id")
-          .eq("customer_id", customerId)
-          .eq("created_by", user?.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        if (!fetchError && newOfferData) {
-          // Create a task for the new offer
-          try {
-            const result = await createTask({
-              title: `Review offer for ${customerName}`,
-              description: `Review the offer details and follow up with the customer.`,
-              assignedTo: data.assigned_to,
-              createdBy: user?.id,
-              offerId: newOfferData.id
-            });
-            
-            if (!result.success) {
-              console.error("Failed to create task for new offer:", result.error);
-            }
-          } catch (taskError) {
-            console.error("Error creating task for new offer:", taskError);
-          }
-        }
         
         // Call onSave callback
         if (onSave) {
           onSave();
         }
         
-        // Close dialog after successful save
+        // Close dialog after successful save - reduced delay
         setTimeout(() => {
           onOpenChange(false);
-        }, 1500);
+        }, 500);
+        
+        // Create tasks and notifications asynchronously after closing the dialog
+        setTimeout(async () => {
+          try {
+            // Get the offer ID from the response
+            const { data: newOfferData, error: fetchError } = await supabase
+              .from("offers")
+              .select("id")
+              .eq("customer_id", customerId)
+              .eq("created_by", user?.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .single();
+
+            if (!fetchError && newOfferData) {
+              // Create a task for the new offer
+              createTask({
+                title: `Review offer for ${customerName}`,
+                description: `Review the offer details and follow up with the customer.`,
+                assignedTo: data.assigned_to,
+                createdBy: user?.id,
+                offerId: newOfferData.id
+              }).catch(taskError => {
+                console.error("Error creating task for new offer:", taskError);
+              });
+            }
+          } catch (error) {
+            console.error("Error creating task for new offer:", error);
+          }
+        }, 100);
       }
     } catch (error) {
       console.error("Error saving offer:", error);
       setError("Σφάλμα κατά την αποθήκευση της προσφοράς. Παρακαλώ δοκιμάστε ξανά.");
-      toast({
-        title: "Σφάλμα",
-        description: "Δεν ήταν δυνατή η αποθήκευση της προσφοράς.",
-        variant: "destructive",
-      });
     } finally {
       setIsSubmitting(false);
     }
@@ -719,6 +690,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     isEditing,
     loading,
     customerName,
+    customerPhone,
     currentDate,
     sourceOptions,
     statusOptions,
@@ -854,6 +826,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
           <OfferDialogContext.Provider value={contextValue}>
             <DialogHeaderSection 
               customerName={customerName}
+              customerPhone={customerPhone}
               isEditing={isEditing}
               watch={watch}
               setValue={setValue}
@@ -871,12 +844,18 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
             />
 
             <form onSubmit={handleSubmit(onSubmit)} className="p-4 flex flex-col">
-              <div className="space-y-4 mb-4">
-                <BasicInfoSection />
-                <RequirementsSection />
-                <StatusSection />
-                <CommentsSection />
-              </div>
+              <TabsContainer>
+                {/* Tab 1: Basic Information */}
+                <div className="space-y-4">
+                  <BasicInfoSection />
+                  <RequirementsSection />
+                  <StatusSection />
+                  <CommentsSection />
+                </div>
+                
+                {/* Tab 2: Details */}
+                <DetailsTab />
+              </TabsContainer>
 
               <DialogFooterSection 
                 error={error}

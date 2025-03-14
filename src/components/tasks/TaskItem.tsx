@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
-import { Check, Clock, AlertCircle, User, Edit } from 'lucide-react';
+import { Check, Clock, AlertCircle, User, Edit, Trash2 } from 'lucide-react';
 import { TaskDialog } from './TaskDialog';
 
 interface Task {
@@ -24,9 +24,10 @@ interface Task {
 interface TaskItemProps {
   task: Task;
   onStatusChange?: () => void;
+  onDelete?: () => void;
 }
 
-export function TaskItem({ task, onStatusChange }: TaskItemProps) {
+export function TaskItem({ task, onStatusChange, onDelete }: TaskItemProps) {
   const { user } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -131,6 +132,16 @@ export function TaskItem({ task, onStatusChange }: TaskItemProps) {
               <option value="in_progress">In Progress</option>
               <option value="completed">Completed</option>
             </select>
+            
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="p-1 text-[#84a98c] hover:text-red-500 rounded-full hover:bg-[#2f3e46]"
+                title="Delete task"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>

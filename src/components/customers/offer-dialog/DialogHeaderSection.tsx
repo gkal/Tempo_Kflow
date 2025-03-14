@@ -2,10 +2,11 @@ import React from 'react';
 import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
-import { Plus } from "lucide-react";
+import { Plus, Phone } from "lucide-react";
 
 const DialogHeaderSection = ({ 
   customerName,
+  customerPhone,
   isEditing,
   watch,
   setValue,
@@ -25,9 +26,16 @@ const DialogHeaderSection = ({
     <DialogHeader className="p-3 max-w-full overflow-hidden">
       <div className="flex flex-wrap justify-between items-center mb-3">
         <div className="flex items-center gap-2">
-          <div className="text-[#a8c5b5] text-sm font-medium mr-1 truncate max-w-[200px]">
-            {customerName}
+          <div className="text-[#a8c5b5] text-lg font-medium truncate max-w-[200px]">
+            {customerName || "Πελάτης"}
           </div>
+          {customerPhone && (
+            <div className="flex items-center gap-1 text-[#cad2c5] text-xs">
+              <Phone className="h-3 w-3" />
+              <span>{customerPhone}</span>
+            </div>
+          )}
+          <div className="h-4 w-px bg-[#52796f] mx-1"></div>
           <DialogTitle className="text-[#cad2c5] text-xs cursor-default">
             {isEditing ? "Επεξεργασία Προσφοράς" : "Νέα Προσφορά"}
           </DialogTitle>

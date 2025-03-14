@@ -11,6 +11,7 @@ import {
   X,
   CheckSquare,
   RotateCcw,
+  Database,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -38,12 +39,18 @@ export default function Sidebar() {
     { name: "Ρυθμίσεις", href: "/dashboard/settings", icon: Settings },
   ];
   
-  // Add the recovery page link for admin users only
+  // Add the recovery and backup page links for admin users only
   if (isAdmin) {
     navigation.push({ 
       name: "Ανάκτηση Δεδομένων", 
       href: "/admin/recovery", 
       icon: RotateCcw 
+    });
+    
+    navigation.push({ 
+      name: "Αντίγραφα Ασφαλείας", 
+      href: "/admin/backup", 
+      icon: Database 
     });
   }
 

@@ -455,17 +455,20 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
         const isExpanded = expandedOffers[row.id] || false;
         return (
           <div 
-            className="flex items-center cursor-pointer"
+            className="flex items-center justify-center w-full h-full"
             onClick={(e) => {
               e.stopPropagation();
               toggleOfferExpanded(row.id);
             }}
           >
-            {isExpanded ? (
-              <ChevronDown className="h-4 w-4 text-[#84a98c]" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-[#84a98c]" />
-            )}
+            <div className="flex items-center justify-center relative group cursor-pointer hover:bg-[#52796f]/60 rounded-full w-7 h-7 transition-colors duration-200">
+              <span className="absolute inset-0 rounded-full bg-[#52796f]/0 group-hover:bg-[#52796f]/30 transition-colors duration-200"></span>
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 text-[#84a98c] group-hover:text-white relative z-10" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-[#84a98c] group-hover:text-white relative z-10" />
+              )}
+            </div>
           </div>
         );
       }

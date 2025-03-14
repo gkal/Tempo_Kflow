@@ -19,6 +19,7 @@ import { Search, ChevronUp, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from 
 import { cn } from "@/lib/utils";
 import { searchBarStyles } from "@/lib/styles/search-bar";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import React from "react";
 
 type SortDirection = "asc" | "desc";
 
@@ -188,15 +189,18 @@ export function DataTableBase({
     if (searchTerm && searchColumn) {
       filtered = transformed.filter(item => {
         const value = item[searchColumn];
-        if (!value) return false;
+        if (value === undefined || value === null) return false;
+        
+        const stringValue = String(value).toLowerCase();
+        const searchTermLower = searchTerm.toLowerCase();
         
         // For date columns, search in the formatted value
         if (columns.find(col => col.accessor === searchColumn && (col.type === 'date' || inferColumnType(searchColumn) === 'date'))) {
           const formattedValue = item[`_formatted_${searchColumn}`] || safeFormatDateTime(value);
-          return formattedValue.toLowerCase().includes(searchTerm.toLowerCase());
+          return formattedValue.toLowerCase().includes(searchTermLower);
         }
         
-        return String(value).toLowerCase().includes(searchTerm.toLowerCase());
+        return stringValue.includes(searchTermLower);
       });
     }
     
@@ -343,9 +347,9 @@ export function DataTableBase({
       .search-highlight {
         background-color: #52796f !important;
         color: #cad2c5 !important;
-        padding: 0 4px;
-        border-radius: 2px;
-        display: inline-block;
+        padding: 0 4px !important;
+        border-radius: 2px !important;
+        display: inline-block !important;
       }
     `;
     document.head.appendChild(style);
@@ -355,9 +359,120 @@ export function DataTableBase({
     };
   }, []);
 
-  // Modify the highlightMatch function
+  // Add a useEffect to apply highlighting directly to the DOM
+  useEffect(() => {
+    // Wait for the table to render
+    setTimeout(() => {
+      try {
+        // Find all cells in the column that should be highlighted
+        const table = tableRef.current;
+        if (!table) return;
+        
+        // Function to clear all highlighting in the table
+        const clearAllHighlighting = () => {
+          // Get all cells with highlighting
+          const highlightedCells = table.querySelectorAll('.search-highlight');
+          
+          // For each highlighted element, replace it with its text content
+          highlightedCells.forEach(highlight => {
+            const parent = highlight.parentNode;
+            if (parent) {
+              const text = highlight.textContent || '';
+              const textNode = document.createTextNode(text);
+              parent.replaceChild(textNode, highlight);
+            }
+          });
+          
+          // Also reset any cells that might have been modified
+          const allCells = table.querySelectorAll('td');
+          allCells.forEach(cell => {
+            if (cell.querySelector('.search-highlight')) {
+              // Get the row and column index
+              const row = cell.closest('tr');
+              if (!row) return;
+              
+              const rowIndex = Array.from(row.parentNode?.children || []).indexOf(row);
+              if (rowIndex < 0 || rowIndex >= displayedData.length) return;
+              
+              const columnIndex = Array.from(row.children).indexOf(cell);
+              if (columnIndex < 0 || columnIndex >= columns.length) return;
+              
+              // Get the original data
+              const rowData = displayedData[rowIndex];
+              const column = columns[columnIndex];
+              if (!rowData || !column) return;
+              
+              // Reset the cell content
+              const originalText = rowData[column.accessor] ? String(rowData[column.accessor]) : '';
+              cell.textContent = originalText;
+            }
+          });
+        };
+        
+        // If search term is empty or too short, clear all highlighting and return
+        if (!searchTerm || !searchColumn || searchTerm.length === 0) {
+          clearAllHighlighting();
+          return;
+        }
+        
+        // Find the column index
+        const columnIndex = columns.findIndex(col => col.accessor === searchColumn);
+        if (columnIndex === -1) {
+          clearAllHighlighting();
+          return;
+        }
+        
+        // First clear any existing highlighting
+        clearAllHighlighting();
+        
+        // Get all rows in the table
+        const rows = table.querySelectorAll('tbody tr');
+        
+        // For each row, highlight the matching text in the appropriate cell
+        rows.forEach((row, rowIndex) => {
+          if (rowIndex >= displayedData.length) return;
+          
+          const cell = row.querySelectorAll('td')[columnIndex];
+          if (!cell) return;
+          
+          // Get the original data for this row
+          const rowData = displayedData[rowIndex];
+          if (!rowData) return;
+          
+          // Get the original text content (without any highlighting)
+          const originalText = rowData[searchColumn] ? String(rowData[searchColumn]) : '';
+          if (!originalText) return;
+          
+          const searchTermLower = searchTerm.toLowerCase();
+          const index = originalText.toLowerCase().indexOf(searchTermLower);
+          
+          // Only apply highlighting if the search term is at least 1 character long
+          // and there's a match in the text
+          if (searchTerm.length > 0 && index !== -1) {
+            // Create the highlighted HTML
+            const before = originalText.substring(0, index);
+            const match = originalText.substring(index, index + searchTerm.length);
+            const after = originalText.substring(index + searchTerm.length);
+            
+            // Set the HTML directly with inline styles to ensure it's applied (without bold)
+            cell.innerHTML = `${before}<span class="search-highlight" style="background-color: #52796f !important; color: #cad2c5 !important; padding: 0 4px !important; border-radius: 2px !important; display: inline-block !important;">${match}</span>${after}`;
+          } else {
+            // If no match or search term is empty, ensure we display the original text without highlighting
+            cell.textContent = originalText;
+          }
+        });
+      } catch (error) {
+        console.error('Error applying search highlighting:', error);
+      }
+    }, 100);
+  }, [searchTerm, searchColumn, displayedData, columns]);
+
+  // Restore the highlightMatch function for React-based highlighting
   const highlightMatch = (text: any, searchTerm: string, columnType: string): React.ReactNode => {
-    if (!text || !searchTerm) return text || "-";
+    // Only apply highlighting if we have text, a search term, and the search term is not empty
+    if (!text || !searchTerm || searchTerm.length === 0) {
+      return text || "-";
+    }
     
     const textStr = String(text);
     const searchTermLower = searchTerm.toLowerCase();
@@ -368,16 +483,30 @@ export function DataTableBase({
     }
     
     const index = textStr.toLowerCase().indexOf(searchTermLower);
-    if (index === -1) return textStr;
     
+    // If no match found, return the original text
+    if (index === -1) {
+      return textStr;
+    }
+    
+    // Apply highlighting
     return (
-      <>
+      <React.Fragment key={`highlight-${textStr.substring(0, 10)}-${index}`}>
         {textStr.substring(0, index)}
-        <span className="search-highlight">
+        <span 
+          className="search-highlight"
+          style={{
+            backgroundColor: '#52796f',
+            color: '#cad2c5',
+            padding: '0 4px',
+            borderRadius: '2px',
+            display: 'inline-block'
+          }}
+        >
           {textStr.substring(index, index + searchTerm.length)}
         </span>
         {textStr.substring(index + searchTerm.length)}
-      </>
+      </React.Fragment>
     );
   };
 
@@ -400,6 +529,34 @@ export function DataTableBase({
       onSearchFocus(e);
     }
   };
+
+  // Add a special useEffect to clear all highlighting when the search term becomes empty
+  useEffect(() => {
+    if (!searchTerm || searchTerm.length === 0) {
+      // Wait for the table to render
+      setTimeout(() => {
+        try {
+          const table = tableRef.current;
+          if (!table) return;
+          
+          // Get all cells with highlighting
+          const highlightedCells = table.querySelectorAll('.search-highlight');
+          
+          // For each highlighted element, replace it with its text content
+          highlightedCells.forEach(highlight => {
+            const parent = highlight.parentNode;
+            if (parent) {
+              const text = highlight.textContent || '';
+              const textNode = document.createTextNode(text);
+              parent.replaceChild(textNode, highlight);
+            }
+          });
+        } catch (error) {
+          console.error('Error clearing highlighting:', error);
+        }
+      }, 50);
+    }
+  }, [searchTerm]);
 
   return (
     <div className="w-full flex flex-col" ref={tableRef}>
@@ -425,8 +582,6 @@ export function DataTableBase({
       
       {/* Main table container with fixed header */}
       <div className="relative overflow-hidden border border-[#52796f] rounded-md">
-        {/* Fixed header border that doesn't scroll */}
-        <div className="absolute top-[39px] left-0 right-0 h-[1px] bg-[#52796f] z-20"></div>
         {/* Container with both horizontal and vertical scrollbars */}
         <div
           className="overflow-x-auto overflow-y-auto scrollbar-visible"
@@ -436,17 +591,17 @@ export function DataTableBase({
           <div className="min-w-full inline-block align-middle">
             <table className="min-w-full table-fixed border-collapse">
               {/* Fixed header */}
-              <thead className="bg-[#2f3e46] sticky top-0 z-10">
+              <thead className="bg-[#2f3e46] sticky top-0 z-20 shadow-sm after:content-[''] after:absolute after:left-0 after:right-0 after:bottom-0 after:h-[1px] after:bg-[#52796f] after:z-10">
                 <tr className="hover:bg-transparent">
-                  {columns.map((column) => (
+                  {columns.map((column, index) => (
                     <th
-                      key={column.accessor || column.id || `column-${columns.indexOf(column)}`}
+                      key={`header-${column.accessor || column.id || index}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         column.sortable !== false && handleSort(column.accessor);
                       }}
                       className={cn(
-                        "text-[#84a98c] select-none whitespace-nowrap relative p-3 text-left font-normal text-sm",
+                        "text-[#84a98c] select-none whitespace-nowrap relative p-0 text-left font-normal text-sm",
                         column.sortable !== false
                           ? "cursor-pointer"
                           : "cursor-default",
@@ -454,7 +609,7 @@ export function DataTableBase({
                       )}
                       style={columnStyles[column.accessor]}
                     >
-                      <div className="flex items-center">
+                      <div className="flex items-center py-1 px-3 w-full h-full">
                         <span>{column.header}</span>
                         {column.sortable !== false && (
                           <span className="ml-1 inline-block w-3 text-center">
@@ -476,7 +631,7 @@ export function DataTableBase({
               {/* Table body */}
               <tbody className="divide-y divide-[#52796f]/30">
                 {isLoading ? (
-                  <tr>
+                  <tr key="loading-row">
                     <td colSpan={columns.length} className="text-center py-8">
                       <div className="flex justify-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#84a98c]"></div>
@@ -484,7 +639,7 @@ export function DataTableBase({
                     </td>
                   </tr>
                 ) : displayedData.length === 0 ? (
-                  <tr>
+                  <tr key="no-data-row">
                     <td colSpan={columns.length} className="text-center py-8 text-[#84a98c]">
                       {searchTerm ? "Δεν βρέθηκαν αποτελέσματα" : "Δεν υπάρχουν δεδομένα"}
                     </td>
@@ -496,40 +651,55 @@ export function DataTableBase({
                     
                     const defaultRow = (
                       <tr
-                        key={row.id || index}
+                        key={`row-${row.id || index}`}
                         onClick={() => onRowClick && onRowClick(row)}
                         className={cn(
                           "transition-colors",
                           rowClassName,
                           highlightedRowId === row.id && "bg-[#52796f]/20",
+                          onRowClick && "cursor-pointer"
                         )}
                       >
-                        {columns.map((column) => (
+                        {columns.map((column, colIndex) => (
                           <td
-                            key={`${row.id || index}-${column.accessor || column.id || columns.indexOf(column)}`}
+                            key={`cell-${row.id || index}-${column.accessor || column.id || colIndex}`}
                             className={cn(
-                              "text-[#cad2c5] whitespace-nowrap group-hover:underline py-1 px-3 text-sm",
+                              "text-[#cad2c5] whitespace-nowrap group-hover:underline text-sm p-0",
                               column.type === "status" && "whitespace-nowrap",
                             )}
                             style={columnStyles[column.accessor]}
                           >
-                            {column.cell
-                              ? column.cell(row[column.accessor], row)
-                              : (column.type === 'date' || inferColumnType(column.accessor) === 'date')
-                                ? searchColumn === column.accessor && searchTerm
-                                  ? highlightMatch(
-                                      safeFormatDateTime(row[column.accessor]), 
-                                      searchTerm, 
-                                      'date'
-                                    )
-                                  : safeFormatDateTime(row[column.accessor])
-                                : searchColumn === column.accessor && searchTerm
-                                  ? highlightMatch(
-                                      row[column.accessor], 
-                                      searchTerm, 
-                                      column.type || inferColumnType(column.accessor)
-                                    )
-                                  : row[column.accessor]}
+                            <div className="w-full h-full py-1 px-4">
+                            {(() => {
+                              // Only apply highlighting if we have a search term with at least one character
+                              // and we're searching in the current column
+                              const shouldHighlight = searchTerm && 
+                                                     searchTerm.length > 0 && 
+                                                     searchColumn === column.accessor;
+                              
+                              const cellValue = row[column.accessor];
+                              const columnType = column.type || inferColumnType(column.accessor);
+                              
+                              // If this cell has a custom renderer, use it
+                              if (column.cell) {
+                                return column.cell(cellValue, row);
+                              } 
+                              
+                              // For date columns, just format the date without highlighting
+                              if (columnType === 'date' || inferColumnType(column.accessor) === 'date') {
+                                const formattedDate = safeFormatDateTime(cellValue);
+                                return formattedDate;
+                              } 
+                              
+                              // For non-date columns with a search term, apply highlighting if we have a value
+                              if (shouldHighlight && cellValue) {
+                                return highlightMatch(cellValue, searchTerm, columnType);
+                              } 
+                              
+                              // For all other cases, just return the cell value
+                              return cellValue;
+                            })()}
+                            </div>
                           </td>
                         ))}
                       </tr>
@@ -551,7 +721,7 @@ export function DataTableBase({
 
                 {/* Loader for infinite scrolling */}
                 {isLoading && displayedData.length > 0 && (
-                  <tr ref={loader}>
+                  <tr key="infinite-scroll-loader" ref={loader}>
                     <td colSpan={columns.length} className="text-center py-4">
                       <div className="flex justify-center">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>

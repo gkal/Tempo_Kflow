@@ -39,6 +39,27 @@ const Home = () => {
       );
     }
 
+    if (path === "/admin/backup") {
+      const BackupPage = React.lazy(
+        () => import("./admin/BackupPage"),
+      );
+      return (
+        <React.Suspense
+          fallback={
+            <div className="flex items-center justify-center p-8">
+              <div className="flex items-center justify-center space-x-2">
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.2s]" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.4s]" />
+              </div>
+            </div>
+          }
+        >
+          <BackupPage />
+        </React.Suspense>
+      );
+    }
+
     if (path === "/tasks") {
       const TasksPage = React.lazy(
         () => import("./tasks/TasksPage"),
