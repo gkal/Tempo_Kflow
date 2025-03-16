@@ -8,58 +8,33 @@ export interface VersionEntry {
 
 export const VERSION_HISTORY: VersionEntry[] = [
   {
-    version: "1.0.1",
-    date: "2025-10-01", // Estimated date
-    description: "Initial release",
+    version: "1.5.1",
+    date: "16-03-2025",
+    description: "Βελτιωμένο Σύστημα Προσφορών με Απλοποιημένη Διαχείριση Λεπτομερειών",
     changes: [
-      "Basic application structure",
-      "User authentication",
-      "Dashboard layout"
+      "Δημιουργία πινάκων καταχώρησης πιθανών εργασιών",
+      "Νέο μενού για την πλοήγηση στις εργασίες",
+      "Πλήρης αναδιάρθρωση του συστήματος διαχείρισης λεπτομερειών προσφορών",
+      "Αποτροπή αυτόματης αποθήκευσης στη βάση δεδομένων πριν την τελική υποβολή",
+      "Βελτιστοποίηση της διαδικασίας αποθήκευσης για αποφυγή σφαλμάτων",
+      "Απλοποίηση του κώδικα για καλύτερη συντηρησιμότητα και απόδοση"
     ]
   },
   {
-    version: "1.1.0",
-    date: "2025-11-15", // Estimated date
-    description: "Customer and Contact Management",
+    version: "1.5.0",
+    date: "09-03-2025",
+    description: "Βελτιώσεις Συστήματος Προσφορών",
     changes: [
-      "Added Customers and Contacts tables with relationship",
-      "Included user tracking fields and notes",
-      "Added status field with active/inactive values to Customers and Contacts tables"
-    ]
-  },
-  {
-    version: "1.1.1",
-    date: "2025-12-10", // Estimated date
-    description: "Customer Type Enhancement",
-    changes: [
-      "Added customer_type field with values: Ιδιώτης, Εταιρεία, Δημόσιο"
-    ]
-  },
-  {
-    version: "1.2.0",
-    date: "2025-01-15", // Previous date
-    description: "UI Improvements and Bug Fixes",
-    changes: [
-      "Fixed DataTable loading state to show proper animation",
-      "Fixed user role comparison in CustomerDetailPage",
-      "Added automatic version logging system"
-    ]
-  },
-  {
-    version: "1.3.0",
-    date: "2025-02-20", // Previous date
-    description: "Customer Management Enhancements",
-    changes: [
-      "Improved customer status toggle with optimized UI updates",
-      "Fixed customer deletion process to properly handle foreign key constraints",
-      "Enhanced edit form with better save/cancel functionality",
-      "Removed redundant edit button from customer list",
-      "Optimized table updates to avoid full refreshes when toggling status"
+      "Προσθήκη λειτουργίας πραγματικού χρόνου για αυτόματη ενημέρωση προσφορών",
+      "Βελτιστοποίηση απόδοσης με έξυπνη διαχείριση δεδομένων",
+      "Προσθήκη φίλτρων για κατάσταση και αποτέλεσμα προσφορών",
+      "Βελτίωση διεπαφής χρήστη με καλύτερη οργάνωση πληροφοριών",
+      "Διόρθωση προβλήματος άπειρου βρόχου στις ενημερώσεις πραγματικού χρόνου"
     ]
   },
   {
     version: "1.4.0",
-    date: new Date().toISOString().split('T')[0], // Today's date
+    date: "02-03-2025",
     description: "Σύστημα Διαχείρισης Προσφορών",
     changes: [
       "Προσθήκη νέας λειτουργίας Προσφορών για την παρακολούθηση προσφορών πελατών",
@@ -70,18 +45,56 @@ export const VERSION_HISTORY: VersionEntry[] = [
     ]
   },
   {
-    version: "1.5.0",
-    date: new Date().toISOString().split('T')[0], // Today's date
-    description: "Βελτιώσεις Συστήματος Προσφορών",
+    version: "1.3.0",
+    date: "20-02-2025",
+    description: "Customer Management Enhancements",
     changes: [
-      "Προσθήκη λειτουργίας πραγματικού χρόνου για αυτόματη ενημέρωση προσφορών",
-      "Βελτιστοποίηση απόδοσης με έξυπνη διαχείριση δεδομένων",
-      "Προσθήκη φίλτρων για κατάσταση και αποτέλεσμα προσφορών",
-      "Βελτίωση διεπαφής χρήστη με καλύτερη οργάνωση πληροφοριών",
-      "Διόρθωση προβλήματος άπειρου βρόχου στις ενημερώσεις πραγματικού χρόνου"
+      "Improved customer status toggle with optimized UI updates",
+      "Fixed customer deletion process to properly handle foreign key constraints",
+      "Enhanced edit form with better save/cancel functionality",
+      "Removed redundant edit button from customer list",
+      "Optimized table updates to avoid full refreshes when toggling status"
+    ]
+  },
+  {
+    version: "1.2.0",
+    date: "15-01-2025",
+    description: "UI Improvements and Bug Fixes",
+    changes: [
+      "Fixed DataTable loading state to show proper animation",
+      "Fixed user role comparison in CustomerDetailPage",
+      "Added automatic version logging system"
+    ]
+  },
+  {
+    version: "1.1.1",
+    date: "10-12-2025",
+    description: "Customer Type Enhancement",
+    changes: [
+      "Added customer_type field with values: Ιδιώτης, Εταιρεία, Δημόσιο"
+    ]
+  },
+  {
+    version: "1.1.0",
+    date: "15-11-2025",
+    description: "Customer and Contact Management",
+    changes: [
+      "Added Customers and Contacts tables with relationship",
+      "Included user tracking fields and notes",
+      "Added status field with active/inactive values to Customers and Contacts tables"
+    ]
+  },
+  {
+    version: "1.0.1",
+    date: "01-10-2025",
+    description: "Initial release",
+    changes: [
+      "Basic application structure",
+      "User authentication",
+      "Dashboard layout"
     ]
   }
 ];
 
-// Current version is the last entry in the version history
-export const VERSION = VERSION_HISTORY[VERSION_HISTORY.length - 1].version;
+// Current version is the first entry in the version history
+export const VERSION = VERSION_HISTORY[0].version;

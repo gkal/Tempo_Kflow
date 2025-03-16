@@ -1,0 +1,29 @@
+/* Ensure the table header stays visible during scrolling */
+.details-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #2f3e46;
+  box-shadow: 0 1px 0 0 #52796f;
+}
+
+/* Add a solid background to the header */
+.details-table-header th {
+  background-color: #2f3e46;
+}
+
+/* Ensure the border is visible but thinner */
+.details-table-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background-color: #52796f;
+}
+
+/* Add a bottom border to category rows */
+.category-row {
+  border-bottom: 1px solid #52796f;
+} 

@@ -7,7 +7,6 @@ interface TabsContainerProps {
 const TabsContainer: React.FC<TabsContainerProps> = ({ children }) => {
   const [activeTab, setActiveTab] = useState(0);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const [contentHeight, setContentHeight] = useState<number | null>(null);
   const contentRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Handle keyboard navigation
@@ -30,36 +29,17 @@ const TabsContainer: React.FC<TabsContainerProps> = ({ children }) => {
     contentRefs.current = contentRefs.current.slice(0, React.Children.count(children));
   }, [children]);
 
-  // Calculate and set the maximum height of all tab contents
-  useEffect(() => {
-    // Wait for the DOM to be fully rendered
-    const timer = setTimeout(() => {
-      // Get the heights of all tab panels
-      const heights = contentRefs.current
-        .filter(Boolean)
-        .map(ref => ref?.scrollHeight || 0);
-      
-      // Set the maximum height
-      if (heights.length > 0) {
-        const maxHeight = Math.max(...heights);
-        setContentHeight(maxHeight);
-      }
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [children]);
-
   return (
-    <div className="flex flex-col w-full mb-4">
-      <div className="flex border-b border-[#52796f] mb-4" role="tablist">
+    <div className="flex flex-col w-full mb-2 -mt-1">
+      <div className="flex border-b border-[#52796f] mb-2" role="tablist">
         <button
           type="button"
           ref={el => (tabRefs.current[0] = el)}
           onClick={() => setActiveTab(0)}
           onKeyDown={(e) => handleKeyDown(e, 0)}
-          className={`px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+          className={`px-4 py-2 text-sm font-medium transition-all duration-200 relative ${
             activeTab === 0
-              ? 'text-[#a8c5b5] border-b-2 border-[#a8c5b5]'
+              ? 'text-[#a8c5b5] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#a8c5b5] after:rounded-t-sm'
               : 'text-[#cad2c5] hover:text-[#a8c5b5]'
           }`}
           aria-selected={activeTab === 0}
@@ -75,9 +55,9 @@ const TabsContainer: React.FC<TabsContainerProps> = ({ children }) => {
           ref={el => (tabRefs.current[1] = el)}
           onClick={() => setActiveTab(1)}
           onKeyDown={(e) => handleKeyDown(e, 1)}
-          className={`px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+          className={`px-4 py-2 text-sm font-medium transition-all duration-200 relative ${
             activeTab === 1
-              ? 'text-[#a8c5b5] border-b-2 border-[#a8c5b5]'
+              ? 'text-[#a8c5b5] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#a8c5b5] after:rounded-t-sm'
               : 'text-[#cad2c5] hover:text-[#a8c5b5]'
           }`}
           aria-selected={activeTab === 1}
@@ -90,11 +70,15 @@ const TabsContainer: React.FC<TabsContainerProps> = ({ children }) => {
         </button>
       </div>
 
-      <div className="tab-content" style={{ minHeight: contentHeight ? `${contentHeight}px` : 'auto' }}>
+      <div className="tab-content" style={{ height: 'auto', minHeight: '450px' }}>
+        {/* 
+          Using minHeight to prevent tab content from collapsing when switching tabs.
+          This ensures a consistent height across all tabs.
+        */}
         {React.Children.map(children, (child, index) => (
           <div
             ref={el => (contentRefs.current[index] = el)}
-            className={`transition-opacity duration-200 ${
+            className={`transition-opacity duration-200 h-full ${
               activeTab === index ? 'block' : 'hidden'
             }`}
             role="tabpanel"

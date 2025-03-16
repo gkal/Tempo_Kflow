@@ -60,6 +60,27 @@ const Home = () => {
       );
     }
 
+    if (path === "/admin/service-types") {
+      const ServiceTypesPage = React.lazy(
+        () => import("./admin/ServiceTypesPage"),
+      );
+      return (
+        <React.Suspense
+          fallback={
+            <div className="flex items-center justify-center p-8">
+              <div className="flex items-center justify-center space-x-2">
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.2s]" />
+                <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.4s]" />
+              </div>
+            </div>
+          }
+        >
+          <ServiceTypesPage />
+        </React.Suspense>
+      );
+    }
+
     if (path === "/tasks") {
       const TasksPage = React.lazy(
         () => import("./tasks/TasksPage"),
@@ -141,6 +162,17 @@ const Home = () => {
         >
           <OffersPage />
         </React.Suspense>
+      );
+    }
+
+    if (path === "/calls") {
+      return (
+        <div className="p-8">
+          <h1 className="text-2xl font-bold mb-6 text-[#cad2c5]">Κλήσεις</h1>
+          <div className="bg-[#354f52] p-6 rounded-lg shadow-md">
+            <p className="text-[#cad2c5]">Η λειτουργία διαχείρισης κλήσεων είναι υπό κατασκευή.</p>
+          </div>
+        </div>
       );
     }
 

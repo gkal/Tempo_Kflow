@@ -314,15 +314,11 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
     
     return (
       <div className="flex items-center">
-        <span className="truncate max-w-[300px] inline-block">
+        <span className="max-w-[300px] inline-block">
           {text.substring(0, maxLength)}
         </span>
-        <span className="text-blue-400 ml-1 flex-shrink-0" title="Περισσότερο κείμενο">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="1"></circle>
-            <circle cx="19" cy="12" r="1"></circle>
-            <circle cx="5" cy="12" r="1"></circle>
-          </svg>
+        <span className="text-blue-400 ml-1 flex-shrink-0">
+          ....
         </span>
       </div>
     );
@@ -635,9 +631,9 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
         />
         <Button
           onClick={handleAddOffer}
-          className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] ml-4"
+          className="bg-transparent hover:bg-[#52796f] text-[#84a98c] hover:text-[#cad2c5] flex items-center gap-2 transition-colors font-normal ml-4"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 text-white" />
           Νέα Προσφορά
         </Button>
       </div>

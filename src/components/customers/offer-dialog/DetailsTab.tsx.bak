@@ -1,0 +1,993 @@
+import React, { useState, useEffect, useContext, useCallback } from 'react';
+import { OfferDialogContext } from '../OffersDialog';
+import { useAuth } from '@/lib/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { 
+  fetchOfferDetails,
+  deleteOfferDetail,
+  fetchServiceCategories,
+  fetchSubcategories,
+  fetchMeasurementUnits,
+  addOfferDetail
+} from '@/services/offerDetailsService';
+import { 
+  OfferDetail, 
+  ServiceCategory, 
+  ServiceSubcategory, 
+  MeasurementUnit 
+} from '@/types/offer-details';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// Wrap the component with React.memo to prevent unnecessary re-renders
+const DetailsTab = React.memo(() => {
+  const context = useContext(OfferDialogContext);
+  const { user } = useAuth();
+  const offerId = context?.offerId;
+  const isEditing = context?.isEditing;
+  
+  // State for offer details
+  const [details, setDetails] = useState<OfferDetail[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // State for delete confirmation
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [detailToDelete, setDetailToDelete] = useState<OfferDetail | null>(null);
+  
+  // State for selection dialog
+  const [showSelectionDialog, setShowSelectionDialog] = useState(false);
+  const [confirmingSelection, setConfirmingSelection] = useState(false);
+  
+  // State for dropdown options
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [subcategories, setSubcategories] = useState<ServiceSubcategory[]>([]);
+  const [units, setUnits] = useState<MeasurementUnit[]>([]);
+  const [dialogLoading, setDialogLoading] = useState(false);
+  
+  // State for selected items
+  const [selectedItems, setSelectedItems] = useState<{
+    categoryId: string;
+    subcategoryId: string;
+    subcategoryName: string;
+    unitId: string;
+    price: number;
+  }[]>([]);
+  
+  // State for current category view
+  const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(null);
+
+  // Reset function to clear all temporary state
+  const resetState = useCallback(() => {
+    setSelectedItems([]);
+    setCurrentCategoryId(null);
+    setShowSelectionDialog(false);
+    setShowDeleteDialog(false);
+    setDetailToDelete(null);
+    setError(null);
+    setConfirmingSelection(false);
+    
+    // Also clear from localStorage
+    localStorage.removeItem('offerDetailsSelectedItems');
+  }, []);
+
+  // Register the reset function with the context only once
+  useEffect(() => {
+    // Only register if context exists and has the registerTabReset function
+    if (context?.registerTabReset) {
+      // Register the reset function
+      context.registerTabReset("details", resetState);
+      
+      // Cleanup function to unregister when component unmounts
+      return () => {
+        if (context.unregisterTabReset) {
+          context.unregisterTabReset("details");
+        }
+      };
+    }
+  }, [context, resetState]);
+
+  // Clear selected items from localStorage on component mount
+  useEffect(() => {
+    // Clear any stored selected items on mount
+    localStorage.removeItem('offerDetailsSelectedItems');
+    
+    // Set up event listener for beforeunload to save selected items
+    const handleBeforeUnload = () => {
+      // Clear selected items from localStorage
+      localStorage.removeItem('offerDetailsSelectedItems');
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Clear selected items from localStorage on unmount
+      localStorage.removeItem('offerDetailsSelectedItems');
+      // Reset all state on unmount
+      setSelectedItems([]);
+      setCurrentCategoryId(null);
+    };
+  }, []);
+
+  // Fetch offer details when the component mounts or offerId changes
+  useEffect(() => {
+    if (offerId) {
+      fetchDetails();
+      
+      // Preload categories and units for faster dialog opening
+      preloadCategoriesAndUnits();
+    }
+    
+    // Cleanup function to clear selectedItems when component unmounts
+    return () => {
+      // Don't call resetState here as it causes an infinite loop
+    };
+  }, [offerId]);
+
+  // Preload categories and units
+  const preloadCategoriesAndUnits = async () => {
+    try {
+      // Only fetch if we don't already have the data
+      if (categories.length === 0 || units.length === 0) {
+        const [categoriesData, unitsData] = await Promise.all([
+          fetchServiceCategories(),
+          fetchMeasurementUnits()
+        ]);
+        
+        setCategories(categoriesData);
+        setUnits(unitsData);
+        
+        // Preload subcategories for the first few categories to improve initial load time
+        if (categoriesData.length > 0) {
+          const categoriesToPreload = categoriesData.slice(0, 3); // Preload first 3 categories
+          
+          // Fetch subcategories in parallel
+          const preloadPromises = categoriesToPreload.map(category => 
+            fetchSubcategories(category.id)
+          );
+          
+          // Use Promise.allSettled to continue even if some requests fail
+          const results = await Promise.allSettled(preloadPromises);
+          
+          // Process successful results
+          const successfulResults = results
+            .filter((result): result is PromiseFulfilledResult<ServiceSubcategory[]> => 
+              result.status === 'fulfilled'
+            )
+            .map(result => result.value)
+            .flat();
+          
+          // Update subcategories state with preloaded data
+          if (successfulResults.length > 0) {
+            setSubcategories(successfulResults);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error preloading data:", error);
+    }
+  };
+
+  // Function to fetch offer details
+  const fetchDetails = async () => {
+    if (!offerId) return;
+    
+    try {
+      setLoading(true);
+      const data = await fetchOfferDetails(offerId);
+      setDetails(data);
+    } catch (error) {
+      console.error("Error fetching offer details:", error);
+      setError("Σφάλμα κατά την ανάκτηση λεπτομερειών προσφοράς.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle add button click - open selection dialog
+  const handleAddClick = async () => {
+    // Clear all state when opening the dialog
+    setSelectedItems([]);
+    setCurrentCategoryId(null);
+    setConfirmingSelection(false);
+    setError(null);
+    localStorage.removeItem('offerDetailsSelectedItems');
+    
+    // Open dialog immediately for better UX
+    setShowSelectionDialog(true);
+    
+    try {
+      // Only show loading if we need to fetch data
+      const needToFetchData = categories.length === 0 || units.length === 0;
+      if (needToFetchData) {
+        setDialogLoading(true);
+      }
+      
+      // Only fetch categories and units if they haven't been preloaded
+      if (categories.length === 0 || units.length === 0) {
+        const [categoriesData, unitsData] = await Promise.all([
+          fetchServiceCategories(),
+          fetchMeasurementUnits()
+        ]);
+        
+        setCategories(categoriesData);
+        setUnits(unitsData);
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setError("Σφάλμα κατά την ανάκτηση δεδομένων. Παρακαλώ δοκιμάστε ξανά.");
+    } finally {
+      setDialogLoading(false);
+    }
+  };
+
+  // Handle category click
+  const handleCategoryClick = async (categoryId: string) => {
+    try {
+      // Update current category immediately for better UX
+      setCurrentCategoryId(categoryId);
+      
+      // Check if we already have subcategories for this category
+      const existingSubcategories = subcategories.filter(sub => 
+        sub.category_id === categoryId
+      );
+      
+      // Only fetch if we don't have subcategories for this category
+      if (existingSubcategories.length === 0) {
+        // Show loading only when we need to fetch
+        setDialogLoading(true);
+        
+        // Fetch subcategories for this category
+        const subcategoriesData = await fetchSubcategories(categoryId);
+        
+        // Merge with existing subcategories
+        setSubcategories(prev => [...prev, ...subcategoriesData]);
+        
+        setDialogLoading(false);
+      }
+    } catch (error) {
+      console.error("Error fetching subcategories:", error);
+      setError("Σφάλμα κατά την ανάκτηση υποκατηγοριών. Παρακαλώ δοκιμάστε ξανά.");
+      setDialogLoading(false);
+    }
+  };
+
+  // Handle subcategory selection
+  const handleSubcategorySelect = async (subcategoryId: string) => {
+    // Check if this item is already selected
+    const existingIndex = selectedItems.findIndex(
+      item => item.categoryId === currentCategoryId && item.subcategoryId === subcategoryId
+    );
+    
+    if (existingIndex >= 0) {
+      // Remove from selection
+      setSelectedItems(prev => prev.filter((_, index) => index !== existingIndex));
+    } else {
+      // Get the subcategory details to ensure we have the correct data
+      const subcategory = subcategories.find(s => s.id === subcategoryId);
+      
+      if (!subcategory) {
+        console.error(`Subcategory with ID ${subcategoryId} not found`);
+        return;
+      }
+      
+      // Add to selection with default unit and price
+      setSelectedItems(prev => [
+        ...prev,
+        {
+          categoryId: currentCategoryId,
+          subcategoryId: subcategoryId,
+          subcategoryName: subcategory.subcategory_name,
+          unitId: units.length > 0 ? units[0].id : "",
+          price: 0
+        }
+      ]);
+    }
+  };
+
+  // Handle unit change for a selected item
+  const handleUnitChange = (index: number, unitId: string) => {
+    setSelectedItems(prev => 
+      prev.map((item, i) => i === index ? { ...item, unitId } : item)
+    );
+  };
+
+  // Handle price change for a selected item
+  const handlePriceChange = (index: number, price: number) => {
+    setSelectedItems(prev => 
+      prev.map((item, i) => i === index ? { ...item, price } : item)
+    );
+  };
+
+  // Handle selection confirmation
+  const handleSelectionConfirm = async () => {
+    if (selectedItems.length === 0) {
+      setError("Παρακαλώ επιλέξτε τουλάχιστον ένα στοιχείο.");
+      return;
+    }
+    
+    try {
+      setDialogLoading(true);
+      // Set flag to prevent clearing selectedItems when dialog closes
+      setConfirmingSelection(true);
+      
+      // Ensure we have all subcategory data loaded
+      const uniqueCategoryIds = Array.from(new Set(selectedItems.map(item => item.categoryId)));
+      const missingCategoryIds = uniqueCategoryIds.filter(categoryId => 
+        !subcategories.some(sub => sub.category_id === categoryId)
+      );
+      
+      // Load subcategories for missing categories in parallel
+      if (missingCategoryIds.length > 0) {
+        const fetchPromises = missingCategoryIds.map(categoryId => fetchSubcategories(categoryId));
+        const subcategoryResults = await Promise.all(fetchPromises);
+        
+        // Merge all subcategory results
+        const allSubcategories = subcategoryResults.flat();
+        
+        // Update subcategories state, avoiding duplicates
+        setSubcategories(prev => {
+          const newSubcategories = [...prev];
+          allSubcategories.forEach(sub => {
+            if (!newSubcategories.some(existing => existing.id === sub.id)) {
+              newSubcategories.push(sub);
+            }
+          });
+          return newSubcategories;
+        });
+      }
+      
+      // Save the selected items immediately
+      if (selectedItems.length > 0 && user?.id) {
+        // Get the current offer data from context
+        const offerData = context?.offerData;
+        let currentOfferId = offerId;
+        
+        // If no offerId exists, we need to save the offer first
+        if (!currentOfferId) {
+          if (!offerData) {
+            setError("Δεν βρέθηκαν δεδομένα προσφοράς.");
+            setShowSelectionDialog(false);
+            setConfirmingSelection(false); // Reset flag
+            return;
+          }
+          
+          try {
+            // Call the saveOffer function from context
+            const savedOfferId = await context?.saveOffer();
+            
+            if (!savedOfferId) {
+              throw new Error("Αποτυχία αποθήκευσης προσφοράς.");
+            }
+            
+            currentOfferId = savedOfferId;
+          } catch (saveError) {
+            console.error("Error saving offer:", saveError);
+            setError("Αποτυχία αποθήκευσης προσφοράς. Παρακαλώ δοκιμάστε ξανά.");
+            setShowSelectionDialog(false);
+            setConfirmingSelection(false); // Reset flag
+            return;
+          }
+        }
+        
+        // Store all created detail IDs for potential rollback
+        const createdDetailIds: string[] = [];
+        let hasError = false;
+        
+        setLoading(true);
+        
+        // Check for duplicates before adding
+        const itemsToAdd = selectedItems.filter(item => {
+          // Check if this item already exists in the details
+          return !details.some(
+            detail => 
+              detail.category_id === item.categoryId && 
+              detail.subcategory_id === item.subcategoryId
+          );
+        });
+        
+        if (itemsToAdd.length === 0) {
+          setError("Όλα τα επιλεγμένα στοιχεία υπάρχουν ήδη στην προσφορά.");
+          setDialogLoading(false);
+          setShowSelectionDialog(false);
+          setLoading(false);
+          setConfirmingSelection(false); // Reset flag
+          return;
+        }
+        
+        // Add each selected item in a transaction-like approach
+        for (const item of itemsToAdd) {
+          try {
+            const result = await addOfferDetail(
+              currentOfferId, 
+              {
+                category_id: item.categoryId,
+                subcategory_id: item.subcategoryId,
+                unit_id: item.unitId,
+                quantity: 1, // Default quantity
+                price: item.price,
+                notes: ""
+              }, 
+              user.id
+            );
+            
+            if (result && result.id) {
+              createdDetailIds.push(result.id);
+            } else {
+              hasError = true;
+              break;
+            }
+          } catch (error) {
+            console.error("Error adding offer detail:", error);
+            hasError = true;
+            break;
+          }
+        }
+        
+        // If any error occurred, attempt to roll back by deleting created details
+        if (hasError) {
+          console.error("Error occurred during save, attempting rollback...");
+          
+          // Try to delete any details that were created
+          for (const detailId of createdDetailIds) {
+            try {
+              await deleteOfferDetail(detailId);
+            } catch (rollbackError) {
+              console.error("Error during rollback:", rollbackError);
+            }
+          }
+          
+          setError("Σφάλμα κατά την προσθήκη λεπτομερειών. Η διαδικασία ακυρώθηκε.");
+        } else {
+          // All details were added successfully
+          // Refresh the list
+          await fetchDetails();
+          
+          // Clear selected items after saving
+          setSelectedItems([]);
+          setCurrentCategoryId(null);
+          setConfirmingSelection(false);
+          localStorage.removeItem('offerDetailsSelectedItems');
+          
+          // If we saved the offer as part of this process, update the context
+          if (!offerId && currentOfferId) {
+            context?.setOfferId(currentOfferId);
+          }
+        }
+        
+        setLoading(false);
+      }
+      
+      // Close the dialog
+      setShowSelectionDialog(false);
+    } catch (error) {
+      console.error("Error loading subcategory data:", error);
+      setError("Σφάλμα κατά την φόρτωση δεδομένων. Παρακαλώ δοκιμάστε ξανά.");
+      // Reset the flag in case of error
+      setConfirmingSelection(false);
+    } finally {
+      setDialogLoading(false);
+      // We don't reset the flag here, it will be reset in the onOpenChange handler
+    }
+  };
+
+  // Handle delete button click
+  const handleDeleteClick = (detail: OfferDetail) => {
+    setDetailToDelete(detail);
+    setShowDeleteDialog(true);
+  };
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = () => {
+    if (!detailToDelete) {
+      return;
+    }
+    
+    // Close dialog immediately
+    setShowDeleteDialog(false);
+    
+    // Store the ID before deleting
+    const idToDelete = detailToDelete.id;
+    
+    // Clear the detailToDelete immediately
+    setDetailToDelete(null);
+    
+    setLoading(true);
+    
+    // Use a direct promise chain instead of an async function
+    deleteOfferDetail(idToDelete)
+      .then(() => {
+        setDetails(prev => prev.filter(item => item.id !== idToDelete));
+      })
+      .catch(error => {
+        console.error("Error deleting offer detail:", error);
+        setError("Σφάλμα κατά τη διαγραφή λεπτομέρειας προσφοράς.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
+  // Truncate text and add ellipsis if needed
+  const truncateText = (text: string, maxLength: number = 20) => {
+    if (!text) return "";
+    return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+  };
+
+  // Render functions for dropdown options
+  const renderCategoryOption = (id: string) => {
+    const category = categories.find(cat => cat.id === id);
+    return category ? truncateText(category.category_name, 20) : id;
+  };
+
+  const renderSubcategoryOption = (id: string) => {
+    const subcategory = subcategories.find(sub => sub.id === id);
+    return subcategory ? truncateText(subcategory.subcategory_name, 20) : id;
+  };
+
+  const renderUnitOption = (id: string) => {
+    const unit = units.find(u => u.id === id);
+    return unit ? truncateText(unit.name, 20) : id;
+  };
+
+  // Full text render functions for tooltips
+  const getFullCategoryName = (id: string) => {
+    const category = categories.find(cat => cat.id === id);
+    return category ? category.category_name : id;
+  };
+
+  const getFullSubcategoryName = (id: string) => {
+    const subcategory = subcategories.find(sub => sub.id === id);
+    return subcategory ? subcategory.subcategory_name : id;
+  };
+
+  const getFullUnitName = (id: string) => {
+    const unit = units.find(u => u.id === id);
+    return unit ? unit.name : id;
+  };
+
+  return (
+    <div id="details-tab" className="space-y-4">
+      <div className="p-4 bg-[#354f52] rounded-md border border-[#52796f]">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-[#a8c5b5] text-sm font-medium">Λεπτομέρειες Προσφοράς</h3>
+          
+          {isEditing && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleAddClick}
+              className="h-8 px-2 bg-transparent hover:bg-[#52796f] border-none flex items-center gap-1 group"
+            >
+              <Plus className="h-4 w-4 text-white" />
+              <span className="text-xs text-[#84a98c] group-hover:text-white">Προσθήκη</span>
+            </Button>
+          )}
+        </div>
+        
+        {loading ? (
+          <div className="text-center py-4">
+            <div className="animate-pulse text-[#cad2c5] text-xs">Φόρτωση...</div>
+          </div>
+        ) : error ? (
+          <div className="p-2 bg-red-900/30 text-red-300 border border-red-800 rounded-md text-xs">
+            {error}
+          </div>
+        ) : details.length === 0 && selectedItems.length === 0 ? (
+        <p className="text-[#cad2c5] text-xs">
+            Δεν υπάρχουν λεπτομέρειες προσφοράς. {isEditing && "Πατήστε το κουμπί Προσθήκη για να προσθέσετε."}
+          </p>
+        ) : (
+          <>
+            {/* Existing details from database */}
+            {details.length > 0 && (
+              <>
+                <div className="overflow-y-auto border border-[#52796f] rounded-md max-h-[240px] mb-4">
+                  <table className="w-full text-xs text-[#cad2c5]">
+                    <thead className="sticky top-0 bg-[#2f3e46]">
+                      <tr className="border-b border-[#52796f]/50">
+                        <th className="text-left py-2 px-3 font-medium text-[#84a98c]" colSpan={2}>Κατηγορία / Περιγραφή</th>
+                        <th className="text-center py-2 px-3 font-medium text-[#84a98c]">Μονάδα</th>
+                        <th className="text-center py-2 px-3 font-medium text-[#84a98c]">Τιμή</th>
+                        {isEditing && <th className="w-10 py-2 px-3"></th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Group by category */}
+                      {Array.from(new Set(details.map(detail => detail.category_id))).map(categoryId => {
+                        const categoryDetails = details.filter(detail => detail.category_id === categoryId);
+                        const category = categoryDetails[0]?.category;
+                        
+                        return (
+                          <React.Fragment key={categoryId}>
+                            {/* Category row */}
+                            <tr className="bg-[#354f52]/70">
+                              <td colSpan={isEditing ? 5 : 4} className="py-2 px-3 font-medium">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-block">
+                                        {truncateText(category?.category_name || "-", 40)}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{category?.category_name || "-"}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </td>
+                            </tr>
+                            
+                            {/* Subcategory rows */}
+                            {categoryDetails.map((detail) => (
+                              <tr key={detail.id} className="hover:bg-[#2f3e46]">
+                                <td className="w-4"></td>
+                                <td className="py-2 px-3">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="inline-block text-[#84a98c]">
+                                          {truncateText(detail.subcategory?.subcategory_name || '-', 30)}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{detail.subcategory?.subcategory_name || '-'}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="inline-block">
+                                          {truncateText(detail.unit?.name || '-', 10)}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{detail.unit?.name || '-'}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </td>
+                                <td className="py-2 px-3 text-center">{detail.price.toFixed(2)} €</td>
+                                {isEditing && (
+                                  <td className="py-2 px-3 text-center">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteClick(detail)}
+                                      className="h-6 w-6 p-0 text-[#84a98c] hover:text-red-400 hover:bg-[#52796f]"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+            
+            {/* Selected items (not yet saved) */}
+            {selectedItems.length > 0 && (
+              <>
+                <div className="overflow-y-auto border border-[#52796f] rounded-md max-h-[240px]">
+                  <table className="w-full text-xs text-[#cad2c5]">
+                    <thead className="sticky top-0 bg-[#2f3e46]">
+                      <tr className="border-b border-[#52796f]/50">
+                        <th className="text-left py-2 px-3 font-medium text-[#84a98c]" colSpan={2}>Κατηγορία / Περιγραφή</th>
+                        <th className="text-center py-2 px-3 font-medium text-[#84a98c]">Μονάδα</th>
+                        <th className="text-center py-2 px-3 font-medium text-[#84a98c]">Τιμή</th>
+                        <th className="w-10 py-2 px-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Group items by category */}
+                      {Array.from(new Set(selectedItems.map(item => item.categoryId))).map(categoryId => {
+                        const category = categories.find(c => c.id === categoryId);
+                        const categoryItems = selectedItems.filter(item => item.categoryId === categoryId);
+                        
+                        return (
+                          <React.Fragment key={categoryId}>
+                            {/* Category header row */}
+                            <tr className="bg-[#354f52]/70">
+                              <td colSpan={5} className="py-2 px-3 font-medium">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-block">
+                                        {truncateText(category?.category_name || "-", 40)}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{category?.category_name || "-"}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </td>
+                            </tr>
+                            
+                            {/* Subcategory rows */}
+                            {categoryItems.map((item) => {
+                              // Use the stored subcategory name directly
+                              return (
+                                <tr key={`${item.categoryId}-${item.subcategoryId}`}>
+                                  <td className="w-4"></td>
+                                  <td className="py-2 px-3">
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-block text-[#84a98c]">
+                                            {truncateText(item.subcategoryName, 30)}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{item.subcategoryName}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </td>
+                                  <td className="py-2 px-3 text-center">
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-block">
+                                            {truncateText(renderUnitOption(item.unitId), 10)}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{renderUnitOption(item.unitId)}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </td>
+                                  <td className="py-2 px-3 text-center">{item.price.toFixed(2)} €</td>
+                                  <td className="py-2 px-3 text-center">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setSelectedItems(prev => prev.filter(i => !(i.categoryId === item.categoryId && i.subcategoryId === item.subcategoryId)))}
+                                      className="h-6 w-6 p-0 text-[#84a98c] hover:text-red-400 hover:bg-[#52796f]"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+    
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f]">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-[#84a98c]">Διαγραφή Λεπτομέρειας</AlertDialogTitle>
+          <AlertDialogDescription className="text-[#cad2c5]">
+            Είστε βέβαιοι ότι θέλετε να διαγράψετε αυτή τη λεπτομέρεια προσφοράς;
+            <br />
+            Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]">
+            Ακύρωση
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-600 text-white hover:bg-red-700">
+            Διαγραφή
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    
+    {/* Selection Dialog */}
+    <Dialog 
+      open={showSelectionDialog} 
+      onOpenChange={(open) => {
+        if (open) {
+          // If dialog is opening, just update the state
+          setShowSelectionDialog(true);
+        } else {
+          // If dialog is closing
+          if (!confirmingSelection) {
+            // Always clear selections when closing without confirming
+            setSelectedItems([]);
+            setCurrentCategoryId(null);
+            setError(null);
+            localStorage.removeItem('offerDetailsSelectedItems');
+          } else {
+            // If dialog is closing by the confirm button, just reset the flag
+            // The selectedItems will be cleared in handleSelectionConfirm after saving
+            setConfirmingSelection(false);
+          }
+          setShowSelectionDialog(false);
+        }
+      }}
+    >
+      <DialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] max-w-4xl w-[800px] h-[550px] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="text-[#a8c5b5]">Επιλογή Λεπτομερειών</DialogTitle>
+        </DialogHeader>
+        
+        <div className="flex flex-col space-y-4 py-4 flex-grow overflow-hidden">
+          <div className="flex space-x-4 h-[400px] flex-shrink-0">
+            {/* Categories List */}
+            <div className="w-1/3 border border-[#52796f] rounded-md overflow-hidden flex-shrink-0">
+              <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
+                <h3 className="text-[#a8c5b5] text-sm font-medium">Κατηγορίες</h3>
+              </div>
+              <div className="overflow-y-auto h-[calc(100%-36px)]">
+                {categories.length > 0 ? (
+                  <div className="divide-y divide-[#52796f]/30">
+                    {categories.map((category) => (
+                      <div 
+                        key={category.id}
+                        className={`px-3 py-2 cursor-pointer hover:bg-[#354f52]/50 ${
+                          currentCategoryId === category.id ? 'bg-[#354f52]/70' : ''
+                        }`}
+                        onClick={() => handleCategoryClick(category.id)}
+                      >
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="block truncate text-sm font-medium">
+                                {truncateText(category.category_name, 30)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{category.category_name}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 text-center text-[#cad2c5]/70 text-sm">
+                    Δεν βρέθηκαν κατηγορίες
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Subcategories List */}
+            <div className="w-2/3 border border-[#52796f] rounded-md overflow-hidden flex-shrink-0">
+              <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
+                <h3 className="text-[#a8c5b5] text-sm font-medium">
+                  {currentCategoryId 
+                    ? `Περιγραφές: ${truncateText(categories.find(c => c.id === currentCategoryId)?.category_name || "", 20)}`
+                    : "Περιγραφές"
+                  }
+                </h3>
+              </div>
+              <div className="overflow-y-auto h-[calc(100%-36px)]">
+                {currentCategoryId ? (
+                  dialogLoading ? (
+                    <div className="p-3 text-center">
+                      <div className="animate-pulse text-[#cad2c5]/70 text-sm">Φόρτωση περιγραφών...</div>
+                    </div>
+                  ) : subcategories.filter(sub => sub.category_id === currentCategoryId).length > 0 ? (
+                    <div className="divide-y divide-[#52796f]/30">
+                      {subcategories
+                        .filter(sub => sub.category_id === currentCategoryId)
+                        .map((subcategory) => {
+                          const isSelected = selectedItems.some(
+                            item => item.categoryId === currentCategoryId && item.subcategoryId === subcategory.id
+                          );
+                          
+                          return (
+                            <div 
+                              key={subcategory.id}
+                              className={`px-3 py-2 cursor-pointer hover:bg-[#354f52]/50 ${
+                                isSelected ? 'bg-[#354f52]/70' : ''
+                              }`}
+                              onClick={() => handleSubcategorySelect(subcategory.id)}
+                            >
+                              <div className="flex items-center">
+                                <div className={`w-4 h-4 mr-2 border ${isSelected ? 'bg-[#84a98c] border-[#84a98c]' : 'border-[#52796f]'} rounded flex items-center justify-center`}>
+                                  {isSelected && <span className="text-white text-xs">✓</span>}
+                                </div>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="block truncate text-sm text-[#84a98c]">
+                                        {truncateText(subcategory.subcategory_name, 40)}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{subcategory.subcategory_name}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <div className="p-3 text-center text-[#cad2c5]/70 text-sm">
+                      Δεν βρέθηκαν περιγραφές για αυτή την κατηγορία
+                    </div>
+                  )
+                ) : (
+                  <div className="p-3 text-center text-[#cad2c5]/70 text-sm">
+                    Επιλέξτε μια κατηγορία για να δείτε τις περιγραφές
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Selection Counter */}
+          <div className="text-center text-sm text-[#84a98c] flex-shrink-0">
+            {selectedItems.length > 0 
+              ? `${selectedItems.length} επιλεγμένα στοιχεία` 
+              : "Δεν έχετε επιλέξει κανένα στοιχείο"}
+          </div>
+        </div>
+        
+        <DialogFooter className="flex-shrink-0">
+          <Button
+            type="button"
+            variant="default"
+            onClick={handleSelectionConfirm}
+            className="bg-[#52796f] text-white hover:bg-[#52796f]/90 h-8 px-3 text-xs flex items-center gap-1"
+            disabled={selectedItems.length === 0}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Προσθήκη
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+});
+
+export default DetailsTab;

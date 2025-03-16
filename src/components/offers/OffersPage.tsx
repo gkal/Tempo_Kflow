@@ -483,9 +483,9 @@ export default function OffersPage() {
         </h1>
         <Button
           onClick={handleCreateOffer}
-          className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] mb-2"
+          className="bg-transparent hover:bg-[#52796f] text-[#84a98c] hover:text-[#cad2c5] flex items-center gap-2 transition-colors font-normal"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 text-white" />
           Νέα Προσφορά
         </Button>
       </div>

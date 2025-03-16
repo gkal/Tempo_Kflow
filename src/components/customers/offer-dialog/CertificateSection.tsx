@@ -1,7 +1,7 @@
 import React, { useContext, useEffect } from 'react';
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
 
-const CommentsSection = () => {
+const CertificateSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);
   
   // Add default values to prevent TypeError when context is null
@@ -14,19 +14,24 @@ const CommentsSection = () => {
   // Force a re-render when the form values change
   useEffect(() => {
     // This is just to trigger a re-render when the component mounts
-    if (typeof watch === 'function') {
-      // Just call watch to subscribe to form changes
-      const values = watch();
+    const formValues = {
+      certificate: watch("certificate"),
+      hma: watch("hma")
+    };
+    
+    // Log the values to help with debugging
+    if (Object.values(formValues).some(val => val)) {
+      console.log("CertificateSection form values:", formValues);
     }
   }, [watch]);
 
   // If context is null, show a loading state or return null
   if (!context) {
     return (
-      <div className="section-comments bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full">
+      <div className="section-certificate bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full">
         <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
           <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-            ΣΧΟΛΙΑ
+            ΠΙΣΤΟΠΟΙΗΤΙΚΑ
           </h2>
         </div>
         <div className="p-4 text-center text-[#cad2c5]">
@@ -42,35 +47,35 @@ const CommentsSection = () => {
   }
 
   return (
-    <div className="section-comments bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full">
+    <div className="section-certificate bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full">
       <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
         <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-          ΣΧΟΛΙΑ
+          ΠΙΣΤΟΠΟΙΗΤΙΚΑ
         </h2>
       </div>
       <div className="p-2">
-        <div className="flex flex-row gap-2">
-          <div className="flex flex-col gap-0.5 w-1/2">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-0.5">
             <div className="w-full text-[#a8c5b5] text-sm">
-              Σχόλια Πελάτη
+              Πιστοποιητικό
             </div>
-            <textarea
-              {...register("customer_comments")}
-              className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] rounded-md p-1 text-sm resize-none w-full hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] focus:shadow-[0_0_0_2px_#52796f] focus:outline-none transition-all duration-200"
-              rows={5}
-              placeholder="Εισάγετε σχόλια πελάτη"
+            <input
+              type="text"
+              {...register("certificate")}
+              className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] rounded-md p-1 text-sm h-8 w-full hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] focus:shadow-[0_0_0_2px_#52796f] focus:outline-none transition-all duration-200"
+              placeholder="Εισάγετε πιστοποιητικό"
             />
           </div>
-          <div className="flex flex-col gap-0.5 w-1/2">
-            <div className="w-full text-[#a8c5b5] text-sm">
-              Δικά μας Σχόλια
-            </div>
-            <textarea
-              {...register("our_comments")}
-              className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] rounded-md p-1 text-sm resize-none w-full hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] focus:shadow-[0_0_0_2px_#52796f] focus:outline-none transition-all duration-200"
-              rows={5}
-              placeholder="Εισάγετε δικά μας σχόλια"
+          <div className="flex items-center gap-2 mt-1">
+            <input
+              type="checkbox"
+              id="hma-checkbox"
+              {...register("hma")}
+              className="w-4 h-4 bg-[#2f3e46] border border-[#52796f] rounded text-[#52796f] focus:ring-[#52796f]"
             />
+            <label htmlFor="hma-checkbox" className="text-[#cad2c5] text-sm">
+              ΗΜΑ
+            </label>
           </div>
         </div>
       </div>
@@ -78,4 +83,4 @@ const CommentsSection = () => {
   );
 };
 
-export default CommentsSection; 
+export default CertificateSection; 

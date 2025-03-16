@@ -199,6 +199,15 @@ function App() {
             />
 
             <Route
+              path="/calls"
+              element={
+                <ProtectedRoute>
+                  <Home />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/admin/recovery"
               element={
                 <ProtectedRoute>
@@ -209,6 +218,15 @@ function App() {
 
             <Route
               path="/admin/backup"
+              element={
+                <ProtectedRoute>
+                  <Home />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin/service-types"
               element={
                 <ProtectedRoute>
                   <Home />

@@ -110,10 +110,11 @@ export function GlobalDropdown({
           left: `${buttonPosition.left}px`,
           width: `${buttonPosition.width}px`,
           minWidth: `${buttonPosition.width}px`,
-          zIndex: 30,  // Much lower than dialogs
+          zIndex: 9999,  // Much higher to ensure it's above other elements
           pointerEvents: 'auto',
-          maxHeight: '200px',
-          overflowY: 'auto'
+          maxHeight: '300px',
+          overflowY: 'auto',
+          position: 'fixed' // Use fixed positioning to ensure it's always visible
         }}
         onClick={(e) => e.stopPropagation()}
         onWheel={handleWheel}
@@ -159,11 +160,14 @@ export function GlobalDropdown({
   const buttonStyle = {
     backgroundColor: '#2f3e46', // Standard input background color
     color: '#cad2c5',
-    border: 'none',
+    border: '1px solid #52796f',
     boxShadow: isHovered || isOpen ? '0 0 0 1px #84a98c' : 'none',
     transition: 'all 0.2s ease',
     opacity: disabled ? 0.5 : 1,
     cursor: disabled ? 'not-allowed' : 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    height: '100%'
   };
 
   // Render the selected value or placeholder
@@ -183,6 +187,7 @@ export function GlobalDropdown({
           onContextMenu(e);
         }
       }}
+      style={{ height: '100%' }}
     >
       {header && <div className="text-sm font-medium mb-1 text-[#cad2c5]">{header}</div>}
       <button
@@ -203,12 +208,12 @@ export function GlobalDropdown({
         }}
         onMouseEnter={() => !disabled && setIsHovered(true)}
         onMouseLeave={() => !disabled && setIsHovered(false)}
-        className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-md focus:outline-none text-[#cad2c5]"
+        className="flex items-center justify-between w-full px-3 py-1 text-sm rounded-md focus:outline-none text-[#cad2c5] h-full"
         style={buttonStyle}
         disabled={disabled}
       >
-        <span>{renderSelectedValue()}</span>
-        <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="truncate">{renderSelectedValue()}</span>
+        <ChevronDown className={`h-4 w-4 ml-2 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       
       {renderDropdownMenu()}

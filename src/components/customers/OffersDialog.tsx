@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import React, { useState, useEffect, useMemo, useCallback, createContext } from "react";
+import { useForm, UseFormRegister, UseFormWatch, UseFormSetValue, UseFormReset, FormState, UseFormHandleSubmit, FieldValues, Control } from "react-hook-form";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { formatDateTime } from "@/lib/utils";
@@ -40,6 +40,10 @@ import CommentsSection from "./offer-dialog/CommentsSection";
 import DialogFooterSection from "./offer-dialog/DialogFooterSection";
 import TabsContainer from "./offer-dialog/TabsContainer";
 import DetailsTab from "./offer-dialog/DetailsTab";
+import SourceSection from "./offer-dialog/SourceSection";
+import AssignmentSection from "./offer-dialog/AssignmentSection";
+import ResultSection from "./offer-dialog/ResultSection";
+import CertificateSection from "./offer-dialog/CertificateSection";
 
 // Export the props interface so it can be imported by other files
 export interface OffersDialogProps {
@@ -52,8 +56,55 @@ export interface OffersDialogProps {
   tableRef?: React.RefObject<OffersTableRef>;
 }
 
+// Define the form values type
+interface OfferFormValues {
+  offer_date: string;
+  source: string;
+  amount: string;
+  requirements: string;
+  customer_comments: string;
+  our_comments: string;
+  offer_result: string;
+  result: any;
+  assigned_to: string;
+  hma: boolean;
+  certificate: string;
+  address: string;
+  postal_code: string;
+  town: string;
+  status: string;
+}
+
 // Create a context to share state between components
-export const OfferDialogContext = React.createContext<any>(null);
+export interface OfferDialogContextType {
+  offerId: string | null;
+  customerId: string | null;
+  isEditing: boolean;
+  register: UseFormRegister<OfferFormValues>;
+  watch: UseFormWatch<OfferFormValues>;
+  setValue: UseFormSetValue<OfferFormValues>;
+  control: Control<OfferFormValues>;
+  formState: FormState<OfferFormValues>;
+  handleSubmit: UseFormHandleSubmit<OfferFormValues>;
+  reset: UseFormReset<OfferFormValues>;
+  sourceOptions: any[];
+  getSourceLabel: (val: any) => string;
+  getSourceValue: (val: any) => any;
+  statusOptions: any[];
+  getStatusLabel: (val: any) => string;
+  getStatusValue: (val: any) => any;
+  resultOptions: any[];
+  getResultLabel: (val: any) => string;
+  getResultValue: (val: any) => any;
+  userOptions: string[];
+  getUserNameById: (id: string) => string;
+  getUserIdByName: (name: string) => string;
+  registerSaveDetailsToDatabase?: (saveFn: ((realOfferId: string) => Promise<boolean>) | null) => void;
+  registerTabReset?: (tabId: string, resetFn: () => void) => void;
+  unregisterTabReset?: (tabId: string) => void;
+}
+
+export const OfferDialogContext = createContext<OfferDialogContextType | null>(null);
 
 // Wrap the component with React.memo to prevent unnecessary re-renders
 const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) {
@@ -70,7 +121,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     open,
     onOpenChange,
     customerId,
-    offerId,
+    offerId: initialOfferId,
     onSave,
     defaultSource = "Email",
     tableRef,
@@ -98,6 +149,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [offerId, setOfferId] = useState<string | undefined>(initialOfferId);
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactOptions, setContactOptions] = useState<string[]>([]);
   const [contactMap, setContactMap] = useState<Record<string, string>>({});
@@ -218,17 +270,37 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     assigned_to: user?.id || "",
     hma: false,
     certificate: "",
+    address: "",
+    postal_code: "",
+    town: ""
   }), [defaultSource, user?.id]);
 
+  // Initialize the form
   const {
     register,
-    handleSubmit,
-    reset,
-    setValue,
     watch,
-    formState: { errors },
-  } = useForm({
-    defaultValues,
+    setValue,
+    control,
+    formState,
+    handleSubmit,
+    reset
+  } = useForm<OfferFormValues>({
+    defaultValues: {
+      offer_date: new Date().toISOString().split('T')[0],
+      source: '',
+      amount: '',
+      requirements: '',
+      customer_comments: '',
+      our_comments: '',
+      offer_result: '',
+      result: '',
+      assigned_to: '',
+      hma: false,
+      certificate: '',
+      address: '',
+      postal_code: '',
+      town: ''
+    }
   });
   
   // Update source when defaultSource changes
@@ -294,12 +366,9 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   useEffect(() => {
     const fetchCustomerData = async () => {
       try {
-        console.log("Fetching customer data for ID:", customerId);
-        
         // Validate customerId format (should be a UUID)
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(customerId)) {
-          console.error("Invalid customerId format:", customerId);
           return;
         }
         
@@ -310,15 +379,12 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
           .eq("id", customerId)
           .single();
 
-        console.log("Customer data response:", { data, error });
-
         if (error) throw error;
         
         if (data) {
           // Set customer name and phone
           setCustomerName(data.company_name);
           setCustomerPhone(data.telephone || "");
-          console.log("Customer data set:", { name: data.company_name, phone: data.telephone });
         }
       } catch (error) {
         console.error("Error fetching customer data:", error);
@@ -327,8 +393,6 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
 
     if (customerId) {
       fetchCustomerData();
-    } else {
-      console.warn("No customerId provided to OffersDialog");
     }
   }, [customerId]);
 
@@ -339,32 +403,47 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       const fetchOffer = async () => {
         try {
           setLoading(true);
+          
           const { data, error } = await supabase
             .from("offers")
             .select("*, users!offers_assigned_to_fkey(fullname)")
             .eq("id", offerId)
             .single();
 
-          if (error) throw error;
-
+          if (error) {
+            console.error("Error fetching offer data:", error);
+            throw error;
+          }
+          
           if (data) {
-            setValue("offer_date", formatCurrentDateTimeForInput(data.created_at));
-            setValue("source", data.source || defaultSource);
-            setValue("amount", data.amount || "");
-            setValue("requirements", data.requirements || "");
-            setValue("customer_comments", data.customer_comments || "");
-            setValue("our_comments", data.our_comments || "");
-            setValue("offer_result", data.offer_result || "wait_for_our_answer");
-            setValue("result", data.result || null);
-            setValue("assigned_to", data.assigned_to || user?.id || "");
-            setValue("hma", data.hma || false);
-            setValue("certificate", data.certificate || "");
+            // Reset the form first to clear any existing values
+            reset({
+              offer_date: formatCurrentDateTimeForInput(data.created_at),
+              source: data.source || defaultSource,
+              amount: data.amount || "",
+              requirements: data.requirements || "",
+              customer_comments: data.customer_comments || "",
+              our_comments: data.our_comments || "",
+              offer_result: data.offer_result || "wait_for_our_answer",
+              result: data.result || null,
+              assigned_to: data.assigned_to || user?.id || "",
+              hma: data.hma || false,
+              certificate: data.certificate || "",
+              address: data.address || "",
+              postal_code: data.postal_code || "",
+              town: data.town || ""
+            });
             
             setSelectedContactId(data.contact_id || null);
+            
+            // Force a re-render to ensure the form values are displayed
+            setTimeout(() => {
+              // This will trigger a re-render of the form
+              const formValues = watch();
+            }, 0);
           }
         } catch (error) {
           console.error("Error fetching offer:", error);
-          setError("Failed to load offer data");
         } finally {
           setLoading(false);
         }
@@ -375,7 +454,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       setIsEditing(false);
       reset(defaultValues);
     }
-  }, [offerId, open, defaultSource, currentDate, reset, setValue, user?.id]);
+  }, [offerId, open, defaultSource, currentDate, reset, setValue, user?.id, watch]);
 
   // Fetch customer contacts
   useEffect(() => {
@@ -447,274 +526,147 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     return contact.full_name;
   };
 
-  const onSubmit = async (data) => {
-    try {
-      setIsSubmitting(true);
-      
-      // Validate required fields
-      if (!isFormValid()) {
-        return;
-      }
-      
-      // Convert 'none' result to null
-      const resultValue = data.result === "none" ? null : data.result;
-      
-      // Validate assigned_to is a valid UUID
-      if (data.assigned_to && typeof data.assigned_to === 'string') {
-        // UUID validation regex
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(data.assigned_to)) {
-          console.error("Invalid assigned_to value:", data.assigned_to);
-          setError("Μη έγκυρη τιμή για το πεδίο 'Ανάθεση σε'.");
-          return;
-        }
-      }
-      
-      const offerData = {
-        customer_id: customerId,
-        source: data.source,
-        amount: data.amount,
-        requirements: data.requirements,
-        customer_comments: data.customer_comments,
-        our_comments: data.our_comments,
-        offer_result: data.offer_result,
-        result: resultValue, // Use the converted value
-        assigned_to: data.assigned_to,
-        contact_id: selectedContactId,
-        hma: data.hma,
-        certificate: data.certificate,
-      };
-
-      console.log("Saving offer with data:", offerData);
-
-      if (isEditing) {
-        // Update existing offer
-        try {
-          console.log("Updating existing offer:", offerId);
-          
-          // First, get the current offer data to check for changes
-          const { data: currentOffer, error: fetchError } = await supabase
-            .from("offers")
-            .select("*, users!offers_assigned_to_fkey(fullname), customers(company_name)")
-            .eq("id", offerId)
-            .single();
-            
-          if (fetchError) throw fetchError;
-          
-          // Check if assigned user has changed
-          const assignedUserChanged = currentOffer && currentOffer.assigned_to !== offerData.assigned_to;
-          
-          // Update the offer
-          const { data: updatedOffer, error: updateError } = await supabase
-            .from("offers")
-            .update(offerData)
-            .eq("id", offerId)
-            .select()
-            .single();
-            
-          if (updateError) {
-            console.error("Error updating offer:", updateError);
-            throw updateError;
-          }
-          
-          console.log("Successfully updated offer:", updatedOffer);
-          
-          // Use the tableRef for optimistic updates if available
-          if (tableRef?.current && updatedOffer) {
-            tableRef.current.updateOfferInList(updatedOffer);
-          }
-          
-          setSuccess(true);
-          
-          // Call onSave callback
-          if (onSave) {
-            onSave();
-          }
-          
-          // Close dialog after successful save - reduced delay
-          setTimeout(() => {
-            onOpenChange(false);
-          }, 500);
-          
-          // Create tasks and notifications asynchronously after closing the dialog
-          // This prevents the user from waiting for these operations
-          setTimeout(() => {
-            // If assigned user has changed, create a task for the new assignee
-            if (assignedUserChanged && offerData.assigned_to) {
-              const companyName = currentOffer.customers?.company_name || "Unknown Company";
-              const newAssigneeName = userMap[offerData.assigned_to] || 'Unknown User';
-              const oldAssigneeName = userMap[currentOffer.assigned_to] || 'Unknown User';
-              
-              // Create a task for the new assignee using the createTask helper function
-              createTask({
-                title: `Offer assigned for ${companyName}`,
-                description: `You have been assigned an offer for ${companyName}. Please review and take appropriate action.`,
-                assignedTo: offerData.assigned_to,
-                createdBy: user.id,
-                offerId: offerId,
-                dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Due in 7 days
-              }).catch(taskError => {
-                console.error("Error creating task for new assignee:", taskError);
-              });
-            }
-            
-            // Create a task for the updated offer if status changed to "ready"
-            if (data.offer_result === "ready") {
-              createTask({
-                title: `Follow up on completed offer for ${customerName}`,
-                description: `The offer has been marked as ready. Follow up with the customer.`,
-                assignedTo: data.assigned_to,
-                createdBy: user?.id,
-                offerId: offerId
-              }).catch(taskError => {
-                console.error("Error creating task for offer:", taskError);
-              });
-            }
-          }, 100);
-          
-        } catch (error) {
-          console.error("Error saving offer:", error);
-          setError("Υπήρξε ένα σφάλμα κατά την ενημέρωση της προσφοράς.");
-          throw error;
-        }
-      } else {
-        // Create new offer
-        const { data: newOffer, error } = await supabase
-          .from("offers")
-          .insert({
-            ...offerData,
-            created_by: user?.id,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        // Use the tableRef for optimistic updates if available
-        if (tableRef?.current && newOffer) {
-          tableRef.current.addOfferToList(newOffer);
-        }
-        
-        setSuccess(true);
-        
-        // Call onSave callback
-        if (onSave) {
-          onSave();
-        }
-        
-        // Close dialog after successful save - reduced delay
-        setTimeout(() => {
-          onOpenChange(false);
-        }, 500);
-        
-        // Create tasks and notifications asynchronously after closing the dialog
-        setTimeout(async () => {
-          try {
-            // Get the offer ID from the response
-            const { data: newOfferData, error: fetchError } = await supabase
-              .from("offers")
-              .select("id")
-              .eq("customer_id", customerId)
-              .eq("created_by", user?.id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .single();
-
-            if (!fetchError && newOfferData) {
-              // Create a task for the new offer
-              createTask({
-                title: `Review offer for ${customerName}`,
-                description: `Review the offer details and follow up with the customer.`,
-                assignedTo: data.assigned_to,
-                createdBy: user?.id,
-                offerId: newOfferData.id
-              }).catch(taskError => {
-                console.error("Error creating task for new offer:", taskError);
-              });
-            }
-          } catch (error) {
-            console.error("Error creating task for new offer:", error);
-          }
-        }, 100);
-      }
-    } catch (error) {
-      console.error("Error saving offer:", error);
-      setError("Σφάλμα κατά την αποθήκευση της προσφοράς. Παρακαλώ δοκιμάστε ξανά.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const watchOfferResult = watch("offer_result");
-  const watchResult = watch("result");
-  const watchHma = watch("hma");
+  // Tab reset functions
+  const [detailsTabReset, setDetailsTabReset] = useState<(() => void) | null>(null);
   
-  // Determine if the form is valid for submission
+  // Function to register a tab reset function
+  const registerTabReset = useCallback((tabId: string, resetFn: () => void) => {
+    if (tabId === 'details') {
+      setDetailsTabReset(() => resetFn);
+    }
+  }, []);
+  
+  // Function to unregister a tab reset function
+  const unregisterTabReset = useCallback((tabId: string) => {
+    if (tabId === 'details') {
+      setDetailsTabReset(null);
+    }
+  }, []);
+  
+  // Function to reset all tabs
+  const resetAllTabs = useCallback(() => {
+    if (detailsTabReset) {
+      try {
+        detailsTabReset();
+      } catch (error) {
+        // Silently catch errors
+      }
+    }
+  }, [detailsTabReset]);
+
+  // Function to check if the form is valid
   const isFormValid = () => {
-    // If status is "ready", a result must be selected
-    if (watchOfferResult === "ready" && (watchResult === "none" || !watchResult)) {
+    // Check required fields
+    const formData = watch();
+    
+    // Check if source is selected
+    if (!formData.source) {
+      setError("Παρακαλώ επιλέξτε πηγή.");
       return false;
     }
+    
+    // If status is not "wait_for_our_answer", result is required
+    if (formData.offer_result && formData.offer_result !== "wait_for_our_answer" && (!formData.result || formData.result === "none")) {
+      // We're removing this validation as requested
+      // setError("Παρακαλώ επιλέξτε αποτέλεσμα.");
+      // return false;
+      
+      // Instead, we'll allow the form to be submitted without a result
+      console.log("No result selected, but continuing anyway as requested");
+    }
+    
+    // All validations passed
     return true;
   };
 
-  // Add console log when form is fully loaded
-  useEffect(() => {
-    if (open) {
-      // Check if key DOM elements are rendered
-      setTimeout(() => {
-      }, 100);
+  // Add a function to save the offer and return the offer ID
+  const saveOfferAndGetId = async (): Promise<string | null> => {
+    try {
+      // Get the current form data
+      const formData = watch();
+      
+      // Validate required fields
+      if (!isFormValid()) {
+        return null;
+      }
+      
+      if (offerId && !offerId.startsWith('temp-')) {
+        // If we already have a real offer ID, return it
+        return offerId;
+      } else {
+        // If no offer ID exists or it's a temporary ID, return null
+        // This prevents any database interactions until the form is explicitly saved
+        console.log("No real offer ID exists, returning null to prevent database interaction");
+        return null;
+      }
+    } catch (error) {
+      console.error("Error in saveOfferAndGetId:", error);
+      return null;
     }
-  }, [open]);
+  };
 
-  // If you're doing focus operations when the dialog opens
-  useEffect(() => {
-    if (open) {
-      // Let the dialog render first
-      requestAnimationFrame(() => {
-        // Then focus in the next frame
-        requestAnimationFrame(() => {
-          const element = document.querySelector('.dialog-content input') as HTMLElement;
-          if (element) element.focus();
-        });
-      });
-    }
-  }, [open]);
-
-  // Create a context value to share with child components
-  const contextValue = {
+  // Add a ref to store the saveDetailsToDatabase function
+  const saveDetailsToDatabaseRef = React.useRef<((realOfferId: string) => Promise<boolean>) | null>(null);
+  
+  // Function to register the saveDetailsToDatabase function
+  const registerSaveDetailsToDatabase = useCallback((saveFn: ((realOfferId: string) => Promise<boolean>) | null) => {
+    saveDetailsToDatabaseRef.current = saveFn;
+  }, []);
+  
+  // Create the context value with useMemo to optimize performance
+  const contextValue = useMemo(() => ({
+    offerId, 
+    customerId, 
+    isEditing,
     register,
     watch,
     setValue,
-    errors,
-    isEditing,
-    loading,
-    customerName,
-    customerPhone,
-    currentDate,
+    control,
+    formState,
+    handleSubmit,
+    reset,
     sourceOptions,
-    statusOptions,
-    resultOptions,
-    userOptions,
-    contactOptions,
-    selectedContactId,
-    setSelectedContactId,
     getSourceLabel,
     getSourceValue,
+    statusOptions,
     getStatusLabel,
     getStatusValue,
+    resultOptions,
     getResultLabel,
     getResultValue,
-    getUserIdByName,
+    userOptions,
     getUserNameById,
-    getContactIdByName,
-    getContactNameById,
-    getContactDisplayNameById,
-    watchOfferResult,
-    watchResult,
-    watchHma,
-    setShowContactDialog
-  };
+    getUserIdByName,
+    registerSaveDetailsToDatabase,
+    registerTabReset,
+    unregisterTabReset
+  }), [
+    offerId, 
+    customerId, 
+    isEditing,
+    register,
+    watch,
+    setValue,
+    control,
+    formState,
+    handleSubmit,
+    reset,
+    sourceOptions,
+    getSourceLabel,
+    getSourceValue,
+    statusOptions,
+    getStatusLabel,
+    getStatusValue,
+    resultOptions,
+    getResultLabel,
+    getResultValue,
+    userOptions,
+    getUserNameById,
+    getUserIdByName,
+    registerSaveDetailsToDatabase,
+    registerTabReset,
+    unregisterTabReset
+  ]);
 
   // Find where contactOptions are created or where the dropdown is rendered
   // It might look something like this:
@@ -759,71 +711,360 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     [offerId, isSubmitting]
   );
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-4xl bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-        aria-labelledby="offer-dialog-title"
-        aria-describedby="offer-dialog-description"
-      >
-        <style>
-          {`
-            textarea {
-              min-height: 4rem !important;
-              resize: none !important;
-            }
+  // Handle form submission
+  const onSubmit = async (data) => {
+    try {
+      setIsSubmitting(true);
+      
+      // Validate required fields
+      if (!isFormValid()) {
+        return;
+      }
+      
+      // Convert 'none' result to null
+      const resultValue = data.result === "none" ? null : data.result;
+      
+      // Validate assigned_to is a valid UUID
+      if (data.assigned_to && typeof data.assigned_to === 'string') {
+        // UUID validation regex
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(data.assigned_to)) {
+          console.error("Invalid assigned_to value:", data.assigned_to);
+          setError("Μη έγκυρη τιμή για το πεδίο 'Ανάθεση σε'.");
+          return;
+        }
+      }
+      
+      const offerData = {
+        customer_id: customerId,
+        source: data.source,
+        amount: data.amount,
+        requirements: data.requirements,
+        customer_comments: data.customer_comments,
+        our_comments: data.our_comments,
+        offer_result: data.offer_result,
+        result: resultValue, // Use the converted value
+        assigned_to: data.assigned_to,
+        contact_id: selectedContactId,
+        hma: data.hma,
+        certificate: data.certificate,
+        address: data.address,
+        tk: data.postal_code,
+        town: data.town
+      };
+      
+      // Variables to store data during the save process
+      let savedOfferId = null;
+      let assignedUserChanged = false;
+      let currentOfferData = null;
+      
+      // STEP 1: Save or update the offer in the database
+      try {
+        if (isEditing && offerId && !offerId.startsWith('temp-')) {
+          // Update existing offer
+          
+          // First, get the current offer data to check for changes
+          const { data: currentOffer, error: fetchError } = await supabase
+            .from("offers")
+            .select("*, users!offers_assigned_to_fkey(fullname), customers(company_name)")
+            .eq("id", offerId)
+            .single();
             
-            /* Remove background and border from dialog header */
-            .dialog-header-section,
-            .p-5.border-b.border-\\[\\#52796f\\].bg-\\[\\#3a5258\\] {
-              background: transparent !important;
-              border-bottom: none !important;
-            }
+          if (fetchError) throw fetchError;
+          
+          // Store current offer data for later use
+          currentOfferData = currentOffer;
+          
+          // Check if assigned user has changed
+          assignedUserChanged = currentOffer && currentOffer.assigned_to !== offerData.assigned_to;
+          
+          // Update the offer
+          const { data: updatedOffer, error: updateError } = await supabase
+            .from("offers")
+            .update(offerData)
+            .eq("id", offerId)
+            .select()
+            .single();
             
-            /* Custom text selection colors with !important to override */
-            .max-w-4xl *::selection {
-              background-color: #52796f !important;
-              color: #cad2c5 !important;
-            }
-            
-            .max-w-4xl *::-moz-selection {
-              background-color: #52796f !important;
-              color: #cad2c5 !important;
-            }
-            
-            /* Target specific elements */
-            .max-w-4xl textarea::selection,
-            .max-w-4xl input::selection,
-            .max-w-4xl div::selection {
-              background-color: #52796f !important;
-              color: #cad2c5 !important;
-            }
-            
-            .max-w-4xl textarea::-moz-selection,
-            .max-w-4xl input::-moz-selection,
-            .max-w-4xl div::-moz-selection {
-              background-color: #52796f !important;
-              color: #cad2c5 !important;
-            }
-            
-            /* Specifically target date/time input */
-            input[type="datetime-local"]::selection,
-            input[type="datetime-local"]::-moz-selection {
-              background-color: #52796f !important;
-              color: #cad2c5 !important;
-            }
-            
-            /* Target all input types to be safe */
-            input[type]::selection,
-            input[type]::-moz-selection {
-              background-color: #52796f !important;
-              color: #cad2c5 !important;
-            }
-          `}
-        </style>
+          if (updateError) {
+            console.error("Error updating offer:", updateError);
+            throw updateError;
+          }
+          
+          savedOfferId = updatedOffer.id;
+          
+          // Use the tableRef for optimistic updates if available
+          if (tableRef?.current && updatedOffer) {
+            tableRef.current.updateOfferInList(updatedOffer);
+          }
+        } else {
+          // Create new offer
+          console.log("Creating new offer");
+          
+          const { data: newOffer, error } = await supabase
+            .from("offers")
+            .insert({
+              ...offerData,
+              created_by: user?.id,
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error("Error creating offer:", error);
+            throw error;
+          }
+          
+          console.log("Successfully created offer:", newOffer);
+
+          // Update the offer ID with the real one from the database
+          savedOfferId = newOffer.id;
+          setOfferId(newOffer.id);
+
+          // Use the tableRef for optimistic updates if available
+          if (tableRef?.current && newOffer) {
+            tableRef.current.addOfferToList(newOffer);
+          }
+        }
         
-        <div className="dialog-content">
-          <OfferDialogContext.Provider value={contextValue}>
+        // STEP 2: Now that we have a valid offer ID, save the details
+        if (savedOfferId && saveDetailsToDatabaseRef.current) {
+          try {
+            const detailsSaveResult = await saveDetailsToDatabaseRef.current(savedOfferId);
+            
+            if (!detailsSaveResult) {
+              // We don't throw an error here because we want to continue even if details save fails
+              // The offer has been saved successfully
+            }
+          } catch (error) {
+            console.error("Error calling saveDetailsToDatabase:", error);
+          }
+        } else {
+          console.log("No details to save or saveDetailsToDatabase function not available", {
+            savedOfferId,
+            saveDetailsToDatabase: !!saveDetailsToDatabaseRef.current,
+            saveDetailsToDatabaseRefType: typeof saveDetailsToDatabaseRef.current
+          });
+        }
+        
+        // STEP 3: Show success message and close dialog
+        setSuccess(true);
+        
+        // Call onSave callback
+        if (onSave) {
+          onSave();
+        }
+        
+        // Close dialog after successful save - reduced delay
+        setTimeout(() => {
+          onOpenChange(false);
+        }, 500);
+        
+        // Create tasks and notifications asynchronously after closing the dialog
+        setTimeout(() => {
+          try {
+            // If assigned user has changed, create a task for the new assignee
+            if (assignedUserChanged && offerData.assigned_to && currentOfferData) {
+              const companyName = currentOfferData.customers?.company_name || "Unknown Company";
+              const newAssigneeName = userMap[offerData.assigned_to] || 'Unknown User';
+              const oldAssigneeName = userMap[currentOfferData.assigned_to] || 'Unknown User';
+              
+              // Create a task for the new assignee using the createTask helper function
+              createTask({
+                title: `Offer assigned for ${companyName}`,
+                description: `You have been assigned an offer for ${companyName}. Please review and take appropriate action.`,
+                assignedTo: offerData.assigned_to,
+                createdBy: user.id,
+                offerId: savedOfferId,
+                dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Due in 7 days
+              }).catch(taskError => {
+                console.error("Error creating task for new assignee:", taskError);
+              });
+            }
+            
+            // Create a task for the updated offer if status changed to "ready"
+            if (data.offer_result === "ready") {
+              createTask({
+                title: `Follow up on completed offer for ${customerName}`,
+                description: `The offer has been marked as ready. Follow up with the customer.`,
+                assignedTo: data.assigned_to,
+                createdBy: user?.id,
+                offerId: savedOfferId
+              }).catch(taskError => {
+                console.error("Error creating task for offer:", taskError);
+              });
+            }
+            
+            // For new offers, create a review task
+            if (!isEditing || (offerId && offerId.startsWith('temp-'))) {
+              createTask({
+                title: `Review offer for ${customerName}`,
+                description: `Review the offer details and follow up with the customer.`,
+                assignedTo: data.assigned_to,
+                createdBy: user?.id,
+                offerId: savedOfferId
+              }).catch(taskError => {
+                console.error("Error creating task for new offer:", taskError);
+              });
+            }
+          } catch (error) {
+            console.error("Error creating tasks:", error);
+          }
+        }, 100);
+      } catch (error) {
+        console.error("Error saving offer or details:", error);
+        setError("Σφάλμα κατά την αποθήκευση της προσφοράς. Παρακαλώ δοκιμάστε ξανά.");
+      }
+    } catch (error) {
+      console.error("Error in form submission:", error);
+      setError("Σφάλμα κατά την υποβολή της φόρμας. Παρακαλώ δοκιμάστε ξανά.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle dialog close
+  const handleClose = () => {
+    onOpenChange(false);
+  };
+
+  const watchOfferResult = watch("offer_result");
+  const watchResult = watch("result");
+  const watchHma = watch("hma");
+  
+  // Add console log when form is fully loaded
+  useEffect(() => {
+    if (open) {
+      // Check if key DOM elements are rendered
+      setTimeout(() => {
+      }, 100);
+    }
+  }, [open]);
+
+  // If you're doing focus operations when the dialog opens
+  useEffect(() => {
+    if (open) {
+      // Let the dialog render first
+      requestAnimationFrame(() => {
+        // Then focus in the next frame
+        requestAnimationFrame(() => {
+          const element = document.querySelector('.dialog-content input') as HTMLElement;
+          if (element) element.focus();
+        });
+      });
+    }
+  }, [open]);
+
+  // Update form values when they change
+  useEffect(() => {
+    // This effect is used to track form changes
+    const subscription = watch((value, { name, type }) => {
+      // We don't need to do anything here, just watching for changes
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [watch]);
+
+  return (
+    <OfferDialogContext.Provider value={contextValue}>
+      <Dialog open={open} onOpenChange={(newOpen) => {
+        // Only reset tabs when dialog is closing, not when opening
+        if (open && !newOpen) {
+          resetAllTabs();
+        }
+        onOpenChange(newOpen);
+      }}>
+        <DialogContent
+          className="max-w-4xl bg-[#2f3e46] border-[#52796f] text-[#cad2c5] p-3"
+          style={{ height: 'auto', maxHeight: '90vh', overflow: 'hidden' }}
+          aria-labelledby="offer-dialog-title"
+          aria-describedby="offer-dialog-description"
+        >
+          <style>
+            {`
+              textarea {
+                min-height: 2.5rem !important;
+                resize: none !important;
+              }
+              
+              /* Remove background and border from dialog header */
+              .dialog-header-section,
+              .p-5.border-b.border-\\[\\#52796f\\].bg-\\[\\#3a5258\\] {
+                background: transparent !important;
+                border-bottom: none !important;
+              }
+              
+              /* Custom text selection colors with !important to override */
+              .max-w-4xl *::selection {
+                background-color: #52796f !important;
+                color: #cad2c5 !important;
+              }
+              
+              .max-w-4xl *::-moz-selection {
+                background-color: #52796f !important;
+                color: #cad2c5 !important;
+              }
+              
+              /* Target specific elements */
+              .max-w-4xl textarea::selection,
+              .max-w-4xl input::selection,
+              .max-w-4xl div::selection {
+                background-color: #52796f !important;
+                color: #cad2c5 !important;
+              }
+              
+              .max-w-4xl textarea::-moz-selection,
+              .max-w-4xl input::-moz-selection,
+              .max-w-4xl div::-moz-selection {
+                background-color: #52796f !important;
+                color: #cad2c5 !important;
+              }
+              
+              /* Specifically target date/time input */
+              input[type="datetime-local"]::selection,
+              input[type="datetime-local"]::-moz-selection {
+                background-color: #52796f !important;
+                color: #cad2c5 !important;
+              }
+              
+              /* Target all input types to be safe */
+              input[type]::selection,
+              input[type]::-moz-selection {
+                background-color: #52796f !important;
+                color: #cad2c5 !important;
+              }
+              
+              /* Override datetime-local display format */
+              input[type="datetime-local"] {
+                position: relative;
+              }
+              
+              input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+                background: transparent;
+                bottom: 0;
+                color: transparent;
+                cursor: pointer;
+                height: auto;
+                left: 0;
+                position: absolute;
+                right: 0;
+                top: 0;
+                width: auto;
+                z-index: 1;
+              }
+              
+              input[type="datetime-local"]::before {
+                color: #cad2c5;
+                content: attr(data-date);
+              }
+              
+              input[type="datetime-local"]:focus::before {
+                display: none;
+              }
+            `}
+          </style>
+          
+          <div className="dialog-content">
             <DialogHeaderSection 
               customerName={customerName}
               customerPhone={customerPhone}
@@ -843,10 +1084,10 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
               getSourceValue={getSourceValue}
             />
 
-            <form onSubmit={handleSubmit(onSubmit)} className="p-4 flex flex-col">
+            <form onSubmit={handleSubmit(onSubmit)} className="p-2 flex flex-col" style={{ height: 'auto', minHeight: 'auto', display: 'flex', flexDirection: 'column' }}>
               <TabsContainer>
                 {/* Tab 1: Basic Information */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <BasicInfoSection />
                   <RequirementsSection />
                   <StatusSection />
@@ -966,10 +1207,10 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
                 </div>
               </AlertDialogContent>
             </AlertDialog>
-          </OfferDialogContext.Provider>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </OfferDialogContext.Provider>
   );
 });
 
