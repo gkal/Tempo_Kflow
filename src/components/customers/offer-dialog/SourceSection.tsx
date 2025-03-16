@@ -19,7 +19,7 @@ const SourceSection = () => {
   // Use useWatch instead of watch
   const sourceValue = useWatch({
     control,
-    name: "source" as const,
+    name: "source",
     defaultValue: ""
   });
 

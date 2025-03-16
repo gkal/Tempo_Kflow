@@ -19,13 +19,13 @@ const ResultSection = () => {
   // Use useWatch instead of watch
   const resultValue = useWatch({
     control,
-    name: "result" as const,
+    name: "result",
     defaultValue: ""
   });
   
   const isStatusReady = useWatch({
     control,
-    name: "status" as const,
+    name: "status",
     defaultValue: ""
   }) === "ready";
 

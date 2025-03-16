@@ -33,7 +33,7 @@ const AddressSection = () => {
             </div>
             <div className="w-2/3">
               <Input
-                id="tk"
+                id="postal_code"
                 className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8"
                 {...register("postal_code")}
               />

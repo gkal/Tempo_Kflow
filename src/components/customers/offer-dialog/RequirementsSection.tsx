@@ -13,7 +13,7 @@ const RequirementsSection = () => {
   // Use useWatch instead of watch
   const hmaValue = useWatch({
     control,
-    name: "hma" as const,
+    name: "hma",
     defaultValue: false
   });
 

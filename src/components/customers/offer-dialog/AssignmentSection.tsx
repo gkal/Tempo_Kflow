@@ -1,4 +1,4 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext } from 'react';
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
 import { useWatch } from "react-hook-form";
@@ -6,24 +6,6 @@ import { useWatch } from "react-hook-form";
 const AssignmentSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);
   
-  // Add default values to prevent TypeError when context is null
-  const {
-    register = () => ({ name: "" }),
-    control,
-    setValue = () => {},
-    userOptions = [],
-    getUserNameById = (id) => id,
-    getUserIdByName = (name) => name
-  } = context || {};
-
-  // Use useWatch instead of watch for better TypeScript support
-  const assignedTo = control ? useWatch({
-    control,
-    name: "assigned_to",
-    defaultValue: ""
-  }) : "";
-
-  // If context is null, show a loading state or return null
   if (!context) {
     return (
       <div className="section-assignment bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full">
@@ -43,6 +25,15 @@ const AssignmentSection = () => {
       </div>
     );
   }
+  
+  const { control, setValue, userOptions, getUserNameById, getUserIdByName } = context;
+  
+  // Use useWatch instead of watch
+  const assignedTo = useWatch({
+    control,
+    name: "assigned_to",
+    defaultValue: ""
+  });
 
   return (
     <div className="section-assignment bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full">

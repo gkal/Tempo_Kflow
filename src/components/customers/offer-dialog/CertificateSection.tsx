@@ -15,13 +15,13 @@ const CertificateSection = () => {
   // Use useWatch instead of watch
   const certificate = useWatch({
     control,
-    name: "certificate" as const,
+    name: "certificate",
     defaultValue: ""
   });
   
   const hma = useWatch({
     control,
-    name: "hma" as const,
+    name: "hma",
     defaultValue: false
   });
 
