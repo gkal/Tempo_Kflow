@@ -1,6 +1,7 @@
 import React, { useContext, useEffect } from 'react';
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
+import { useWatch } from "react-hook-form";
 
 const AssignmentSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);
@@ -8,23 +9,19 @@ const AssignmentSection = () => {
   // Add default values to prevent TypeError when context is null
   const {
     register = () => ({ name: "" }),
-    watch = () => "",
+    control,
     setValue = () => {},
     userOptions = [],
     getUserNameById = (id) => id,
     getUserIdByName = (name) => name
   } = context || {};
 
-  // Force a re-render when the form values change
-  useEffect(() => {
-    // This is just to trigger a re-render when the component mounts
-    const assignedToValue = watch("assigned_to");
-    
-    // Log the values to help with debugging
-    if (assignedToValue) {
-      console.log("AssignmentSection assigned_to value:", assignedToValue);
-    }
-  }, [watch]);
+  // Use useWatch instead of watch for better TypeScript support
+  const assignedTo = control ? useWatch({
+    control,
+    name: "assigned_to",
+    defaultValue: ""
+  }) : "";
 
   // If context is null, show a loading state or return null
   if (!context) {
@@ -61,7 +58,7 @@ const AssignmentSection = () => {
           </div>
           <GlobalDropdown
             options={userOptions}
-            value={getUserNameById(watch("assigned_to") || "")}
+            value={getUserNameById(assignedTo || "")}
             onSelect={(value) => {
               const userId = getUserIdByName(value);
               console.log(`Setting assigned_to to: ${userId} (from name: ${value})`);

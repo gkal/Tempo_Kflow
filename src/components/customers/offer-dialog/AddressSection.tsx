@@ -35,7 +35,7 @@ const AddressSection = () => {
               <Input
                 id="tk"
                 className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8"
-                {...register("tk")}
+                {...register("postal_code")}
               />
             </div>
           </div>
