@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
-import { useWatch } from "react-hook-form";
+import { useFormWatch } from "@/lib/form-helpers";
 
 const SourceSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);
@@ -16,12 +16,8 @@ const SourceSection = () => {
     getSourceValue
   } = context;
   
-  // Use useWatch instead of watch
-  const sourceValue = useWatch({
-    control,
-    name: "source",
-    defaultValue: ""
-  });
+  // Use our custom useFormWatch helper
+  const sourceValue = useFormWatch(control, "source", "");
 
   return (
     <div className="source-section bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">

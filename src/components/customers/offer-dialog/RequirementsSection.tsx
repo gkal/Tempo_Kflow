@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { Input } from "@/components/ui/input";
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
-import { useWatch } from "react-hook-form";
+import { useFormWatch } from "@/lib/form-helpers";
 
 const RequirementsSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);
@@ -10,12 +10,8 @@ const RequirementsSection = () => {
   
   const { register, control, setValue } = context;
   
-  // Use useWatch instead of watch
-  const hmaValue = useWatch({
-    control,
-    name: "hma",
-    defaultValue: false
-  });
+  // Use our custom useFormWatch helper
+  const hmaValue = useFormWatch(control, "hma", false);
 
   const toggleHma = () => {
     setValue("hma", !hmaValue);

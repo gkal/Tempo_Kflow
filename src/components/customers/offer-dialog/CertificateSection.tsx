@@ -3,7 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
-import { useWatch } from "react-hook-form";
+import { useFormWatch } from "@/lib/form-helpers";
 
 const CertificateSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);
@@ -12,18 +12,9 @@ const CertificateSection = () => {
   
   const { register, control, setValue } = context;
   
-  // Use useWatch instead of watch
-  const certificate = useWatch({
-    control,
-    name: "certificate",
-    defaultValue: ""
-  });
-  
-  const hma = useWatch({
-    control,
-    name: "hma",
-    defaultValue: false
-  });
+  // Use our custom useFormWatch helper
+  const certificate = useFormWatch(control, "certificate", "");
+  const hma = useFormWatch(control, "hma", false);
 
   return (
     <div className="certificate-section bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">

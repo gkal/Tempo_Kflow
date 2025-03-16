@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
-import { useWatch } from "react-hook-form";
+import { useFormWatch } from "@/lib/form-helpers";
 
 const AssignmentSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);
@@ -28,12 +28,8 @@ const AssignmentSection = () => {
   
   const { control, setValue, userOptions, getUserNameById, getUserIdByName } = context;
   
-  // Use useWatch instead of watch
-  const assignedTo = useWatch({
-    control,
-    name: "assigned_to",
-    defaultValue: ""
-  });
+  // Use our custom useFormWatch helper
+  const assignedTo = useFormWatch(control, "assigned_to", "");
 
   return (
     <div className="section-assignment bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full">

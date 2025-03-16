@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
-import { useWatch } from "react-hook-form";
+import { useFormWatch } from "@/lib/form-helpers";
 
 const ResultSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);
@@ -16,18 +16,9 @@ const ResultSection = () => {
     getResultValue
   } = context;
   
-  // Use useWatch instead of watch
-  const resultValue = useWatch({
-    control,
-    name: "result",
-    defaultValue: ""
-  });
-  
-  const isStatusReady = useWatch({
-    control,
-    name: "status",
-    defaultValue: ""
-  }) === "ready";
+  // Use our custom useFormWatch helper
+  const resultValue = useFormWatch(control, "result", "");
+  const isStatusReady = useFormWatch(control, "status", "") === "ready";
 
   return (
     <div className="result-section bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
