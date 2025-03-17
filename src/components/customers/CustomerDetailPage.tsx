@@ -50,6 +50,7 @@ import {
 import { openNewOfferDialog, openEditOfferDialog } from './OfferDialogManager';
 import { CustomerDialog } from "./CustomerDialog";
 import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
+import { TruncatedText } from "@/components/ui/truncated-text";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -569,20 +570,13 @@ export default function CustomerDetailPage() {
     if (!text) return "—";
     if (text.length <= maxLength) return text;
     
-    return (
-      <div className="flex items-center">
-        <span className="truncate max-w-[300px] inline-block">
-          {text.substring(0, maxLength)}
-        </span>
-        <span className="text-blue-400 ml-1 flex-shrink-0" title="Περισσότερο κείμενο">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="1"></circle>
-            <circle cx="19" cy="12" r="1"></circle>
-            <circle cx="5" cy="12" r="1"></circle>
-          </svg>
-        </span>
-      </div>
-    );
+    return <TruncatedText 
+      text={text} 
+      maxLength={maxLength} 
+      tooltipMaxWidth={800}
+      multiLine={text.length > 100}
+      maxLines={2}
+    />;
   };
 
   if (loading) {

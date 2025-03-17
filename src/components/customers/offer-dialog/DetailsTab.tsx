@@ -38,7 +38,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { GlobalTooltip, TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 import {
   Select,
   SelectContent,
@@ -47,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import './OffersDialog.css';
+import { TruncatedText } from "@/components/ui/truncated-text";
 
 /**
  * DetailsTab Component
@@ -554,22 +555,12 @@ const DetailsTab = React.memo(() => {
     if (!text) return "";
     if (text.length <= maxLength) return text;
     
-    return (
-      <div className="flex items-center relative group">
-        <span className="whitespace-nowrap">
-          {text.substring(0, maxLength)}
-        </span>
-        <span className="text-blue-400 ml-1 flex-shrink-0 pointer-events-none">
-          ....
-        </span>
-        <div className="tooltip-container">
-          <div className="absolute transform -translate-x-1/4 bottom-0 translate-y-full bg-[#2f3e46] border border-[#52796f] p-1.5 rounded-md shadow-lg text-[#cad2c5] text-xs z-50 w-auto min-w-[200px] max-w-[400px] whitespace-normal opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-            {text}
-            <div className="absolute w-2 h-2 bg-[#2f3e46] border-r border-b border-[#52796f] -rotate-[135deg] -top-1 left-1/4 transform -translate-x-1/2"></div>
-          </div>
-        </div>
-      </div>
-    );
+    return <TruncateWithTooltip 
+      text={text} 
+      maxLength={maxLength} 
+      maxWidth={800}
+      position="top" // Always use top position to avoid being cut off at the edges
+    />;
   };
 
   // Render functions for dropdown options
@@ -773,8 +764,17 @@ const DetailsTab = React.memo(() => {
   }) => {
     return (
       <div className="flex items-center space-x-2 p-1 border-b border-[#52796f]/30">
-        <div className="flex-1 truncate">
-          {truncateText(item.subcategoryName, 30)}
+        <div className="flex-1 truncate text-xs">
+          {item.subcategoryName.length > 30 ? (
+            <GlobalTooltip content={item.subcategoryName} position="top">
+              <span>
+                {item.subcategoryName.substring(0, 30)}
+                <span className="ml-1 ellipsis-blue">...</span>
+              </span>
+            </GlobalTooltip>
+          ) : (
+            item.subcategoryName
+          )}
         </div>
         <div className="w-24">
           <div style={{ width: '180px' }}>
@@ -887,13 +887,23 @@ const DetailsTab = React.memo(() => {
                         
                         // Get the category object from the first detail
                         const category = categoryDetails[0]?.category;
+                        const categoryName = category?.category_name || "-";
                         
                         return (
                           <React.Fragment key={categoryId}>
                             {/* Category row */}
                             <tr className="bg-[#354f52]/70 category-row">
                               <td colSpan={isEditing ? 5 : 4} className="py-2 px-3 font-medium">
-                                {truncateText(category?.category_name || "-", 40)}
+                                {categoryName.length > 40 ? (
+                                  <GlobalTooltip content={categoryName} position="top">
+                                    <span>
+                                      {categoryName.substring(0, 40)}
+                                      <span className="ml-1 ellipsis-blue">...</span>
+                                    </span>
+                                  </GlobalTooltip>
+                                ) : (
+                                  categoryName
+                                )}
                               </td>
                             </tr>
                             
@@ -910,7 +920,16 @@ const DetailsTab = React.memo(() => {
                                   </td>
                                   <td className="py-2 px-3">
                                     <span className="text-[#84a98c]">
-                                      {truncateText(detail.subcategory?.subcategory_name || '-', 30)}
+                                      {detail.subcategory?.subcategory_name && detail.subcategory.subcategory_name.length > 30 ? (
+                                        <GlobalTooltip content={detail.subcategory.subcategory_name} position="top">
+                                          <span>
+                                            {detail.subcategory.subcategory_name.substring(0, 30)}
+                                            <span className="ml-1 ellipsis-blue">...</span>
+                                          </span>
+                                        </GlobalTooltip>
+                                      ) : (
+                                        detail.subcategory?.subcategory_name || '-'
+                                      )}
                                     </span>
                                   </td>
                                   <td className="py-2 px-3 text-center">
@@ -923,7 +942,16 @@ const DetailsTab = React.memo(() => {
                                         onUnitChange={handleUnitChange}
                                       />
                                     ) : (
-                                      truncateText(detail.unit?.name || '-', 10)
+                                      detail.unit?.name && detail.unit.name.length > 10 ? (
+                                        <GlobalTooltip content={detail.unit.name} position="top">
+                                          <span>
+                                            {detail.unit.name.substring(0, 10)}
+                                            <span className="ml-1 ellipsis-blue">...</span>
+                                          </span>
+                                        </GlobalTooltip>
+                                      ) : (
+                                        detail.unit?.name || '-'
+                                      )
                                     )}
                                   </td>
                                   <td className="py-2 px-3 text-center">
@@ -1061,18 +1089,13 @@ const DetailsTab = React.memo(() => {
                           }`}
                           onClick={() => handleCategoryClick(category.id)}
                         >
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="block truncate text-sm font-medium">
-                                  {truncateText(category.category_name, 30)}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{category.category_name}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <GlobalTooltip content={category.category_name} position="top">
+                            <span className="block truncate text-xs font-medium">
+                              {category.category_name.length > 30 
+                                ? `${category.category_name.substring(0, 30)}...` 
+                                : category.category_name}
+                            </span>
+                          </GlobalTooltip>
                         </div>
                       ))}
                     </div>
@@ -1121,7 +1144,18 @@ const DetailsTab = React.memo(() => {
                                   <div className={`w-4 h-4 mr-2 border ${isSelected ? 'bg-[#84a98c] border-[#84a98c]' : 'border-[#52796f]'} rounded flex items-center justify-center`}>
                                     {isSelected && <span className="text-white text-xs">✓</span>}
                                   </div>
-                                  {truncateText(subcategory.subcategory_name, 40)}
+                                  <span className="text-xs">
+                                    {subcategory.subcategory_name.length > 40 ? (
+                                      <GlobalTooltip content={subcategory.subcategory_name} position="top">
+                                        <span>
+                                          {subcategory.subcategory_name.substring(0, 40)}
+                                          <span className="ml-1 ellipsis-blue">...</span>
+                                        </span>
+                                      </GlobalTooltip>
+                                    ) : (
+                                      subcategory.subcategory_name
+                                    )}
+                                  </span>
                                   {isSelected && <span className="ml-1 text-xs text-[#cad2c5]/70">(επιλεγμένο)</span>}
                                 </div>
                               </div>
@@ -1152,8 +1186,17 @@ const DetailsTab = React.memo(() => {
                   <div className="divide-y divide-[#52796f]/30">
                     {selectedItems.map((item, index) => (
                       <div key={index} className="flex items-center space-x-2 p-1 border-b border-[#52796f]/30">
-                        <div className="flex-1 truncate">
-                          {truncateText(item.subcategoryName, 30)}
+                        <div className="flex-1 truncate text-xs">
+                          {item.subcategoryName.length > 30 ? (
+                            <GlobalTooltip content={item.subcategoryName} position="top">
+                              <span>
+                                {item.subcategoryName.substring(0, 30)}
+                                <span className="ml-1 ellipsis-blue">...</span>
+                              </span>
+                            </GlobalTooltip>
+                          ) : (
+                            item.subcategoryName
+                          )}
                         </div>
                         <div className="w-24">
                           <div style={{ width: '180px' }}>

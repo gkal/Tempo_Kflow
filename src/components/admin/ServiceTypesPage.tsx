@@ -32,6 +32,7 @@ import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDateTime } from "@/lib/utils";
 import ReactDOM from "react-dom";
+import { TruncatedText } from "@/components/ui/truncated-text";
 
 // Extend Window interface to include our custom property
 declare global {
@@ -113,12 +114,6 @@ function CategoryContextMenu({
         
         // Open the menu
         setIsOpen(true);
-        
-        // Add the force-hover class to the row
-        const row = target.closest('tr');
-        if (row) {
-          row.classList.add('force-hover');
-        }
       }
     };
     
@@ -136,11 +131,6 @@ function CategoryContextMenu({
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsOpen(false);
-        
-        // Remove the force-hover class from all rows
-        document.querySelectorAll('tr.force-hover').forEach(row => {
-          row.classList.remove('force-hover');
-        });
       }
     };
 
@@ -193,9 +183,6 @@ function CategoryContextMenu({
           onClick={() => {
             onCreateSubcategory(categoryId);
             setIsOpen(false);
-            document.querySelectorAll('tr.force-hover').forEach(row => {
-              row.classList.remove('force-hover');
-            });
           }}
         >
           <div className="flex items-center">
@@ -257,79 +244,6 @@ export default function ServiceTypesPage() {
     }
   }, [user, navigate, hasEditPermission]);
 
-  // Add a script to the page that will run on every render
-  useEffect(() => {
-    const uniqueId = Math.random().toString(36).substring(2, 11);
-    const script = document.createElement('script');
-    script.textContent = `
-      // Fix all dots in the application
-      function fixAllDots() {
-        document.querySelectorAll('span').forEach(span => {
-          if (span.textContent && (span.textContent.includes('...') || span.textContent.includes('....'))) {
-            span.style.color = '#60a5fa';
-          }
-        });
-      }
-      
-      // Run immediately and on any DOM changes
-      fixAllDots();
-      
-      // Set up a MutationObserver to watch for DOM changes
-      // Use a unique variable name that won't conflict
-      window.dotsObserver = window.dotsObserver || new MutationObserver(fixAllDots);
-      
-      // Disconnect any existing observer before creating a new one
-      if (window.dotsObserver) {
-        window.dotsObserver.disconnect();
-      }
-      
-      // Start observing
-      window.dotsObserver.observe(document.body, { 
-        childList: true, 
-        subtree: true,
-        characterData: true,
-        attributes: true
-      });
-    `;
-    script.id = `dots-script-${uniqueId}`;
-    document.head.appendChild(script);
-    
-    return () => {
-      const scriptElement = document.getElementById(`dots-script-${uniqueId}`);
-      if (scriptElement) {
-        document.head.removeChild(scriptElement);
-      }
-      
-      // Clean up the observer when component unmounts
-      if (window.dotsObserver) {
-        window.dotsObserver.disconnect();
-      }
-    };
-  }, []);
-
-  // Global fix for all truncation dots
-  useEffect(() => {
-    const fixAllTruncationDots = () => {
-      // Target all potential dots in the entire component - using standard selectors
-      const allDots = document.querySelectorAll('.text-green-400, .text-green-300, [class*="text-green"]');
-      
-      // Then manually check all spans for dots
-      document.querySelectorAll('span').forEach(span => {
-        const text = span.textContent || '';
-        if (text.includes('...')) {
-          // Force blue color on all dots
-          (span as HTMLElement).style.color = '#60a5fa';
-        }
-      });
-    };
-
-    // Run on mount and periodically
-    fixAllTruncationDots();
-    const truncationInterval = setInterval(fixAllTruncationDots, 200);
-    
-    return () => clearInterval(truncationInterval);
-  }, []);
-
   return (
     <div className="container mx-auto py-6 space-y-6">
       <Tabs defaultValue="categories" className="w-full">
@@ -388,62 +302,6 @@ function CategoriesTab() {
     type: "success" | "error";
     text: string;
   } | null>(null);
-
-  // Function to truncate text with ellipsis
-  const truncateText = (text: string, maxLength: number) => {
-    if (!text) return "-";
-    if (text.length <= maxLength) return text;
-    
-    return (
-      <div className="flex items-center relative group">
-        <span className="whitespace-nowrap">
-          {text.substring(0, maxLength)}
-        </span>
-        <span className="text-blue-400 ml-1 flex-shrink-0 pointer-events-none">
-          ....
-        </span>
-        <div className="tooltip-container">
-          <div className="absolute transform -translate-x-1/4 bottom-0 translate-y-full bg-[#2f3e46] border border-[#52796f] p-1.5 rounded-md shadow-lg text-[#cad2c5] text-xs z-50 w-auto min-w-[500px] max-w-[800px] whitespace-normal opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-            {text}
-            <div className="absolute w-2 h-2 bg-[#2f3e46] border-r border-b border-[#52796f] -rotate-[135deg] -top-1 left-1/4 transform -translate-x-1/2"></div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Remove the effect for tooltip positioning since we're always showing it below
-  useEffect(() => {
-    // No need to check position since tooltip is always below
-    const handleTooltipPosition = () => {
-      // Keep this empty but available in case we need to add logic later
-    };
-    
-    window.addEventListener('resize', handleTooltipPosition);
-    
-    return () => {
-      window.removeEventListener('resize', handleTooltipPosition);
-    };
-  }, [categories]);
-
-  // Fix for truncation dots
-  useEffect(() => {
-    // Fix any green dots by making them blue
-    const fixTruncationDots = () => {
-      const greenDots = document.querySelectorAll('.text-green-400, .text-green-300');
-      greenDots.forEach(dot => {
-        if (dot.textContent?.includes('....')) {
-          (dot as HTMLElement).style.color = '#60a5fa';
-        }
-      });
-    };
-
-    // Run initially and after data loads
-    fixTruncationDots();
-    if (!loading) {
-      setTimeout(fixTruncationDots, 100);
-    }
-  }, [loading, categories]);
 
   // Set up real-time subscription for service categories
   useRealtimeSubscription(
@@ -792,30 +650,27 @@ function CategoriesTab() {
       cell: (value: string, row: CategoryWithSubcategories) => {
         if (!value) return "-";
         
-        const content = (
-          <div className="relative group">
-            <div className={`${row.isSubcategory ? "pl-6 flex items-center text-[#84a98c] font-semibold" : "text-[#cad2c5] text-base"}`}>
-              {row.isSubcategory && (
-                <span className="mr-2 text-[#52796f] flex-shrink-0">└─</span>
-              )}
-              {truncateText(value, 40)}
-            </div>
-          </div>
-        );
-        
-        // Only wrap main categories with context menu
-        if (!row.isSubcategory) {
+        // Simple content without complex DOM structure
+        if (row.isSubcategory) {
           return (
-            <CategoryContextMenu 
-              categoryId={row.id} 
-              onCreateSubcategory={handleCreateSubcategory}
-            >
-              {content}
-            </CategoryContextMenu>
+            <div className="pl-6 flex items-center text-[#84a98c] font-semibold">
+              <span className="mr-2 text-[#52796f] flex-shrink-0">└─</span>
+              <TruncatedText text={value} maxLength={40} />
+            </div>
           );
         }
         
-        return content;
+        // For main categories, wrap with context menu
+        return (
+          <CategoryContextMenu 
+            categoryId={row.id} 
+            onCreateSubcategory={handleCreateSubcategory}
+          >
+            <div className="text-[#cad2c5] text-base">
+              <TruncatedText text={value} maxLength={40} />
+            </div>
+          </CategoryContextMenu>
+        );
       }
     },
     {
@@ -853,15 +708,10 @@ function CategoriesTab() {
           columns={columns.map(col => ({ ...col, sortable: false }))}
           data={categories}
           isLoading={loading}
-          pageSize={categories.length}
+          pageSize={categories.length > 100 ? 100 : categories.length}
           showSearch={false}
           onRowClick={handleEdit}
-          rowClassName="cursor-pointer hover:bg-[#354f52] py-7"
-          renderRow={(row, index, defaultRow) => {
-            // This ensures that the rows are rendered in the order they appear in the data array
-            // which preserves the parent-child relationship
-            return defaultRow;
-          }}
+          rowClassName="cursor-pointer hover:bg-[#354f52]"
         />
 
         {/* Category Form Dialog */}
@@ -958,25 +808,12 @@ function CategoriesTab() {
           <DialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10">
             <DialogHeader>
               <DialogTitle className="text-[#84a98c] text-xl font-medium">
-                <div className="flex items-center">
-                  {currentParentCategory?.category_name && 
-                    (() => {
-                      const text = currentParentCategory.category_name;
-                      // Only show truncated text without tooltip
-                      if (text.length > 40) {
-                        return (
-                          <div className="flex items-center whitespace-nowrap">
-                            <span>{text.substring(0, 40)}</span>
-                            <span className="text-blue-400 ml-1 flex-shrink-0 pointer-events-none">
-                              ....
-                            </span>
-                          </div>
-                        );
-                      }
-                      return <span>{text}</span>;
-                    })()
-                  }
-                </div>
+                {currentParentCategory?.category_name 
+                  ? (currentParentCategory.category_name.length > 40 
+                      ? <TruncatedText text={currentParentCategory.category_name} maxLength={40} tooltipPosition="top" />
+                      : currentParentCategory.category_name)
+                  : "Προσθήκη Περιγραφής"
+                }
               </DialogTitle>
               <DialogDescription className="text-[#a8c5b5]">
                 Συμπληρώστε την περιγραφή για την επιλεγμένη κατηγορία
@@ -1302,10 +1139,10 @@ function UnitsTab() {
           columns={columns}
           data={units}
           isLoading={loading}
-          pageSize={units.length}
+          pageSize={units.length > 100 ? 100 : units.length}
           showSearch={false}
           onRowClick={handleEdit}
-          rowClassName="cursor-pointer hover:bg-[#354f52] py-7"
+          rowClassName="cursor-pointer hover:bg-[#354f52]"
           defaultSortColumn="name"
           defaultSortDirection="asc"
         />
@@ -1614,10 +1451,10 @@ function DepartmentsTab() {
           columns={columns}
           data={departments}
           isLoading={loading}
-          pageSize={departments.length}
+          pageSize={departments.length > 100 ? 100 : departments.length}
           showSearch={false}
           onRowClick={handleEdit}
-          rowClassName="cursor-pointer hover:bg-[#354f52] py-7"
+          rowClassName="cursor-pointer hover:bg-[#354f52]"
           defaultSortColumn="name"
           defaultSortDirection="asc"
         />

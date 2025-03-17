@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/tooltip";
 import React from "react";
 import { openNewOfferDialog, openEditOfferDialog } from '../customers/OfferDialogManager';
+import { TruncatedText } from "@/components/ui/truncated-text";
 
 // Offer interface
 interface Offer {
@@ -356,7 +357,13 @@ export default function OffersPage() {
         
         // Truncate long text
         return value.length > 50 
-          ? <div className="truncate" title={value}>{value.substring(0, 50)}...</div>
+          ? <TruncatedText 
+              text={value} 
+              maxLength={50} 
+              tooltipMaxWidth={800}
+              multiLine={value.length > 100}
+              maxLines={2}
+            />
           : value;
       },
     },

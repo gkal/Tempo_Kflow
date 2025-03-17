@@ -26,6 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
+import { TruncatedText } from "@/components/ui/truncated-text";
 
 // Add a ref type for the component
 export interface OffersTableRef {
@@ -313,14 +314,13 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
     if (text.length <= maxLength) return text;
     
     return (
-      <div className="flex items-center">
-        <span className="max-w-[300px] inline-block">
-          {text.substring(0, maxLength)}
-        </span>
-        <span className="text-blue-400 ml-1 flex-shrink-0">
-          ....
-        </span>
-      </div>
+      <TruncatedText 
+        text={text} 
+        maxLength={maxLength} 
+        tooltipMaxWidth={800}
+        multiLine={text.length > 100} // Use multi-line for very long text
+        maxLines={2}
+      />
     );
   };
 

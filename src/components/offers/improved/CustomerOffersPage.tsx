@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { openNewOfferDialog, openEditOfferDialog } from '../../customers/OfferDialogManager';
+import { TruncatedText } from "@/components/ui/truncated-text";
 
 // Customer interface
 interface Customer {
@@ -688,29 +689,25 @@ export default function CustomerOffersPage() {
                 }}
               >
                 <td key={`date-${offer.id}`} className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
-                <td key={`request-${offer.id}`} className="px-3 py-2 text-xs text-[#cad2c5] w-[100px] group relative">
-                  <div className="truncate">
-                    {offer.requirements && offer.requirements.length > 50 
-                      ? <React.Fragment key={`req-trunc-${offer.id}`}>{offer.requirements.substring(0, 50)}<span className="text-blue-400">....</span></React.Fragment>
-                      : offer.requirements || "-"}
-                  </div>
-                  {offer.requirements && offer.requirements.length > 50 && (
-                    <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal min-w-[200px] max-w-[300px] text-[#cad2c5]">
-                      {offer.requirements}
-                    </span>
-                  )}
+                <td key={`request-${offer.id}`} className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
+                  {offer.requirements 
+                    ? <TruncatedText 
+                        text={offer.requirements} 
+                        maxLength={50} 
+                        tooltipMaxWidth={800}
+                        multiLine={offer.requirements.length > 100}
+                        maxLines={2}
+                      />
+                    : "-"}
                 </td>
-                <td key={`amount-${offer.id}`} className="px-3 py-2 text-xs text-[#cad2c5] w-[100px] group relative">
-                  <div className="truncate">
-                    {offer.amount && offer.amount.length > 50 
-                      ? <React.Fragment key={`amount-trunc-${offer.id}`}>{offer.amount.substring(0, 50)}<span className="text-blue-400">...</span></React.Fragment>
-                      : offer.amount || "-"}
-                  </div>
-                  {offer.amount && offer.amount.length > 50 && (
-                    <span className="hidden group-hover:block absolute left-0 top-full bg-[#2f3e46] border border-[#52796f] p-2 rounded-md z-10 whitespace-normal min-w-[200px] max-w-[300px] text-[#cad2c5]">
-                      {offer.amount}
-                    </span>
-                  )}
+                <td key={`amount-${offer.id}`} className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
+                  {offer.amount 
+                    ? <TruncatedText 
+                        text={offer.amount} 
+                        maxLength={50} 
+                        tooltipMaxWidth={800}
+                      />
+                    : "-"}
                 </td>
                 <td key={`status-${offer.id}`} className="px-3 py-2 text-xs w-[140px]">
                   <span className={`
