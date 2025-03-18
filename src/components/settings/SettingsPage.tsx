@@ -7,19 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { checkPermission } from "@/lib/permissions";
 import SimpleUserDialog from "./SimpleUserDialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import './settings-cursor-fix.css'; // Import the CSS fix
 import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
-import { toast } from "@/components/ui/use-toast";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -27,8 +16,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [showUserDialog, setShowUserDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [userToDelete, setUserToDelete] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchColumn, setSearchColumn] = useState("fullname");
 
@@ -43,11 +30,15 @@ export default function SettingsPage() {
     },
     (payload) => {
       if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-        fetchUsers(); // Refresh the user list
+        // Silently update the user list without any notifications
+        fetchUsers();
       }
     },
     []
   );
+
+  // Add a flag to prevent notifications
+  const preventNotifications = true;
 
   // Define the full columns array for the admin view
   const columns = [
@@ -101,6 +92,28 @@ export default function SettingsPage() {
     }
   ];
 
+  // Add a new function to directly toggle user status
+  const toggleUserStatus = async (userRow) => {
+    if (!userRow || !checkPermission(user?.role || "", "users", "delete")) {
+      return;
+    }
+
+    try {
+      // Toggle the status between active and inactive
+      const newStatus = userRow.status === "active" ? "inactive" : "active";
+      
+      const { error } = await supabase
+        .from("users")
+        .update({ status: newStatus })
+        .eq("id", userRow.id);
+
+      if (error) throw error;
+      await fetchUsers();
+    } catch (error) {
+      console.error("Error toggling user status:", error);
+    }
+  };
+
   // Define the full columns array with actions for all views
   const columnsWithActions = [
     ...columns,
@@ -118,8 +131,7 @@ export default function SettingsPage() {
               className={`h-8 w-8 hover:bg-[#354f52] ${value === "active" ? "text-green-400" : "text-red-400"}`}
               onClick={(e) => {
                 e.stopPropagation();
-                setUserToDelete(row);
-                setShowDeleteDialog(true);
+                toggleUserStatus(row); // Directly toggle user status without confirmation
               }}
             >
               {value === "active" ? (
@@ -182,34 +194,6 @@ export default function SettingsPage() {
       fetchUsers();
     }
   }, [user]);
-
-  const handleToggleUserStatus = async () => {
-    if (
-      !userToDelete ||
-      !checkPermission(user?.role || "", "users", "delete")
-    ) {
-      return;
-    }
-
-    try {
-      // Toggle the status between active and inactive
-      const newStatus = userToDelete.status === "active" ? "inactive" : "active";
-      
-      const { error } = await supabase
-        .from("users")
-        .update({ status: newStatus })
-        .eq("id", userToDelete.id);
-
-      if (error) throw error;
-      await fetchUsers();
-    } catch (error) {
-      console.error("Error toggling user status:", error);
-      // TODO: Add proper error handling/notification here
-    } finally {
-      setShowDeleteDialog(false);
-      setUserToDelete(null);
-    }
-  };
 
   // For regular users, show only their own data
   if (!isAdmin && !isSuperUser) {
@@ -328,28 +312,6 @@ export default function SettingsPage() {
             isLoading={loading}
           />
         </div>
-
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent aria-describedby="delete-settings-description">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Settings</AlertDialogTitle>
-              <AlertDialogDescription id="delete-settings-description">
-                Are you sure you want to delete these settings? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="bg-[#354f52] text-[#cad2c5] hover:bg-[#354f52]/90">
-                Άκυρο
-              </AlertDialogCancel>
-              <AlertDialogAction
-                className={`text-white ${userToDelete?.status === "active" ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}`}
-                onClick={handleToggleUserStatus}
-              >
-                {userToDelete?.status === "active" ? "Απενεργοποίηση" : "Ενεργοποίηση"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
 
         <SimpleUserDialog
           open={showUserDialog}

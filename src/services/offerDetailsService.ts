@@ -130,17 +130,37 @@ export const deleteOfferDetail = async (detailId: string): Promise<void> => {
   }
   
   try {
-    console.log("Executing Supabase delete query for detail ID:", detailId);
-    const result = await supabase
-      .from("offer_details")
-      .delete()
-      .eq("id", detailId);
-
-    console.log("Delete query completed, result:", result);
+    console.log("Attempting soft delete for detail ID:", detailId);
+    // Try soft delete first
+    let error = null;
+    try {
+      const response = await supabase.rpc('soft_delete_record', {
+        table_name: 'offer_details',
+        record_id: detailId
+      });
+      error = response.error;
+      
+      if (error) {
+        console.log("Soft delete failed with error:", error);
+        throw error; // Throw to trigger the fallback
+      }
+      console.log("Soft delete successful for detail ID:", detailId);
+    } catch (softDeleteError) {
+      // If soft delete is not available or fails, fallback to regular delete
+      console.log("Soft delete not available or failed, falling back to regular delete");
+      console.log("Executing Supabase delete query for detail ID:", detailId);
+      const response = await supabase
+        .from("offer_details")
+        .delete()
+        .eq("id", detailId);
+      
+      error = response.error;
+      console.log("Regular delete completed, result:", response);
+    }
     
-    if (result.error) {
-      console.error("Error deleting offer detail:", result.error);
-      throw result.error;
+    if (error) {
+      console.error("Error deleting offer detail:", error);
+      throw error;
     }
     
     console.log("Successfully deleted offer detail with ID:", detailId);

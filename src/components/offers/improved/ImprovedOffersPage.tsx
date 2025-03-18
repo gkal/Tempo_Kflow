@@ -71,10 +71,11 @@ export default function ImprovedOffersPage() {
         .from("offers")
         .select(`
           *,
+          customer:customers(id, company_name),
           assigned_user:users!assigned_to(fullname),
-          created_user:users!created_by(fullname),
-          customer:customers(id, company_name)
-        `);
+          created_user:users!created_by(fullname)
+        `)
+        .is("deleted_at", null); // Filter out soft-deleted records
       
       // Apply status filter if not "all"
       if (statusFilter !== "all") {
@@ -172,10 +173,23 @@ export default function ImprovedOffersPage() {
     if (!offerToDelete) return;
     
     try {
-      const { error } = await supabase
-        .from("offers")
-        .delete()
-        .eq("id", offerToDelete);
+      // Try soft delete first
+      let error = null;
+      try {
+        const response = await supabase.rpc('soft_delete_record', {
+          table_name: 'offers',
+          record_id: offerToDelete
+        });
+        error = response.error;
+      } catch (softDeleteError) {
+        // If soft delete is not available, fallback to regular delete
+        console.log("Soft delete not available, falling back to regular delete");
+        const response = await supabase
+          .from("offers")
+          .delete()
+          .eq("id", offerToDelete);
+        error = response.error;
+      }
       
       if (error) throw error;
       

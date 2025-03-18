@@ -39,6 +39,14 @@ import React from "react";
 import { CustomerDialog } from "./CustomerDialog";
 import { openNewOfferDialog, openEditOfferDialog } from './OfferDialogManager';
 import { TruncatedText } from "@/components/ui/truncated-text";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Add Customer interface
 interface Customer {
@@ -454,6 +462,7 @@ export default function CustomersPage() {
         .from("offers")
         .select("id")
         .eq("customer_id", customerId)
+        .is("deleted_at", null)
         .or('result.is.null,result.eq.pending,result.eq.,result.eq.none');
       
       if (error) throw error;
@@ -511,6 +520,7 @@ export default function CustomersPage() {
           contact:contacts(full_name, position)
         `)
         .eq("customer_id", customerId)
+        .is("deleted_at", null)
         .or('result.is.null,result.eq.pending,result.eq.,result.eq.none')
         .order("created_at", { ascending: false });
 
@@ -566,7 +576,8 @@ export default function CustomersPage() {
           *,
           offers:offers(
             id,
-            result
+            result,
+            deleted_at
           )
         `, { count: "exact" });
       
@@ -587,10 +598,11 @@ export default function CustomersPage() {
       // Filter active offers client-side
       const customersWithData = (customersData as Customer[])?.map(customer => {
         const activeOffers = customer.offers?.filter(offer => 
-          !offer.result || 
+          !offer.deleted_at && // Filter out soft-deleted offers
+          (!offer.result || 
           offer.result === 'pending' || 
           offer.result === '' || 
-          offer.result === 'none'
+          offer.result === 'none')
         ) || [];
 
         return {
@@ -931,10 +943,22 @@ export default function CustomersPage() {
     if (!offerToDelete) return;
     
     try {
-      const { error } = await supabase
-        .from('offers')
-        .delete()
-        .eq('id', offerToDelete.offerId);
+      // Try soft delete first
+      let error = null;
+      try {
+        const response = await supabase.rpc('soft_delete_record', {
+          table_name: 'offers',
+          record_id: offerToDelete.offerId
+        });
+        error = response.error;
+      } catch (softDeleteError) {
+        // If soft delete is not available, fallback to regular delete
+        const response = await supabase
+          .from('offers')
+          .delete()
+          .eq('id', offerToDelete.offerId);
+        error = response.error;
+      }
       
       if (error) throw error;
       
@@ -966,8 +990,20 @@ export default function CustomersPage() {
             : customer
         )
       );
+      
+      // Show success toast
+      toast({
+        title: "Επιτυχία",
+        description: "Η προσφορά διαγράφηκε επιτυχώς",
+        variant: "default",
+      });
     } catch (error) {
       console.error("Error deleting offer:", error);
+      toast({
+        title: "Σφάλμα",
+        description: "Δεν ήταν δυνατή η διαγραφή της προσφοράς",
+        variant: "destructive",
+      });
     } finally {
       setShowDeleteOfferDialog(false);
       setOfferToDelete(null);
@@ -1085,21 +1121,70 @@ export default function CustomersPage() {
     if (!customerId) return;
     
     try {
-      // Make role check case-insensitive
-      const isAdminUser = user?.role?.toLowerCase() === 'admin';
+      // Make role check case-insensitive and allow both Admin and Super User roles to delete
+      const isAdminOrSuperUser = 
+        user?.role?.toLowerCase() === 'admin' || 
+        user?.role?.toLowerCase() === 'super user';
       
-      if (isAdminUser) {
-        // For admin users: Perform actual deletion
+      if (isAdminOrSuperUser) {
+        // For admin and super users: Use soft delete for customer and all related data
         
-        // First delete all offers associated with this customer
-        const { error: offersError } = await supabase
-          .from('offers')
-          .delete()
-          .eq('customer_id', customerId);
+        // Set the current timestamp for soft delete
+        const deletedAt = new Date().toISOString();
         
-        if (offersError) {
-          console.error("Error deleting customer offers:", offersError);
-          throw new Error("Failed to delete customer offers");
+        // First soft delete all offers associated with this customer
+        try {
+          // Try to use the soft_delete_record RPC function
+          const { error: offersRpcError } = await supabase.rpc('soft_delete_record_by_field', {
+            table_name: 'offers',
+            field_name: 'customer_id',
+            field_value: customerId
+          });
+          
+          if (offersRpcError) {
+            // Fallback to manual soft delete if RPC fails
+            const { error: offersError } = await supabase
+              .from('offers')
+              .update({ deleted_at: deletedAt })
+              .eq('customer_id', customerId);
+            
+            if (offersError) {
+              console.error("Error soft deleting customer offers:", offersError);
+              throw new Error("Failed to soft delete customer offers");
+            }
+          }
+          
+          // Also soft delete associated offer_details
+          const { data: offerIds } = await supabase
+            .from('offers')
+            .select('id')
+            .eq('customer_id', customerId);
+            
+          if (offerIds && offerIds.length > 0) {
+            const ids = offerIds.map(o => o.id);
+            
+            try {
+              // Try to use RPC for offer details
+              await Promise.all(ids.map(id => 
+                supabase.rpc('soft_delete_record_by_field', {
+                  table_name: 'offer_details',
+                  field_name: 'offer_id',
+                  field_value: id
+                })
+              ));
+            } catch (detailsError) {
+              // Fallback to manual update if RPC fails
+              await Promise.all(ids.map(id => 
+                supabase
+                  .from('offer_details')
+                  .update({ deleted_at: deletedAt })
+                  .eq('offer_id', id)
+              ));
+            }
+          }
+        } catch (error) {
+          console.error("Error soft deleting offers and details:", error);
+          throw new Error("Failed to soft delete customer offers and details");
         }
         
         // Set primary_contact_id to null to break the circular reference
@@ -1113,26 +1198,60 @@ export default function CustomersPage() {
           throw new Error("Failed to update customer primary contact");
         }
         
-        // Then delete all contacts associated with this customer
-        const { error: contactsError } = await supabase
-          .from('contacts')
-          .delete()
-          .eq('customer_id', customerId);
-        
-        if (contactsError) {
-          console.error("Error deleting customer contacts:", contactsError);
-          throw new Error("Failed to delete customer contacts");
+        // Then soft delete all contacts associated with this customer
+        try {
+          // Try to use the soft_delete_record RPC function
+          const { error: contactsRpcError } = await supabase.rpc('soft_delete_record_by_field', {
+            table_name: 'contacts',
+            field_name: 'customer_id',
+            field_value: customerId
+          });
+          
+          if (contactsRpcError) {
+            // Fallback to manual soft delete if RPC fails
+            const { error: contactsError } = await supabase
+              .from('contacts')
+              .update({ deleted_at: deletedAt })
+              .eq('customer_id', customerId);
+            
+            if (contactsError) {
+              console.error("Error soft deleting customer contacts:", contactsError);
+              throw new Error("Failed to soft delete customer contacts");
+            }
+          }
+        } catch (error) {
+          console.error("Error soft deleting contacts:", error);
+          throw new Error("Failed to soft delete customer contacts");
         }
         
-        // Finally delete the customer
-        const { error: customerError } = await supabase
-          .from('customers')
-          .delete()
-          .eq('id', customerId);
-        
-        if (customerError) {
-          console.error("Error deleting customer:", customerError);
-          throw new Error("Failed to delete customer");
+        // Finally soft delete the customer
+        try {
+          // Try to use the soft_delete_record RPC function
+          const { error: customerRpcError } = await supabase.rpc('soft_delete_record', {
+            table_name: 'customers',
+            record_id: customerId
+          });
+          
+          if (customerRpcError) {
+            // Fallback to manual soft delete if RPC fails
+            const { error: customerError } = await supabase
+              .from('customers')
+              .update({ 
+                deleted_at: deletedAt,
+                status: 'inactive',
+                modified_by: user?.id,
+                updated_at: deletedAt
+              })
+              .eq('id', customerId);
+            
+            if (customerError) {
+              console.error("Error soft deleting customer:", customerError);
+              throw new Error("Failed to soft delete customer");
+            }
+          }
+        } catch (error) {
+          console.error("Error soft deleting customer:", error);
+          throw new Error("Failed to soft delete customer");
         }
         
         // Update the customers array
@@ -1147,11 +1266,11 @@ export default function CustomersPage() {
         
         toast({
           title: "Επιτυχής διαγραφή",
-          description: 'Ο πελάτης, οι επαφές και οι προσφορές του διαγράφηκαν οριστικά με επιτυχία!',
+          description: 'Ο πελάτης, οι επαφές και οι προσφορές του διαγράφηκαν με επιτυχία!',
           variant: "default",
         });
       } else {
-        // For non-admin users: Just deactivate
+        // For non-admin/super users: Just deactivate
         await supabase
           .from('customers')
           .update({ 
@@ -1297,6 +1416,71 @@ export default function CustomersPage() {
     }
   }, [refreshCustomers]);
 
+  // Delete confirmation dialog
+  const DeleteConfirmationDialog = () => {
+    if (!customerToDelete) return null;
+
+    const isAdminOrSuperUser = 
+      user?.role?.toLowerCase() === 'admin' || 
+      user?.role?.toLowerCase() === 'super user';
+
+    const isActive = customerToDelete.status === 'active';
+
+    return (
+      <Dialog open={!!customerToDelete} onOpenChange={() => setCustomerToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isAdminOrSuperUser 
+                ? isActive 
+                  ? 'Επιβεβαίωση διαγραφής' 
+                  : 'Επιβεβαίωση διαγραφής απενεργοποιημένου πελάτη'
+                : isActive
+                  ? 'Επιβεβαίωση απενεργοποίησης'
+                  : 'Επιβεβαίωση ενεργοποίησης'}
+            </DialogTitle>
+            <DialogDescription>
+              {isAdminOrSuperUser 
+                ? isActive 
+                  ? 'Είστε σίγουροι ότι θέλετε να διαγράψετε αυτόν τον πελάτη; Η ενέργεια αυτή θα διαγράψει επίσης όλες τις επαφές και προσφορές του πελάτη.'
+                  : 'Είστε σίγουροι ότι θέλετε να διαγράψετε αυτόν τον απενεργοποιημένο πελάτη; Η ενέργεια αυτή θα διαγράψει επίσης όλες τις επαφές και προσφορές του πελάτη.'
+                : isActive
+                  ? 'Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε αυτόν τον πελάτη;'
+                  : 'Είστε σίγουροι ότι θέλετε να ενεργοποιήσετε αυτόν τον πελάτη;'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCustomerToDelete(null)}
+            >
+              Ακύρωση
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (isAdminOrSuperUser) {
+                  handleDelete(customerToDelete.id);
+                } else {
+                  toggleCustomerStatus(customerToDelete);
+                }
+                setCustomerToDelete(null);
+              }}
+            >
+              {isAdminOrSuperUser 
+                ? isActive 
+                  ? 'Διαγραφή'
+                  : 'Διαγραφή απενεργοποιημένου'
+                : isActive
+                  ? 'Απενεργοποίηση'
+                  : 'Ενεργοποίηση'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   // If showing the form, render it instead of the customer list
   return (
     <div className="p-4">
@@ -1416,58 +1600,7 @@ export default function CustomersPage() {
       />
 
       {/* Delete Customer Confirmation */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent 
-          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-          aria-describedby="delete-customer-description"
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#cad2c5]">
-              {isAdminUser 
-                ? "Οριστική Διαγραφή Πελάτη" 
-                : customerToDelete?.status === 'active' 
-                  ? "Απενεργοποίηση Πελάτη"
-                  : "Ενεργοποίηση Πελάτη"}
-            </AlertDialogTitle>
-            <AlertDialogDescription id="delete-customer-description" className="text-[#84a98c]">
-              {isAdminUser
-                ? `Είστε σίγουροι ότι θέλετε να διαγράψετε οριστικά τον πελάτη "${customerToDelete?.company_name}", όλες τις επαφές του και όλες τις προσφορές του; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.`
-                : customerToDelete?.status === 'active'
-                  ? `Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε τον πελάτη "${customerToDelete?.company_name}";`
-                  : `Είστε σίγουροι ότι θέλετε να ενεργοποιήσετε τον πελάτη "${customerToDelete?.company_name}";`
-              }
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-[#354f52] text-[#cad2c5] hover:bg-[#354f52]/90">
-              Άκυρο
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={`text-white ${
-                isAdminUser 
-                  ? "bg-red-600 hover:bg-red-700" 
-                  : customerToDelete?.status === 'active'
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-green-600 hover:bg-green-700"
-              }`}
-              onClick={() => {
-                if (isAdminUser) {
-                  handleDelete(customerToDelete?.id);
-                } else {
-                  toggleCustomerStatus(customerToDelete);
-                }
-                setShowDeleteDialog(false);
-              }}
-            >
-              {isAdminUser 
-                ? "Διαγραφή" 
-                : customerToDelete?.status === 'active'
-                  ? "Απενεργοποίηση"
-                  : "Ενεργοποίηση"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmationDialog />
 
       {/* Delete Offer Confirmation */}
       <AlertDialog open={showDeleteOfferDialog} onOpenChange={setShowDeleteOfferDialog}>

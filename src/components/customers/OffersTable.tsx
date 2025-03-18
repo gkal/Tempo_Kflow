@@ -135,6 +135,7 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
           created_user:users!created_by(fullname)
         `)
         .eq("customer_id", customerId)
+        .is("deleted_at", null)
         .or('result.is.null,result.eq.pending,result.eq.,result.eq.none')
         .order("created_at", { ascending: false });
 

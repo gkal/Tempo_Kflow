@@ -141,7 +141,31 @@ function dispatch(action: Action) {
 type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
-  const id = genId()
+  // Skip toast messages related to user status changes
+  if (
+    (typeof props.title === 'string' && (
+      props.title.includes("Χρήστη") || 
+      props.title.includes("χρήστη") ||
+      props.title.includes("User") ||
+      props.title.includes("user")
+    )) || 
+    (typeof props.description === 'string' && (
+      props.description.includes("Χρήστη") ||
+      props.description.includes("χρήστη") ||
+      props.description.includes("User") ||
+      props.description.includes("user")
+    ))
+  ) {
+    // Don't show these toasts
+    const id = genId();
+    return {
+      id,
+      dismiss: () => {},
+      update: () => {},
+    };
+  }
+
+  const id = genId();
 
   const update = (props: ToasterToast) =>
     dispatch({

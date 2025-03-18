@@ -189,12 +189,11 @@ export default function SimpleUserDialog({
         }
       }
 
-      setSuccess(true);
+      setSuccess(false); // Don't show success message
       await fetchUsers();
 
-      setTimeout(() => {
-        onClose();
-      }, 1000);
+      // Close dialog immediately without showing success message
+      onClose();
     } catch (error: any) {
       setError(error.message);
     } finally {
@@ -379,11 +378,6 @@ export default function SimpleUserDialog({
           {error && (
             <div className="bg-red-500/10 text-red-400 p-3 rounded-md flex items-center space-x-2">
               <span>{error}</span>
-            </div>
-          )}
-          {success && (
-            <div className="bg-green-500/10 text-green-400 p-3 rounded-md flex items-center space-x-2">
-              <span>Η ενημέρωση ολοκληρώθηκε με επιτυχία!</span>
             </div>
           )}
 

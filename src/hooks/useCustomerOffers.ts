@@ -13,6 +13,7 @@ export function useCustomerOffers(customerId: string) {
           .from('offers')
           .select('*')
           .eq('customer_id', customerId)
+          .is("deleted_at", null)
           .order('created_at', { ascending: false });
 
         if (error) {

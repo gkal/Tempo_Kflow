@@ -131,6 +131,7 @@ export default function OffersPage() {
   const fetchOffers = async () => {
     try {
       setLoading(true);
+      console.log(`fetchOffers called with statusFilter=${statusFilter}, resultFilter=${resultFilter}`);
       
       // Build the query
       let query = supabase
@@ -140,27 +141,46 @@ export default function OffersPage() {
           assigned_user:users!assigned_to(fullname),
           created_user:users!created_by(fullname),
           customer:customers(id, company_name)
-        `);
+        `)
+        .is("deleted_at", null); // Filter out soft-deleted records
+      
+      console.log("Base query created with deleted_at filter");
       
       // Apply status filter if not "all"
       if (statusFilter !== "all") {
         query = query.eq("offer_result", statusFilter);
+        console.log(`Added status filter: offer_result=${statusFilter}`);
       }
       
       // Apply result filter if not "all"
       if (resultFilter !== "all") {
         query = query.eq("result", resultFilter);
+        console.log(`Added result filter: result=${resultFilter}`);
       }
       
       // Apply search filter if provided
       if (searchTerm) {
         query = query.ilike(`${searchColumn}`, `%${searchTerm}%`);
+        console.log(`Added search filter: ${searchColumn} ILIKE %${searchTerm}%`);
       }
       
       // Execute the query
+      console.log("Executing query...");
       const { data, error } = await query.order("created_at", { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Query error:", error);
+        throw error;
+      }
+      
+      console.log(`Query returned ${data?.length || 0} offers`);
+      if (data && data.length > 0) {
+        console.log("First result:", {
+          id: data[0].id,
+          result: data[0].result,
+          offer_result: data[0].offer_result
+        });
+      }
       
       // Process the data
       const offersWithData = (data as Offer[])?.map(offer => {
@@ -264,10 +284,22 @@ export default function OffersPage() {
     if (!offerToDelete) return;
     
     try {
-      const { error } = await supabase
-        .from("offers")
-        .delete()
-        .eq("id", offerToDelete);
+      // Try soft delete first
+      let error = null;
+      try {
+        const response = await supabase.rpc('soft_delete_record', {
+          table_name: 'offers',
+          record_id: offerToDelete
+        });
+        error = response.error;
+      } catch (softDeleteError) {
+        // If soft delete is not available, fallback to regular delete
+        const response = await supabase
+          .from("offers")
+          .delete()
+          .eq("id", offerToDelete);
+        error = response.error;
+      }
       
       if (error) throw error;
       

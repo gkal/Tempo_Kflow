@@ -38,6 +38,7 @@ import { TruncatedText } from "@/components/ui/truncated-text";
 declare global {
   interface Window {
     dotsObserver?: MutationObserver;
+    skipNextEditDialog?: boolean;
   }
 }
 
@@ -545,6 +546,12 @@ function CategoriesTab() {
 
   // Handle edit button click
   const handleEdit = (category: CategoryWithSubcategories) => {
+    // Check if we should skip opening the edit dialog
+    if (window.skipNextEditDialog) {
+      window.skipNextEditDialog = false;
+      return;
+    }
+    
     setCurrentCategory(category);
     // Add a small delay before setting form data to prevent auto-selection
     setTimeout(() => {
@@ -560,10 +567,9 @@ function CategoriesTab() {
   const handleCreateSubcategory = (categoryId: string) => {
     const parentCategory = categories.find(cat => cat.id === categoryId && !cat.isSubcategory);
     if (parentCategory) {
-      // Close any other open dialogs first
-      setShowDialog(false);
+      // Set a flag to prevent opening edit dialog after
+      window.skipNextEditDialog = true;
       
-      // Then open the subcategory dialog
       setCurrentParentCategory(parentCategory);
       setFormData({
         category_name: "",
@@ -712,6 +718,7 @@ function CategoriesTab() {
           showSearch={false}
           onRowClick={handleEdit}
           rowClassName="cursor-pointer hover:bg-[#354f52]"
+          footerHint="Πατήστε δεξί κλικ σε κεντρική κατηγορία, για να προσθέσετε νέα υποκατηγορία"
         />
 
         {/* Category Form Dialog */}

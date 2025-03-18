@@ -408,11 +408,36 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
             .from("offers")
             .select("*, users!offers_assigned_to_fkey(fullname)")
             .eq("id", offerId)
+            .is("deleted_at", null)
             .single();
 
           if (error) {
-            console.error("Error fetching offer data:", error);
-            throw error;
+            // Check if it's a "no rows returned" error, which might mean the offer was soft-deleted
+            if (error.message?.includes('multiple (or no) rows returned') || error.details?.includes('contains 0 rows')) {
+              // Try to fetch the offer without the deleted_at filter to confirm it's soft-deleted
+              const { data: softDeletedOffer, error: softDeletedError } = await supabase
+                .from("offers")
+                .select("deleted_at")
+                .eq("id", offerId)
+                .single();
+                
+              if (!softDeletedError && softDeletedOffer && softDeletedOffer.deleted_at) {
+                // The offer exists but is soft-deleted
+                toast({
+                  title: "Offer Unavailable",
+                  description: "This offer has been deleted and cannot be edited.",
+                  variant: "destructive",
+                });
+                onOpenChange(false); // Close the dialog
+              } else {
+                // It's some other error
+                console.error("Error fetching offer data:", error);
+                throw error;
+              }
+            } else {
+              console.error("Error fetching offer data:", error);
+              throw error;
+            }
           }
           
           if (data) {

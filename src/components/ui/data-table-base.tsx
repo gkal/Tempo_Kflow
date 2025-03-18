@@ -48,17 +48,28 @@ interface DataTableBaseProps {
   defaultSortDirection?: SortDirection;
   searchTerm?: string;
   searchColumn?: string;
-  onRowClick?: (row: any) => void;
+  searchPlaceholder?: string;
   rowClassName?: string;
   containerClassName?: string;
-  showSearch?: boolean;
-  pageSize?: number;
   tableId?: string;
   isLoading?: boolean;
-  highlightedRowId?: string;
-  renderRow?: (row: any, index: number, defaultRow: React.ReactNode) => React.ReactNode;
+  expandAll?: boolean;
+  pageSize?: number;
+  showSearch?: boolean;
+  showFilter?: boolean;
+  filterOptions?: { value: string; label: string }[];
+  selectedFilter?: string;
+  onFilterChange?: (filter: string) => void;
+  infiniteScroll?: boolean;
+  onRowClick?: (row: any) => void;
+  onSearchChange?: (value: string) => void;
   onSearchFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
+  renderRow?: (row: any, index: number, defaultRow: JSX.Element) => React.ReactNode;
+  highlightedRowId?: string | number;
+  emptyStateMessage?: string;
+  loadingStateMessage?: string;
   showOfferMessage?: boolean;
+  footerHint?: string;
 }
 
 export function DataTableBase({
@@ -68,7 +79,7 @@ export function DataTableBase({
   defaultSortDirection = "asc",
   searchTerm = "",
   searchColumn = "",
-  onRowClick,
+  searchPlaceholder = "",
   rowClassName = "",
   containerClassName = "",
   showSearch = false, // Default to false since search is now external
@@ -79,6 +90,8 @@ export function DataTableBase({
   renderRow,
   onSearchFocus,
   showOfferMessage = false,
+  footerHint,
+  onRowClick,
 }: DataTableBaseProps) {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -738,9 +751,11 @@ export function DataTableBase({
       {/* Total records count */}
       <div className="mt-3 mb-1 text-sm text-[#84a98c] px-2 flex justify-between items-center font-medium pt-2">
         <div className="text-left italic text-xs">
-          {showOfferMessage && (
+          {footerHint ? (
+            <span>{footerHint}</span>
+          ) : showOfferMessage ? (
             <span>Παρακαλώ πατήστε δεξί κλικ για να προσθέσετε προσφορά</span>
-          )}
+          ) : null}
         </div>
         <div>
           {isLoading ? (

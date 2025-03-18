@@ -41,7 +41,7 @@ interface Customer {
 // Offer interface
 interface Offer {
   id: string;
-  customer_id?: string;
+  customer_id: string;
   requirements?: string;
   amount?: string;
   offer_result?: string;
@@ -86,6 +86,8 @@ export default function CustomerOffersPage() {
   const [customerIdToDelete, setCustomerIdToDelete] = useState<string | null>(null);
   const [customersWithOffers, setCustomersWithOffers] = useState<string[]>([]);
   const [isLoadingAllOffers, setIsLoadingAllOffers] = useState(false);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [filteredOffers, setFilteredOffers] = useState<Offer[]>([]);
   
   // Error dialog state
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
@@ -179,15 +181,22 @@ export default function CustomerOffersPage() {
           customer_id,
           offer_result,
           result
-        `);
+        `)
+        .is("deleted_at", null); // Filter out soft-deleted records
       
       // Apply filters - important to use separate if statements to ensure both filters are applied
       if (statusFilter !== "all") {
         query = query.eq("offer_result", statusFilter);
       }
       
+      // Apply result filter if not "all"
       if (resultFilter !== "all") {
-        query = query.eq("result", resultFilter);
+        // Handle special case for 'waiting' (Σε εξέλιξη)
+        if (resultFilter === "pending" || resultFilter === "waiting") {
+          query = query.eq("result", "waiting");
+        } else {
+          query = query.eq("result", resultFilter);
+        }
       }
 
       // Execute the query
@@ -236,6 +245,7 @@ export default function CustomerOffersPage() {
         .from('offers')
         .select(`
           id,
+          customer_id,
           created_at,
           requirements,
           amount,
@@ -246,7 +256,7 @@ export default function CustomerOffersPage() {
           created_user:users!created_by(fullname)
         `)
         .eq("customer_id", customerId)
-        .order("created_at", { ascending: false });
+        .is("deleted_at", null); // Filter out soft-deleted records
       
       // Apply filters efficiently
       if (statusFilter && statusFilter !== "all") {
@@ -254,11 +264,15 @@ export default function CustomerOffersPage() {
       }
       
       if (resultFilter && resultFilter !== "all") {
-        query = query.eq("result", resultFilter);
+        if (resultFilter === "pending" || resultFilter === "waiting") {
+          query = query.eq("result", "waiting");
+        } else {
+          query = query.eq("result", resultFilter);
+        }
       }
 
       // Execute the query
-      const { data, error } = await query;
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) {
         throw error;
@@ -266,11 +280,14 @@ export default function CustomerOffersPage() {
       
       // Store the result in the cache using both the customer ID and the cache key
       const offersData = data || [];
-      setCustomerOffers(prev => ({
-        ...prev,
-        [customerId]: offersData,
-        [cacheKey]: offersData // Cache with the filter-specific key
-      }));
+      setCustomerOffers(prev => {
+        // Create a new object with all previous entries
+        const newState = { ...prev };
+        // Update both keys with the same data
+        newState[customerId] = offersData;
+        newState[cacheKey] = offersData;
+        return newState;
+      });
       
       // Update customer counts in a single batch update
       const offersCount = offersData.length || 0;
@@ -311,7 +328,9 @@ export default function CustomerOffersPage() {
       const { data: customersData, error: customersError } = await query
         .order('company_name', { ascending: true });
 
-      if (customersError) throw customersError;
+      if (customersError) {
+        throw customersError;
+      }
 
       // Process customers
       const customersWithData = (customersData as Customer[])?.map(customer => {
@@ -329,7 +348,8 @@ export default function CustomerOffersPage() {
       // Fetch all offers to determine which customers have any offers
       const { data: allOffers, error: offersError } = await supabase
         .from('offers')
-        .select('id, customer_id, offer_result, result');
+        .select('id, customer_id, offer_result, result')
+        .is("deleted_at", null); // Filter out soft-deleted offers
       
       if (offersError) {
         throw offersError;
@@ -342,6 +362,7 @@ export default function CustomerOffersPage() {
         
         // If filters are applied, filter the offers
         if (offerStatusFilter !== "all" || offerResultFilter !== "all") {
+          
           // Filter offers based on status and result
           let filteredOffers = [...allOffers];
           
@@ -350,7 +371,12 @@ export default function CustomerOffersPage() {
           }
           
           if (offerResultFilter !== "all") {
-            filteredOffers = filteredOffers.filter(offer => offer.result === offerResultFilter);
+            if (offerResultFilter === "pending" || offerResultFilter === "waiting") {
+              // For "Σε εξέλιξη" check if result is "waiting"
+              filteredOffers = filteredOffers.filter(offer => offer.result === "waiting");
+            } else {
+              filteredOffers = filteredOffers.filter(offer => offer.result === offerResultFilter);
+            }
           }
           
           // Get unique customer IDs from filtered offers
@@ -462,23 +488,60 @@ export default function CustomerOffersPage() {
     if (!offerToDelete || !customerIdToDelete) return;
     
     try {
-      const { error } = await supabase
-        .from("offers")
-        .delete()
-        .eq("id", offerToDelete);
+      // Try soft delete first
+      let error = null;
+      try {
+        const response = await supabase.rpc('soft_delete_record', {
+          table_name: 'offers',
+          record_id: offerToDelete
+        });
+        error = response.error;
+      } catch (softDeleteError) {
+        // If soft delete is not available, fallback to regular delete
+        const response = await supabase
+          .from("offers")
+          .delete()
+          .eq("id", offerToDelete);
+        error = response.error;
+      }
 
       if (error) throw error;
 
+      // Update customer offers state
+      setCustomerOffers(prev => {
+        const updatedOffers = { ...prev };
+        if (updatedOffers[customerIdToDelete]) {
+          updatedOffers[customerIdToDelete] = updatedOffers[customerIdToDelete]
+            .filter(offer => offer.id !== offerToDelete);
+        }
+        return updatedOffers;
+      });
+
+      // Update customers state to reflect new offer count
+      setCustomers(prev => prev.map(customer => {
+        if (customer.id === customerIdToDelete) {
+          const currentOffers = customer.offersCount || 0;
+          return { ...customer, offersCount: Math.max(0, currentOffers - 1) };
+        }
+        return customer;
+      }));
+
+      // Update filtered customers state
+      setFilteredCustomers(prev => prev.map(customer => {
+        if (customer.id === customerIdToDelete) {
+          const currentOffers = customer.offersCount || 0;
+          return { ...customer, offersCount: Math.max(0, currentOffers - 1) };
+        }
+        return customer;
+      }));
+
       showSuccess("Επιτυχία", "Η προσφορά διαγράφηκε επιτυχώς");
       
-      // Refresh customer offers with current filters
+      // Refresh data after state updates
       fetchCustomerOffers(customerIdToDelete, true, offerStatusFilter, offerResultFilter);
-      
-      // Refresh all offers to update counts
       setRefreshTrigger(prev => prev + 1);
       
     } catch (error) {
-      console.error("Error deleting offer:", error);
       showError("Σφάλμα", "Δεν ήταν δυνατή η διαγραφή της προσφοράς.");
     } finally {
       setShowDeleteDialog(false);
@@ -523,21 +586,25 @@ export default function CustomerOffersPage() {
 
   // Handle offer result filter change
   const handleOfferResultChange = (result: string) => {
+    // If "pending" is selected, use "waiting" which is the correct value in the database
+    if (result === "pending") {
+      result = "waiting";
+    }
+    
     // Update the state first
     setOfferResultFilter(result);
     
-    // Use the new result value directly in the function calls
     // Call fetchAllOffers with current status filter and the new result value
     fetchAllOffers(offerStatusFilter, result);
     
     // Refresh offers for all expanded customers with the new filters
-    Object.keys(expandedCustomers).forEach(customerId => {
-      if (expandedCustomers[customerId]) {
-        // Use a timeout to ensure this runs after state updates
-        setTimeout(() => {
-          fetchCustomerOffers(customerId, true, offerStatusFilter, result);
-        }, 0);
-      }
+    const expandedCustomerIds = Object.keys(expandedCustomers).filter(id => expandedCustomers[id]);
+    
+    expandedCustomerIds.forEach(customerId => {
+      // Use a timeout to ensure this runs after state updates
+      setTimeout(() => {
+        fetchCustomerOffers(customerId, true, offerStatusFilter, result);
+      }, 0);
     });
   };
 
@@ -638,7 +705,7 @@ export default function CustomerOffersPage() {
   ];
 
   // Define the customer row renderer - optimized version without hooks
-  const renderCustomerRow = useCallback((row: any, index: number, defaultRow: React.ReactNode) => {
+  const renderCustomerRow = useCallback((row: any, index: number, defaultRow: JSX.Element): React.ReactNode => {
     if (!row) return defaultRow;
     
     const isExpanded = row.isExpanded || false;
@@ -652,7 +719,7 @@ export default function CustomerOffersPage() {
     const isLoadingOffers = loadingOffers[row.id] || false;
     
     // Create the content based on loading state and offers
-    let content;
+    let content: JSX.Element;
     if (isLoadingOffers) {
       content = (
         <div className="flex justify-center items-center py-4">
@@ -900,11 +967,11 @@ export default function CustomerOffersPage() {
                 </div>
                 
                 <div 
-                  onClick={() => handleOfferResultChange("pending")}
+                  onClick={() => handleOfferResultChange("waiting")}
                   className="relative inline-block"
                 >
                   <span className={`cursor-pointer text-xs px-3 py-1.5 rounded-full transition-all block text-center
-                    ${offerResultFilter === "pending" 
+                    ${offerResultFilter === "waiting" 
                       ? "bg-purple-500/20 text-purple-300 font-medium shadow-[0_0_8px_rgba(168,85,247,0.5)] ring-1 ring-purple-400/50" 
                       : "bg-[#354f52] text-[#cad2c5] hover:bg-[#3a5258]"}`}
                   >

@@ -134,20 +134,28 @@ export default function CustomerDetailPage() {
     },
     (payload) => {
       if (payload.eventType === 'INSERT') {
-        // Add the new offer to the list
-        if (payload.new) {
+        // Only add the new offer if it's not soft-deleted
+        if (payload.new && !payload.new.deleted_at) {
           setRecentOffers(prev => [payload.new, ...prev]);
         } else {
           fetchRecentOffers();
         }
       } else if (payload.eventType === 'UPDATE') {
-        // Update the offer in the list
+        // Update the offer in the list only if it's not soft-deleted
         if (payload.new) {
-          setRecentOffers(prev => 
-            prev.map(offer => 
-              offer.id === payload.new.id ? payload.new : offer
-            )
-          );
+          if (payload.new.deleted_at) {
+            // If the offer was soft-deleted, remove it from the list
+            setRecentOffers(prev => 
+              prev.filter(offer => offer.id !== payload.new.id)
+            );
+          } else {
+            // Update the offer in the list if it's not deleted
+            setRecentOffers(prev => 
+              prev.map(offer => 
+                offer.id === payload.new.id ? payload.new : offer
+              )
+            );
+          }
         } else {
           fetchRecentOffers();
         }
@@ -443,6 +451,7 @@ export default function CustomerDetailPage() {
           contact:contacts(full_name, position)
         `)
         .eq("customer_id", id)
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -456,15 +465,42 @@ export default function CustomerDetailPage() {
   };
   
   // Function to handle editing an offer
-  const handleEditOffer = (offerId: string) => {
-    openEditOfferDialog(id, offerId, () => {
-      // Use the ref to refresh the data instead of fetching all offers again
-      if (offersTableRef.current) {
-        offersTableRef.current.refreshData();
-      } else {
-        fetchRecentOffers();
+  const handleEditOffer = async (offerId: string) => {
+    try {
+      // First check if the offer is soft-deleted
+      const { data: offer, error } = await supabase
+        .from("offers")
+        .select("deleted_at")
+        .eq("id", offerId)
+        .single();
+
+      if (error) {
+        console.error("Error checking offer status:", error);
+        return;
       }
-    }, offersTableRef);
+
+      if (offer && offer.deleted_at) {
+        // The offer is soft-deleted
+        toast({
+          title: "Offer Unavailable",
+          description: "This offer has been deleted and cannot be edited.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // If the offer is not deleted, proceed with opening the edit dialog
+      openEditOfferDialog(id, offerId, () => {
+        // Use the ref to refresh the data instead of fetching all offers again
+        if (offersTableRef.current) {
+          offersTableRef.current.refreshData();
+        } else {
+          fetchRecentOffers();
+        }
+      }, offersTableRef);
+    } catch (error) {
+      console.error("Error handling offer edit:", error);
+    }
   };
   
   // Add a function to handle adding a new offer
