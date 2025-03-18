@@ -320,7 +320,8 @@ export default function CustomerDetailPage() {
         .from("contacts")
         .select("*")
         .eq("customer_id", id)
-        .eq("status", "active");
+        .eq("status", "active")
+        .is("deleted_at", null);
 
       if (error) throw error;
       setContacts(data || []);

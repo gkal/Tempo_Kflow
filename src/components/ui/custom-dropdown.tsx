@@ -194,6 +194,21 @@ const SearchBarCustomDropdown: React.FC<SearchBarDropdownProps> = ({
     left: 0,
     width: 0
   });
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+  
+  // Create portal container when component mounts
+  useEffect(() => {
+    const container = document.createElement('div');
+    container.setAttribute('data-dropdown-portal', 'true');
+    document.body.appendChild(container);
+    setPortalContainer(container);
+    
+    return () => {
+      if (document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
+    };
+  }, []);
 
   // Calculate dynamic width based on longest option
   const calculateDropdownWidth = () => {
@@ -241,11 +256,14 @@ const SearchBarCustomDropdown: React.FC<SearchBarDropdownProps> = ({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [isOpen]);
 
   // Toggle dropdown
   const toggleDropdown = () => {
@@ -300,8 +318,59 @@ const SearchBarCustomDropdown: React.FC<SearchBarDropdownProps> = ({
     );
   }
 
+  const renderDropdownContent = () => {
+    if (!isOpen || !portalContainer) return null;
+    
+    return ReactDOM.createPortal(
+      <div 
+        ref={dropdownRef}
+        style={{
+          position: 'absolute',
+          top: `${dropdownPosition.top + 8}px`,
+          left: `${dropdownPosition.left}px`,
+          width: `${dropdownPosition.width}px`,
+          zIndex: 9999,
+          backgroundColor: 'var(--app-bg-primary)',
+          color: 'var(--app-text-primary)',
+          borderRadius: '0.375rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          outline: 'none',
+          border: '1px solid var(--app-border-primary)'
+        }}
+        className="max-h-60 overflow-auto scrollbar-visible"
+      >
+        {currentOptions.map((option) => (
+          <button
+            key={option.value}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSelect(option.value);
+            }}
+            className={cn(
+              "w-full px-3 py-2 text-sm flex items-center",
+              "hover:bg-[var(--app-bg-tertiary)]",
+              option.value === value ? "bg-[var(--app-active-bg)]" : ""
+            )}
+          >
+            {option.value === value ? (
+              <Check 
+                className="h-4 w-4 mr-2 flex-shrink-0" 
+                color="var(--app-text-muted)"
+              />
+            ) : (
+              <div className="w-4 h-4 mr-2 flex-shrink-0" />
+            )}
+            <span className="flex-grow text-left">{option.label}</span>
+          </button>
+        ))}
+      </div>,
+      portalContainer
+    );
+  };
+
   return (
-    <div className={cn("relative inline-block w-full", className)} ref={dropdownRef}>
+    <div className={cn("relative inline-block w-full", className)}>
       <button
         ref={triggerRef}
         type="button"
@@ -320,53 +389,7 @@ const SearchBarCustomDropdown: React.FC<SearchBarDropdownProps> = ({
           ></div>
         </div>
       </button>
-      
-      {isOpen && ReactDOM.createPortal(
-        <div 
-          ref={dropdownRef}
-          style={{
-            position: 'absolute',
-            top: `${dropdownPosition.top + 8}px`,
-            left: `${dropdownPosition.left}px`,
-            width: `${dropdownPosition.width}px`,
-            zIndex: 9999,
-            backgroundColor: 'var(--app-bg-primary)',
-            color: 'var(--app-text-primary)',
-            borderRadius: '0.375rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-            outline: 'none',
-            border: '1px solid var(--app-border-primary)'
-          }}
-          className="max-h-60 overflow-auto scrollbar-visible"
-        >
-          {currentOptions.map((option) => (
-            <button
-              key={option.value}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleSelect(option.value);
-              }}
-              className={cn(
-                "w-full px-3 py-2 text-sm flex items-center",
-                "hover:bg-[var(--app-bg-tertiary)]",
-                option.value === value ? "bg-[var(--app-active-bg)]" : ""
-              )}
-            >
-              {option.value === value ? (
-                <Check 
-                  className="h-4 w-4 mr-2 flex-shrink-0" 
-                  color="var(--app-text-muted)"
-                />
-              ) : (
-                <div className="w-4 h-4 mr-2 flex-shrink-0" />
-              )}
-              <span className="flex-grow text-left">{option.label}</span>
-            </button>
-          ))}
-        </div>,
-        document.body
-      )}
+      {renderDropdownContent()}
     </div>
   );
 };

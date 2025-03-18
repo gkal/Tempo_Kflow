@@ -102,6 +102,10 @@ const DetailsTab = React.memo(() => {
   // State for current category view
   const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(null);
 
+  // Add state variables for loading and success in deletion
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false);
+  const [isDeleteSuccessful, setIsDeleteSuccessful] = useState(false);
+
   // Reset function to clear all temporary state
   const resetState = useCallback(() => {
     setSelectedItems([]);
@@ -516,6 +520,8 @@ const DetailsTab = React.memo(() => {
       setDetailToDelete(detail);
       // Show dialog immediately
       setShowDeleteDialog(true);
+      // Reset success state
+      setIsDeleteSuccessful(false);
     }
   };
 
@@ -525,29 +531,46 @@ const DetailsTab = React.memo(() => {
       return;
     }
     
-    // Close dialog immediately
-    setShowDeleteDialog(false);
+    // Set loading state
+    setIsDeleteLoading(true);
     
     // Store the ID before deleting
     const idToDelete = detailToDelete.id;
     
-    // Clear the detailToDelete immediately
-    setDetailToDelete(null);
-    
-    setLoading(true);
-    
     // Use a direct promise chain instead of an async function
     deleteOfferDetail(idToDelete)
       .then(() => {
-        setDetails(prev => prev.filter(item => item.id !== idToDelete));
+        // Show success state instead of closing immediately
+        setIsDeleteSuccessful(true);
+        
+        // Don't update state immediately to prevent UI refresh
+        // Will update when dialog is closed
       })
       .catch(error => {
         console.error("Error deleting offer detail:", error);
         setError("Σφάλμα κατά τη διαγραφή λεπτομέρειας προσφοράς.");
+        // Close dialog on error
+        setShowDeleteDialog(false);
+        setDetailToDelete(null);
       })
       .finally(() => {
-        setLoading(false);
+        setIsDeleteLoading(false);
       });
+  };
+  
+  // Handle dialog close
+  const handleDeleteDialogClose = (open: boolean) => {
+    if (!open) {
+      if (isDeleteSuccessful) {
+        // Only update state when closing after success
+        setDetails(prev => prev.filter(item => item.id !== detailToDelete?.id));
+      }
+      
+      // Reset states
+      setShowDeleteDialog(false);
+      setDetailToDelete(null);
+      setIsDeleteSuccessful(false);
+    }
   };
 
   // Truncate text and add ellipsis if needed
@@ -1002,41 +1025,90 @@ const DetailsTab = React.memo(() => {
       <Dialog 
         open={showDeleteDialog} 
         onOpenChange={(open) => {
-          setShowDeleteDialog(open);
+          // Prevent closing while deleting
+          if (!isDeleteLoading) {
+            handleDeleteDialogClose(open);
+          }
         }}
       >
         <DialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f]">
           <DialogHeader>
-            <DialogTitle className="text-[#84a98c]">Διαγραφή Λεπτομέρειας</DialogTitle>
+            <DialogTitle className="text-[#84a98c]">
+              {isDeleteSuccessful 
+                ? "Επιτυχής Διαγραφή" 
+                : "Διαγραφή Λεπτομέρειας"
+              }
+            </DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-[#cad2c5] text-sm">
-              Είστε βέβαιοι ότι θέλετε να διαγράψετε αυτή τη λεπτομέρεια προσφοράς;
-              <br />
-              Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
-            </p>
+            {isDeleteLoading ? (
+              <div className="flex flex-col items-center justify-center space-y-3 py-3">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#52796f] border-t-transparent"></div>
+                <p className="text-[#cad2c5]">Η διαγραφή βρίσκεται σε εξέλιξη. Παρακαλώ περιμένετε...</p>
+                <p className="text-sm text-[#84a98c]">Αυτή η διαδικασία μπορεί να διαρκέσει μερικά δευτερόλεπτα.</p>
+              </div>
+            ) : isDeleteSuccessful ? (
+              <div className="flex flex-col items-center justify-center space-y-3 py-3">
+                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <p className="text-center text-green-500 font-medium">
+                  Η λεπτομέρεια προσφοράς διαγράφηκε με επιτυχία!
+                </p>
+              </div>
+            ) : (
+              <p className="text-[#cad2c5] text-sm">
+                Είστε βέβαιοι ότι θέλετε να διαγράψετε αυτή τη λεπτομέρεια προσφοράς;
+                <br />
+                Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
+              </p>
+            )}
           </div>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowDeleteDialog(false);
-              }}
-              className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
-            >
-              Ακύρωση
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                handleDeleteConfirm();
-              }}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              Διαγραφή
-            </Button>
+            {isDeleteSuccessful ? (
+              <Button
+                type="button"
+                onClick={() => handleDeleteDialogClose(false)}
+                className="bg-[#52796f] hover:bg-[#52796f]/90 text-white"
+              >
+                OK
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    handleDeleteDialogClose(false);
+                  }}
+                  className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
+                  disabled={isDeleteLoading}
+                >
+                  Ακύρωση
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    handleDeleteConfirm();
+                  }}
+                  className="bg-red-600 text-white hover:bg-red-700"
+                  disabled={isDeleteLoading}
+                >
+                  {isDeleteLoading ? (
+                    <div className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Διαγραφή...
+                    </div>
+                  ) : "Διαγραφή"}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

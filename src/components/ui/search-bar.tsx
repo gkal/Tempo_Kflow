@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SearchBarCustomDropdown } from "@/components/ui/custom-dropdown";
@@ -24,7 +24,14 @@ export function SearchBar({
   className = "",
 }: SearchBarProps) {
   const [dropdownWidth, setDropdownWidth] = useState(120);
+  const [localValue, setLocalValue] = useState(value);
   const spanRef = useRef<HTMLSpanElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Sync local value with prop value when it changes externally
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
 
   useEffect(() => {
     // Create a temporary span to measure text width
@@ -53,6 +60,15 @@ export function SearchBar({
       setDropdownWidth(Math.max(totalWidth, 120));
     }
   }, [options]);
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // Wrapper function to convert column change to synthetic event
   const handleColumnChange = (column: string) => {
@@ -65,6 +81,22 @@ export function SearchBar({
     
     onColumnChange(column);
   };
+  
+  // Debounced search handler to avoid rapid state updates
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setLocalValue(newValue);
+    
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    // Set a new timeout to update the parent
+    timeoutRef.current = setTimeout(() => {
+      onChange(newValue);
+    }, 150); // Small delay to avoid rapid updates
+  }, [onChange]);
 
   // Update the custom styles to remove borders on hover
   const customStyles = `
@@ -127,8 +159,8 @@ export function SearchBar({
         </div>
         <input
           type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={localValue}
+          onChange={handleSearchChange}
           placeholder={placeholder}
           className="search-input flex-grow bg-transparent py-2 text-sm"
           style={{
@@ -137,6 +169,18 @@ export function SearchBar({
             boxShadow: 'none'
           }}
         />
+        {/* Hidden span for measuring text width */}
+        <span 
+          ref={spanRef} 
+          style={{ 
+            position: 'absolute', 
+            visibility: 'hidden',
+            whiteSpace: 'nowrap',
+            fontFamily: 'inherit',
+            fontSize: 'inherit'
+          }} 
+          aria-hidden="true"
+        ></span>
         <SearchBarCustomDropdown
           options={options}
           value={selectedColumn}

@@ -48,6 +48,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+// Add custom animation style at the top of the file
+const progressAnimationStyle = {
+  "@keyframes progress": {
+    "0%": { transform: "translateX(-100%)" },
+    "50%": { transform: "translateX(0%)" },
+    "100%": { transform: "translateX(100%)" }
+  },
+  ".animate-progress": {
+    animation: "progress 1.5s ease-in-out infinite"
+  }
+}
+
 // Add Customer interface
 interface Customer {
   id: string;
@@ -264,6 +276,52 @@ export default function CustomersPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
+  // Apply custom animation styles
+  React.useEffect(() => {
+    // Create a style element
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+      @keyframes progress {
+        0% { transform: translateX(-100%); }
+        50% { transform: translateX(0%); }
+        100% { transform: translateX(100%); }
+      }
+      .animate-progress {
+        animation: progress 1.5s ease-in-out infinite;
+      }
+      
+      @keyframes modalAppear {
+        0% { opacity: 0; transform: translateY(10px) scale(0.97); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .modal-appear {
+        animation: modalAppear 0.2s ease-out forwards;
+      }
+    `;
+    
+    // Add it to the document head
+    document.head.appendChild(styleElement);
+    
+    // Clean up when component unmounts
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
+  
+  // Simple alert state
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState(null);
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
+  
+  // Track deletion in progress with this ref
+  const deletionInProgressRef = useRef(false);
+  // Track debounce timer for success callback
+  const debounceTimerRef = useRef(null);
+  
+  // Add this state to explicitly control dialog visibility
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  
   // Define searchColumns here, before it's used in any hooks
   const searchColumns = [
     { header: "Επωνυμία", accessor: "company_name" },
@@ -306,9 +364,8 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchColumn, setSearchColumn] = useState("company_name");
   const [showDialog, setShowDialog] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [customerToDelete, setCustomerToDelete] = useState(null);
   const [formValid, setFormValid] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [statusFilter, setStatusFilter] = useState("active"); // "active", "inactive", "all"
@@ -561,7 +618,7 @@ export default function CustomersPage() {
     }
   }, [customerOffers]);
 
-  // Update fetchCustomers to prefetch offers for visible customers
+  // Update fetchCustomers to exclude soft-deleted customers
   const fetchCustomers = async (customersToExpand: string[] = []) => {
     try {
       setLoading(true);
@@ -580,6 +637,9 @@ export default function CustomersPage() {
             deleted_at
           )
         `, { count: "exact" });
+      
+      // Exclude soft-deleted customers 
+      query = query.is("deleted_at", null);
       
       if (statusFilter !== "all") {
         query = query.eq("status", statusFilter);
@@ -909,7 +969,10 @@ export default function CustomersPage() {
                       e.stopPropagation();
                       // Set the customer to delete and show the confirmation dialog
                       setCustomerToDelete(row);
-                      setShowDeleteDialog(true);
+                      // Ensure the dialog is shown after customerToDelete is set
+                      setTimeout(() => {
+                        setShowDeleteAlert(true);
+                      }, 50);
                     }}
                     className="h-8 w-8 hover:bg-[#354f52] text-red-500 hover:text-red-400"
                   >
@@ -1056,9 +1119,11 @@ export default function CustomersPage() {
   // Fetch customers when user or filters change
   useEffect(() => {
     if (user) {
+      // Only fetch if refreshTrigger changes or statusFilter changes
+      // This prevents unnecessary fetches
       fetchCustomers();
     }
-  }, [user, refreshTrigger, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, statusFilter]); // Remove refreshTrigger to prevent cascading refreshes
 
   // Initialize dropdown options once on component mount
   useEffect(() => {
@@ -1117,220 +1182,419 @@ export default function CustomersPage() {
     }
   };
 
-  const handleDelete = async (customerId) => {
-    if (!customerId) return;
+  // Function to track and prevent duplicate delete operations
+  const preventDuplicateDelete = (customerId) => {
+    console.log(`[PREVENT_DUP] Checking deletion for ${customerId}, current state: ${deletionInProgressRef.current}`);
+    
+    if (deletionInProgressRef.current) {
+      console.log(`[PREVENT_DUP] Deletion already in progress, preventing duplicate`);
+      return false;
+    }
+    
+    // Set deletion in progress flag
+    deletionInProgressRef.current = true;
+    
+    // Auto-reset after 3 seconds as a safety measure
+    setTimeout(() => {
+      console.log(`[PREVENT_DUP] Auto-resetting deletion flag after timeout`);
+      deletionInProgressRef.current = false;
+    }, 3000);
+    
+    return true;
+  };
+  
+  // Function to clear deletion in progress flag
+  const clearDeletionInProgress = () => {
+    console.log(`[PREVENT_DUP] Manually clearing deletion flag`);
+    deletionInProgressRef.current = false;
+  };
+
+  // Simple direct customer delete function
+  const deleteCustomer = async (
+    customerId, 
+    setOpFn = null, 
+    setCompletedFn = null,
+    setErrorFn = null
+  ) => {
+    if (!customerId || isDeletingCustomer) return;
+    
+    // Set the deletion in progress flag before any async operations
+    setIsDeletingCustomer(true);
+    
+    // Function to update current operation
+    const updateOperation = (operation) => {
+      if (setOpFn) setOpFn(operation);
+    };
+    
+    // Function to add completed operation
+    const addCompletedOperation = (operation) => {
+      if (setCompletedFn) setCompletedFn(prev => [...prev, operation]);
+    };
     
     try {
-      // Make role check case-insensitive and allow both Admin and Super User roles to delete
-      const isAdminOrSuperUser = 
+      const isAdmin = 
         user?.role?.toLowerCase() === 'admin' || 
         user?.role?.toLowerCase() === 'super user';
       
-      if (isAdminOrSuperUser) {
-        // For admin and super users: Use soft delete for customer and all related data
-        
-        // Set the current timestamp for soft delete
+      if (isAdmin) {
+        // Delete offers and their details first
+        updateOperation("Διαγραφή προσφορών...");
         const deletedAt = new Date().toISOString();
         
-        // First soft delete all offers associated with this customer
-        try {
-          // Try to use the soft_delete_record RPC function
-          const { error: offersRpcError } = await supabase.rpc('soft_delete_record_by_field', {
-            table_name: 'offers',
-            field_name: 'customer_id',
-            field_value: customerId
-          });
+        // First delete sequence: Offers
+        const { error: offersError } = await supabase
+          .from('offers')
+          .update({ deleted_at: deletedAt })
+          .eq('customer_id', customerId);
           
-          if (offersRpcError) {
-            // Fallback to manual soft delete if RPC fails
-            const { error: offersError } = await supabase
-              .from('offers')
-              .update({ deleted_at: deletedAt })
-              .eq('customer_id', customerId);
-            
-            if (offersError) {
-              console.error("Error soft deleting customer offers:", offersError);
-              throw new Error("Failed to soft delete customer offers");
-            }
-          }
-          
-          // Also soft delete associated offer_details
-          const { data: offerIds } = await supabase
-            .from('offers')
-            .select('id')
-            .eq('customer_id', customerId);
-            
-          if (offerIds && offerIds.length > 0) {
-            const ids = offerIds.map(o => o.id);
-            
-            try {
-              // Try to use RPC for offer details
-              await Promise.all(ids.map(id => 
-                supabase.rpc('soft_delete_record_by_field', {
-                  table_name: 'offer_details',
-                  field_name: 'offer_id',
-                  field_value: id
-                })
-              ));
-            } catch (detailsError) {
-              // Fallback to manual update if RPC fails
-              await Promise.all(ids.map(id => 
-                supabase
-                  .from('offer_details')
-                  .update({ deleted_at: deletedAt })
-                  .eq('offer_id', id)
-              ));
-            }
-          }
-        } catch (error) {
-          console.error("Error soft deleting offers and details:", error);
-          throw new Error("Failed to soft delete customer offers and details");
+        if (offersError) {
+          console.error("Error deleting offers:", offersError);
+          throw new Error(`Σφάλμα κατά τη διαγραφή προσφορών: ${offersError.message}`);
         }
         
-        // Set primary_contact_id to null to break the circular reference
-        const { error: updateError } = await supabase
+        addCompletedOperation("Οι προσφορές διαγράφηκαν με επιτυχία");
+        
+        // Get offer IDs
+        updateOperation("Εύρεση στοιχείων προσφορών...");
+        const { data: offerIds, error: offerIdsError } = await supabase
+          .from('offers')
+          .select('id')
+          .eq('customer_id', customerId);
+          
+        if (offerIdsError) {
+          console.error("Error fetching offer IDs:", offerIdsError);
+          throw new Error(`Σφάλμα κατά την εύρεση προσφορών: ${offerIdsError.message}`);
+        }
+        
+        // Mark offer details as deleted if we have offers
+        if (offerIds && offerIds.length > 0) {
+          updateOperation(`Διαγραφή λεπτομερειών προσφορών (${offerIds.length})...`);
+          for (const offer of offerIds) {
+            const { error: offerDetailsError } = await supabase
+              .from('offer_details')
+              .update({ deleted_at: deletedAt })
+              .eq('offer_id', offer.id);
+              
+            if (offerDetailsError) {
+              console.error(`Error deleting details for offer ${offer.id}:`, offerDetailsError);
+              throw new Error(`Σφάλμα κατά τη διαγραφή λεπτομερειών προσφοράς: ${offerDetailsError.message}`);
+            }
+          }
+          addCompletedOperation(`Λεπτομέρειες προσφορών (${offerIds.length}) διαγράφηκαν με επιτυχία`);
+        }
+        
+        // Second delete sequence: Primary Contact
+        updateOperation("Κατάργηση αναφοράς κύριας επαφής...");
+        const { error: primaryContactError } = await supabase
           .from('customers')
           .update({ primary_contact_id: null })
           .eq('id', customerId);
-        
-        if (updateError) {
-          console.error("Error updating customer primary contact:", updateError);
-          throw new Error("Failed to update customer primary contact");
-        }
-        
-        // Then soft delete all contacts associated with this customer
-        try {
-          // Try to use the soft_delete_record RPC function
-          const { error: contactsRpcError } = await supabase.rpc('soft_delete_record_by_field', {
-            table_name: 'contacts',
-            field_name: 'customer_id',
-            field_value: customerId
-          });
           
-          if (contactsRpcError) {
-            // Fallback to manual soft delete if RPC fails
-            const { error: contactsError } = await supabase
-              .from('contacts')
-              .update({ deleted_at: deletedAt })
-              .eq('customer_id', customerId);
-            
-            if (contactsError) {
-              console.error("Error soft deleting customer contacts:", contactsError);
-              throw new Error("Failed to soft delete customer contacts");
-            }
-          }
-        } catch (error) {
-          console.error("Error soft deleting contacts:", error);
-          throw new Error("Failed to soft delete customer contacts");
+        if (primaryContactError) {
+          console.error("Error removing primary contact reference:", primaryContactError);
+          throw new Error(`Σφάλμα κατά την κατάργηση κύριας επαφής: ${primaryContactError.message}`);
         }
         
-        // Finally soft delete the customer
-        try {
-          // Try to use the soft_delete_record RPC function
-          const { error: customerRpcError } = await supabase.rpc('soft_delete_record', {
-            table_name: 'customers',
-            record_id: customerId
-          });
+        addCompletedOperation("Η αναφορά κύριας επαφής καταργήθηκε με επιτυχία");
+        
+        // Third delete sequence: Contacts
+        updateOperation("Διαγραφή επαφών...");
+        const { error: contactsError } = await supabase
+          .from('contacts')
+          .update({ deleted_at: deletedAt })
+          .eq('customer_id', customerId);
           
-          if (customerRpcError) {
-            // Fallback to manual soft delete if RPC fails
-            const { error: customerError } = await supabase
-              .from('customers')
-              .update({ 
-                deleted_at: deletedAt,
-                status: 'inactive',
-                modified_by: user?.id,
-                updated_at: deletedAt
-              })
-              .eq('id', customerId);
-            
-            if (customerError) {
-              console.error("Error soft deleting customer:", customerError);
-              throw new Error("Failed to soft delete customer");
-            }
-          }
-        } catch (error) {
-          console.error("Error soft deleting customer:", error);
-          throw new Error("Failed to soft delete customer");
+        if (contactsError) {
+          console.error("Error deleting contacts:", contactsError);
+          throw new Error(`Σφάλμα κατά τη διαγραφή επαφών: ${contactsError.message}`);
         }
         
-        // Update the customers array
-        setCustomers(prevCustomers => 
-          prevCustomers.filter(c => c.id !== customerId)
-        );
+        addCompletedOperation("Οι επαφές διαγράφηκαν με επιτυχία");
         
-        // Update the filtered customers array
-        setFilteredCustomers(prevFiltered => 
-          prevFiltered.filter(c => c.id !== customerId)
-        );
-        
-        toast({
-          title: "Επιτυχής διαγραφή",
-          description: 'Ο πελάτης, οι επαφές και οι προσφορές του διαγράφηκαν με επιτυχία!',
-          variant: "default",
+        // Fourth delete sequence: Customer
+        updateOperation("Διαγραφή πελάτη...");
+        const { error: customerError } = await supabase.rpc('soft_delete_record', {
+          table_name: 'customers',
+          record_id: customerId
         });
+        
+        if (customerError) {
+          console.error("Error deleting customer:", customerError);
+          throw new Error(`Σφάλμα κατά τη διαγραφή πελάτη: ${customerError.message}`);
+        }
+        
+        addCompletedOperation("Ο πελάτης διαγράφηκε με επιτυχία");
+        updateOperation("");
+        
+        // Update UI
+        setCustomers(prev => prev.filter(c => c.id !== customerId));
+        setFilteredCustomers(prev => prev.filter(c => c.id !== customerId));
       } else {
-        // For non-admin/super users: Just deactivate
-        await supabase
+        // For non-admin, just deactivate
+        updateOperation("Απενεργοποίηση πελάτη...");
+        const { error: deactivateError } = await supabase
           .from('customers')
           .update({ 
             status: 'inactive',
             updated_at: new Date().toISOString()
           })
           .eq('id', customerId);
-        
-        // Update the customers array
-        setCustomers(prevCustomers => 
-          prevCustomers.map(c => 
-            c.id === customerId ? {...c, status: 'inactive'} : c
-          )
-        );
-        
-        // Handle filtered customers based on status filter
-        if (statusFilter !== 'all' && statusFilter !== 'inactive') {
-          // If we're not showing inactive customers, remove from filtered view
-          setFilteredCustomers(prevFiltered => 
-            prevFiltered.filter(c => c.id !== customerId)
-          );
-        } else {
-          // Otherwise update in the filtered view
-          setFilteredCustomers(prevFiltered => 
-            prevFiltered.map(c => c.id === customerId ? {...c, status: 'inactive'} : c)
-          );
+          
+        if (deactivateError) {
+          console.error("Error deactivating customer:", deactivateError);
+          throw new Error(`Σφάλμα κατά την απενεργοποίηση πελάτη: ${deactivateError.message}`);
         }
         
-        toast({
-          title: "Επιτυχής απενεργοποίηση",
-          description: 'Ο πελάτης απενεργοποιήθηκε με επιτυχία!',
-          variant: "default",
-        });
+        addCompletedOperation("Ο πελάτης απενεργοποιήθηκε με επιτυχία");
+        updateOperation("");
+        
+        // Update UI
+        if (statusFilter === 'active') {
+          setCustomers(prev => prev.filter(c => c.id !== customerId));
+          setFilteredCustomers(prev => prev.filter(c => c.id !== customerId));
+        } else {
+          setCustomers(prev => 
+            prev.map(c => c.id === customerId ? {...c, status: 'inactive'} : c)
+          );
+          setFilteredCustomers(prev => 
+            prev.map(c => c.id === customerId ? {...c, status: 'inactive'} : c)
+          );
+        }
       }
+      
+      // Set success state
+      setDeleteSuccess(true);
+      
+      // We no longer auto-close - user must click the button
+      setIsDeletingCustomer(false);
+      
     } catch (error) {
       console.error("Error deleting customer:", error);
-      toast({
-        title: "Σφάλμα",
-        description: 'Σφάλμα κατά τη διαγραφή του πελάτη: ' + (error.message || 'Άγνωστο σφάλμα'),
-        variant: "destructive",
-      });
+      
+      // Pass the error to the error handler if provided
+      if (setErrorFn) {
+        setErrorFn(error.message || 'Άγνωστο σφάλμα κατά τη διαγραφή του πελάτη');
+      }
+      
+      // Reset deletion state but don't hide the modal
+      setIsDeletingCustomer(false);
     }
   };
 
-  // Find the refreshData function that's causing the error
-  const refreshData = () => {
-    // Make sure we're not trying to access properties of null or undefined
-    // and that we're passing a string ID, not an object
-    if (selectedCustomer && selectedCustomer.id) {
-      // If you're using the ID directly, make sure it's a string
-      const customerId = typeof selectedCustomer.id === 'string' 
-        ? selectedCustomer.id 
-        : String(selectedCustomer.id);
-        
-      // Use the string ID in your API calls
-      // ... your existing code ...
+  // Create a rock-solid delete confirmation component
+  const SimpleDeleteModal = () => {
+    if (!customerToDelete) return null;
+    
+    // State for tracking operations
+    const [currentOperation, setCurrentOperation] = useState("");
+    const [completedOperations, setCompletedOperations] = useState([]);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    
+    const isAdmin = 
+      user?.role?.toLowerCase() === 'admin' || 
+      user?.role?.toLowerCase() === 'super user';
+    
+    // Simple function to close the modal and reset state
+    const closeModal = () => {
+      if (isDeletingCustomer) return; // Don't close if deleting
+      setShowDeleteAlert(false);
+      setTimeout(() => {
+        setCustomerToDelete(null);
+        setDeleteSuccess(false);
+        setCompletedOperations([]);
+        setCurrentOperation("");
+        setErrorMessage(null);
+      }, 300);
+    };
+    
+    // Handle delete action
+    const handleDelete = () => {
+      // Reset error message when starting a new deletion
+      setErrorMessage(null);
+      deleteCustomer(customerToDelete.id, setCurrentOperation, setCompletedOperations, setErrorMessage);
+    };
+    
+    // Modal content based on state
+    let modalContent;
+    
+    if (errorMessage) {
+      // Error state
+      modalContent = (
+        <>
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold text-white mb-2">Σφάλμα Διαγραφής</h2>
+            <div className="h-16 w-16 mx-auto rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <p className="text-red-400 font-medium text-lg mb-3">Η διαδικασία διακόπηκε λόγω σφάλματος</p>
+            
+            <div className="mt-2 text-left border border-red-500/30 rounded p-3 bg-red-500/10 max-h-48 overflow-y-auto">
+              <p className="text-sm text-red-300 font-medium mb-1">Λεπτομέρειες σφάλματος:</p>
+              <p className="text-sm text-red-200 break-words">{errorMessage}</p>
+            </div>
+            
+            {completedOperations.length > 0 && (
+              <div className="mt-4 text-left border border-[#354f52] rounded p-3 bg-[#2a3b42] max-h-36 overflow-y-auto">
+                <p className="text-sm text-[#84a98c] font-medium mb-2">Ολοκληρωμένες ενέργειες πριν το σφάλμα:</p>
+                <ul className="text-sm text-[#84a98c] space-y-1">
+                  {completedOperations.map((op, idx) => (
+                    <li key={idx} className="flex items-start">
+                      <svg className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>{op}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-center mt-4">
+            <Button 
+              onClick={closeModal}
+              className="bg-[#52796f] hover:bg-[#52796f]/90 text-white"
+            >
+              Κλείσιμο
+            </Button>
+          </div>
+        </>
+      );
+    } else if (isDeletingCustomer) {
+      // Loading state with current operation display
+      modalContent = (
+        <>
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold text-white mb-2">Διαγραφή σε Εξέλιξη</h2>
+            <div className="h-16 w-16 mx-auto animate-spin rounded-full border-4 border-[#52796f] border-t-transparent mb-4"></div>
+            <p className="text-[#cad2c5] font-medium">
+              {currentOperation || "Επεξεργασία..."}
+            </p>
+            
+            {completedOperations.length > 0 && (
+              <div className="mt-4 text-left border border-[#354f52] rounded p-3 bg-[#2a3b42] max-h-36 overflow-y-auto">
+                <p className="text-sm text-[#84a98c] font-medium mb-2">Ολοκληρωμένες ενέργειες:</p>
+                <ul className="text-sm text-[#84a98c] space-y-1">
+                  {completedOperations.map((op, idx) => (
+                    <li key={idx} className="flex items-start">
+                      <svg className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>{op}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            <div className="w-full bg-[#354f52] h-1.5 rounded-full mt-4 overflow-hidden">
+              <div className="h-full bg-[#84a98c] rounded-full animate-progress"></div>
+            </div>
+          </div>
+        </>
+      );
+    } else if (deleteSuccess) {
+      // Success state with all completed operations
+      modalContent = (
+        <>
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold text-white mb-2">Επιτυχής Διαγραφή</h2>
+            <div className="h-16 w-16 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <p className="text-green-400 font-medium text-lg mb-1">
+              {isAdmin 
+                ? "Ο πελάτης διαγράφηκε με επιτυχία!"
+                : "Ο πελάτης απενεργοποιήθηκε με επιτυχία!"}
+            </p>
+            <p className="text-sm text-[#84a98c]">
+              Η λίστα πελατών έχει ενημερωθεί.
+            </p>
+            
+            {completedOperations.length > 0 && (
+              <div className="mt-4 text-left border border-[#354f52] rounded p-3 bg-[#2a3b42] max-h-36 overflow-y-auto">
+                <p className="text-sm text-[#84a98c] font-medium mb-2">Ολοκληρωμένες ενέργειες:</p>
+                <ul className="text-sm text-[#84a98c] space-y-1">
+                  {completedOperations.map((op, idx) => (
+                    <li key={idx} className="flex items-start">
+                      <svg className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>{op}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-center mt-4">
+            <Button 
+              onClick={closeModal}
+              className="bg-[#52796f] hover:bg-[#52796f]/90 text-white"
+            >
+              Κλείσιμο
+            </Button>
+          </div>
+        </>
+      );
     } else {
-      // If there's no selected customer, just fetch all customers
-      fetchCustomers();
+      // Confirmation state
+      modalContent = (
+        <>
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-white mb-2">
+              {isAdmin ? "Επιβεβαίωση Διαγραφής" : "Επιβεβαίωση Απενεργοποίησης"}
+            </h2>
+            <p className="text-[#84a98c]">
+              {isAdmin 
+                ? 'Είστε σίγουροι ότι θέλετε να διαγράψετε αυτόν τον πελάτη; Η ενέργεια αυτή θα διαγράψει επίσης όλες τις επαφές και προσφορές του πελάτη.'
+                : 'Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε αυτόν τον πελάτη;'
+              }
+            </p>
+          </div>
+          <div className="flex justify-end space-x-3 mt-4">
+            <Button 
+              variant="outline"
+              className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white" 
+              onClick={closeModal}
+            >
+              Άκυρο
+            </Button>
+            <Button 
+              onClick={handleDelete}
+              className={isAdmin 
+                ? "bg-red-600 hover:bg-red-700 text-white" 
+                : "bg-[#52796f] hover:bg-[#3a5a44] text-white"}
+            >
+              {isAdmin ? 'Διαγραφή' : 'Απενεργοποίηση'}
+            </Button>
+          </div>
+        </>
+      );
     }
+    
+    // Create modal backdrop and content that won't close unexpectedly
+    return (
+      <div className="fixed inset-0 z-[9999] overflow-y-auto" style={{pointerEvents: 'all'}}>
+        <div 
+          className="fixed inset-0 bg-black/80" 
+          onClick={isDeletingCustomer ? undefined : closeModal}
+          style={{pointerEvents: isDeletingCustomer ? 'none' : 'auto'}}
+        ></div>
+        <div className="flex min-h-full items-center justify-center p-4">
+          <div 
+            className="w-full max-w-lg rounded-lg bg-[#2f3e46] border-2 border-[#52796f] p-8 shadow-2xl relative z-[10000] modal-appear"
+            onClick={(e) => e.stopPropagation()}
+            style={{transform: 'translateZ(0)'}}
+          >
+            {modalContent}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Define refreshCustomers early in the component
@@ -1350,22 +1614,6 @@ export default function CustomersPage() {
         ...prev,
         [customerId]: true
       }));
-      
-      setCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, isExpanded: true } 
-            : customer
-        )
-      );
-      
-      setFilteredCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, isExpanded: true } 
-            : customer
-        )
-      );
     });
   }
   
@@ -1378,34 +1626,8 @@ export default function CustomersPage() {
         ...prev,
         [customerId]: true
       }));
-      
-      setCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, isExpanded: true } 
-            : customer
-        )
-      );
-      
-      setFilteredCustomers(prev => 
-        prev.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, isExpanded: true } 
-            : customer
-        )
-      );
     });
   }
-  
-  // Replace the handleSaveOffer function
-  const handleSaveOffer = useCallback(() => {
-    refreshCustomers();
-  }, []);
-  
-  // Replace the handleCloseOfferDialog function
-  const handleCloseOfferDialog = useCallback(() => {
-    // Nothing needed here since the dialog manager handles closing
-  }, []);
   
   // Replace the handleOpenOfferDialog function
   const handleOpenOfferDialog = useCallback((customerId: string, source: string = "Email", offerId?: string) => {
@@ -1415,71 +1637,6 @@ export default function CustomersPage() {
       openNewOfferDialog(customerId, source, refreshCustomers);
     }
   }, [refreshCustomers]);
-
-  // Delete confirmation dialog
-  const DeleteConfirmationDialog = () => {
-    if (!customerToDelete) return null;
-
-    const isAdminOrSuperUser = 
-      user?.role?.toLowerCase() === 'admin' || 
-      user?.role?.toLowerCase() === 'super user';
-
-    const isActive = customerToDelete.status === 'active';
-
-    return (
-      <Dialog open={!!customerToDelete} onOpenChange={() => setCustomerToDelete(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {isAdminOrSuperUser 
-                ? isActive 
-                  ? 'Επιβεβαίωση διαγραφής' 
-                  : 'Επιβεβαίωση διαγραφής απενεργοποιημένου πελάτη'
-                : isActive
-                  ? 'Επιβεβαίωση απενεργοποίησης'
-                  : 'Επιβεβαίωση ενεργοποίησης'}
-            </DialogTitle>
-            <DialogDescription>
-              {isAdminOrSuperUser 
-                ? isActive 
-                  ? 'Είστε σίγουροι ότι θέλετε να διαγράψετε αυτόν τον πελάτη; Η ενέργεια αυτή θα διαγράψει επίσης όλες τις επαφές και προσφορές του πελάτη.'
-                  : 'Είστε σίγουροι ότι θέλετε να διαγράψετε αυτόν τον απενεργοποιημένο πελάτη; Η ενέργεια αυτή θα διαγράψει επίσης όλες τις επαφές και προσφορές του πελάτη.'
-                : isActive
-                  ? 'Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε αυτόν τον πελάτη;'
-                  : 'Είστε σίγουροι ότι θέλετε να ενεργοποιήσετε αυτόν τον πελάτη;'}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setCustomerToDelete(null)}
-            >
-              Ακύρωση
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (isAdminOrSuperUser) {
-                  handleDelete(customerToDelete.id);
-                } else {
-                  toggleCustomerStatus(customerToDelete);
-                }
-                setCustomerToDelete(null);
-              }}
-            >
-              {isAdminOrSuperUser 
-                ? isActive 
-                  ? 'Διαγραφή'
-                  : 'Διαγραφή απενεργοποιημένου'
-                : isActive
-                  ? 'Απενεργοποίηση'
-                  : 'Ενεργοποίηση'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  };
 
   // If showing the form, render it instead of the customer list
   return (
@@ -1600,7 +1757,7 @@ export default function CustomersPage() {
       />
 
       {/* Delete Customer Confirmation */}
-      <DeleteConfirmationDialog />
+      <SimpleDeleteModal />
 
       {/* Delete Offer Confirmation */}
       <AlertDialog open={showDeleteOfferDialog} onOpenChange={setShowDeleteOfferDialog}>

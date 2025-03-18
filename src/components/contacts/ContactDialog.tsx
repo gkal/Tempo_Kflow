@@ -10,6 +10,7 @@ import { X, Star, Check, Plus, Edit } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
 import { PositionDialog } from "./PositionDialog";
 import { useFormRegistration } from '@/lib/FormContext';
+import { usePhoneFormat } from "@/hooks/usePhoneFormat";
 
 interface ContactDialogProps {
   open: boolean;
@@ -35,6 +36,21 @@ export function ContactDialog({
     internal_telephone: "",
     notes: "",
   });
+
+  // Phone formatting hooks
+  const { 
+    phoneValue: telephoneValue, 
+    handlePhoneChange: handleTelephoneChange, 
+    setPhone: setTelephone,
+    inputRef: telephoneInputRef
+  } = usePhoneFormat(formData.telephone);
+  
+  const { 
+    phoneValue: mobileValue, 
+    handlePhoneChange: handleMobileChange, 
+    setPhone: setMobile,
+    inputRef: mobileInputRef
+  } = usePhoneFormat(formData.mobile);
 
   const [positions, setPositions] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,6 +126,7 @@ export function ContactDialog({
         .from("contacts")
         .select("*")
         .eq("id", contactId)
+        .is("deleted_at", null)
         .single();
         
       if (error) {
@@ -129,6 +146,10 @@ export function ContactDialog({
           internal_telephone: data.internal_telephone || "",
           notes: data.notes || "",
         });
+        
+        // Update phone values in the custom hooks
+        setTelephone(data.telephone || "");
+        setMobile(data.mobile || "");
       }
       
       setLoading(false);
@@ -192,6 +213,26 @@ export function ContactDialog({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
+    
+    // Handle telephone and mobile separately with our custom hooks
+    if (name === "telephone" && e.target instanceof HTMLInputElement) {
+      const result = handleTelephoneChange(e as React.ChangeEvent<HTMLInputElement>);
+      setFormData((prev) => ({
+        ...prev,
+        [name]: result.value,
+      }));
+      return;
+    }
+    
+    if (name === "mobile" && e.target instanceof HTMLInputElement) {
+      const result = handleMobileChange(e as React.ChangeEvent<HTMLInputElement>);
+      setFormData((prev) => ({
+        ...prev,
+        [name]: result.value,
+      }));
+      return;
+    }
+    
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -381,9 +422,10 @@ export function ContactDialog({
                       <Input
                         id="mobile"
                         name="mobile"
-                        value={formData.mobile}
+                        value={mobileValue}
                         onChange={handleInputChange}
                         className="app-input w-full"
+                        ref={mobileInputRef}
                       />
                     </div>
                   </div>
@@ -442,9 +484,10 @@ export function ContactDialog({
                       <Input
                         id="telephone"
                         name="telephone"
-                        value={formData.telephone}
+                        value={telephoneValue}
                         onChange={handleInputChange}
                         className="app-input w-full"
+                        ref={telephoneInputRef}
                       />
                     </div>
                   </div>

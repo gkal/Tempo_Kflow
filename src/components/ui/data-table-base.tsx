@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import {
   Table,
   TableBody,
@@ -338,189 +338,62 @@ export function DataTableBase({
     };
   }, [displayedData, filteredData, page, pageSize]);
 
-  // Format date for display
-  const formatDate = (dateStr: string): string => {
-    try {
-      if (!dateStr) return "-";
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('el-GR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-    } catch (error) {
-      return dateStr || "-";
-    }
-  };
-
-  // Add a global style for search highlighting
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      .search-highlight {
-        background-color: #52796f !important;
-        color: #cad2c5 !important;
-        padding: 0 4px !important;
-        border-radius: 2px !important;
-        display: inline-block !important;
-      }
-    `;
-    document.head.appendChild(style);
-    
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
-  // Add a useEffect to apply highlighting directly to the DOM
-  useEffect(() => {
-    // Wait for the table to render
-    setTimeout(() => {
-      try {
-        // Find all cells in the column that should be highlighted
-        const table = tableRef.current;
-        if (!table) return;
-        
-        // Function to clear all highlighting in the table
-        const clearAllHighlighting = () => {
-          // Get all cells with highlighting
-          const highlightedCells = table.querySelectorAll('.search-highlight');
-          
-          // For each highlighted element, replace it with its text content
-          highlightedCells.forEach(highlight => {
-            const parent = highlight.parentNode;
-            if (parent) {
-              const text = highlight.textContent || '';
-              const textNode = document.createTextNode(text);
-              parent.replaceChild(textNode, highlight);
-            }
-          });
-          
-          // Also reset any cells that might have been modified
-          const allCells = table.querySelectorAll('td');
-          allCells.forEach(cell => {
-            if (cell.querySelector('.search-highlight')) {
-              // Get the row and column index
-              const row = cell.closest('tr');
-              if (!row) return;
-              
-              const rowIndex = Array.from(row.parentNode?.children || []).indexOf(row);
-              if (rowIndex < 0 || rowIndex >= displayedData.length) return;
-              
-              const columnIndex = Array.from(row.children).indexOf(cell);
-              if (columnIndex < 0 || columnIndex >= columns.length) return;
-              
-              // Get the original data
-              const rowData = displayedData[rowIndex];
-              const column = columns[columnIndex];
-              if (!rowData || !column) return;
-              
-              // Reset the cell content
-              const originalText = rowData[column.accessor] ? String(rowData[column.accessor]) : '';
-              cell.textContent = originalText;
-            }
-          });
-        };
-        
-        // If search term is empty or too short, clear all highlighting and return
-        if (!searchTerm || !searchColumn || searchTerm.length === 0) {
-          clearAllHighlighting();
-          return;
-        }
-        
-        // Find the column index
-        const columnIndex = columns.findIndex(col => col.accessor === searchColumn);
-        if (columnIndex === -1) {
-          clearAllHighlighting();
-          return;
-        }
-        
-        // First clear any existing highlighting
-        clearAllHighlighting();
-        
-        // Get all rows in the table
-        const rows = table.querySelectorAll('tbody tr');
-        
-        // For each row, highlight the matching text in the appropriate cell
-        rows.forEach((row, rowIndex) => {
-          if (rowIndex >= displayedData.length) return;
-          
-          const cell = row.querySelectorAll('td')[columnIndex];
-          if (!cell) return;
-          
-          // Get the original data for this row
-          const rowData = displayedData[rowIndex];
-          if (!rowData) return;
-          
-          // Get the original text content (without any highlighting)
-          const originalText = rowData[searchColumn] ? String(rowData[searchColumn]) : '';
-          if (!originalText) return;
-          
-          const searchTermLower = searchTerm.toLowerCase();
-          const index = originalText.toLowerCase().indexOf(searchTermLower);
-          
-          // Only apply highlighting if the search term is at least 1 character long
-          // and there's a match in the text
-          if (searchTerm.length > 0 && index !== -1) {
-            // Create the highlighted HTML
-            const before = originalText.substring(0, index);
-            const match = originalText.substring(index, index + searchTerm.length);
-            const after = originalText.substring(index + searchTerm.length);
-            
-            // Set the HTML directly with inline styles to ensure it's applied (without bold)
-            cell.innerHTML = `${before}<span class="search-highlight" style="background-color: #52796f !important; color: #cad2c5 !important; padding: 0 4px !important; border-radius: 2px !important; display: inline-block !important;">${match}</span>${after}`;
-          } else {
-            // If no match or search term is empty, ensure we display the original text without highlighting
-            cell.textContent = originalText;
-          }
-        });
-      } catch (error) {
-        console.error('Error applying search highlighting:', error);
-      }
-    }, 100);
-  }, [searchTerm, searchColumn, displayedData, columns]);
-
-  // Restore the highlightMatch function for React-based highlighting
-  const highlightMatch = (text: any, searchTerm: string, columnType: string): React.ReactNode => {
-    // Only apply highlighting if we have text, a search term, and the search term is not empty
-    if (!text || !searchTerm || searchTerm.length === 0) {
+  // Modify the highlightMatch function to add strong !important styles
+  const highlightMatch = (text: any, searchTerm: string): React.ReactNode => {
+    if (!text || !searchTerm || searchTerm.trim() === '') {
       return text || "-";
     }
     
-    const textStr = String(text);
-    const searchTermLower = searchTerm.toLowerCase();
-    
-    // For date columns, we don't highlight matches
-    if (columnType === 'date') {
-      return textStr;
-    }
-    
-    const index = textStr.toLowerCase().indexOf(searchTermLower);
-    
-    // If no match found, return the original text
-    if (index === -1) {
-      return textStr;
-    }
-    
-    // Apply highlighting
-    return (
-      <React.Fragment key={`highlight-${textStr.substring(0, 10)}-${index}`}>
-        {textStr.substring(0, index)}
+    try {
+      const textStr = String(text);
+      const searchTermLower = searchTerm.trim().toLowerCase();
+      const textLower = textStr.toLowerCase();
+      
+      // Find all matches
+      const matches: { index: number; length: number }[] = [];
+      let currentIndex = 0;
+      
+      // Collect all matches
+      while ((currentIndex = textLower.indexOf(searchTermLower, currentIndex)) !== -1) {
+        matches.push({ index: currentIndex, length: searchTermLower.length });
+        currentIndex += searchTermLower.length;
+      }
+      
+      if (matches.length === 0) {
+        return textStr;
+      }
+      
+      // Apply highlights to all matches at once
+      let result = '';
+      let lastIndex = 0;
+      
+      for (const match of matches) {
+        // Text before match
+        result += textStr.substring(lastIndex, match.index);
+        
+        // Highlighted match with very aggressive styling
+        const highlightedText = textStr.substring(match.index, match.index + match.length);
+        result += `<span style="background-color: #52796f !important; color: white !important; padding: 0 2px !important; border-radius: 2px !important; display: inline !important; position: relative !important; z-index: 999 !important;">${highlightedText}</span>`;
+        
+        lastIndex = match.index + match.length;
+      }
+      
+      // Add any remaining text
+      if (lastIndex < textStr.length) {
+        result += textStr.substring(lastIndex);
+      }
+      
+      // Return with unique key based on both content and search term
+      return (
         <span 
-          className="search-highlight"
-          style={{
-            backgroundColor: '#52796f',
-            color: '#cad2c5',
-            padding: '0 4px',
-            borderRadius: '2px',
-            display: 'inline-block'
-          }}
-        >
-          {textStr.substring(index, index + searchTerm.length)}
-        </span>
-        {textStr.substring(index + searchTerm.length)}
-      </React.Fragment>
-    );
+          key={`highlight-${searchTerm}-${textStr.substring(0, 10)}-${Date.now()}`}
+          dangerouslySetInnerHTML={{ __html: result }} 
+        />
+      );
+    } catch (error) {
+      console.error("Error in highlighting:", error);
+      return text;
+    }
   };
 
   // Create a style object for each column to ensure consistent widths
@@ -543,33 +416,112 @@ export function DataTableBase({
     }
   };
 
-  // Add a special useEffect to clear all highlighting when the search term becomes empty
-  useEffect(() => {
-    if (!searchTerm || searchTerm.length === 0) {
-      // Wait for the table to render
-      setTimeout(() => {
-        try {
-          const table = tableRef.current;
-          if (!table) return;
-          
-          // Get all cells with highlighting
-          const highlightedCells = table.querySelectorAll('.search-highlight');
-          
-          // For each highlighted element, replace it with its text content
-          highlightedCells.forEach(highlight => {
-            const parent = highlight.parentNode;
-            if (parent) {
-              const text = highlight.textContent || '';
-              const textNode = document.createTextNode(text);
-              parent.replaceChild(textNode, highlight);
-            }
-          });
-        } catch (error) {
-          console.error('Error clearing highlighting:', error);
+  // Add a utility function for debouncing
+  const useDebounce = (fn, delay) => {
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    
+    const debouncedFn = useCallback((...args) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
+      timeoutRef.current = setTimeout(() => {
+        fn(...args);
+      }, delay);
+    }, [fn, delay]);
+    
+    useEffect(() => {
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
         }
-      }, 50);
-    }
-  }, [searchTerm]);
+      };
+    }, []);
+    
+    return debouncedFn;
+  };
+
+  // Add a new useEffect to handle direct DOM manipulation for highlighting
+  useEffect(() => {
+    // Create a more efficient highlight function
+    const applyHighlights = () => {
+      try {
+        // Skip highlighting if search term is empty
+        if (!searchTerm || !searchColumn || searchTerm.trim() === '') {
+          // Only clear if we know there was a previous search
+          const cells = document.querySelectorAll(`table tbody td[data-highlighted="true"]`);
+          if (cells.length > 0) {
+            cells.forEach(cell => {
+              const cellDiv = cell.querySelector('div');
+              if (cellDiv && cellDiv.innerHTML.includes('background-color')) {
+                // Get the original text without highlighting
+                const plainText = cellDiv.textContent || '';
+                cellDiv.textContent = plainText;
+                cell.removeAttribute('data-highlighted');
+              }
+            });
+          }
+          return;
+        }
+        
+        // Optimize query - only target cells in the current column
+        const selector = `table tbody td[data-column="${searchColumn}"]`;
+        const cells = document.querySelectorAll(selector);
+        const searchStr = searchTerm.toLowerCase().trim();
+        
+        cells.forEach(cell => {
+          const cellDiv = cell.querySelector('div');
+          if (!cellDiv) return;
+          
+          const cellText = cellDiv.textContent || '';
+          if (!cellText) return;
+          
+          const textLower = cellText.toLowerCase();
+          const hasMatch = textLower.includes(searchStr);
+          
+          if (hasMatch) {
+            // Only re-highlight if needed
+            if (cell.getAttribute('data-highlighted') !== 'true' || 
+                cell.getAttribute('data-search-term') !== searchTerm) {
+              
+              // Find only the first match
+              const firstMatchIndex = textLower.indexOf(searchStr);
+              const matchEnd = firstMatchIndex + searchStr.length;
+              
+              // Apply highlighting to only the first match
+              const before = cellText.substring(0, firstMatchIndex);
+              const matchText = cellText.substring(firstMatchIndex, matchEnd);
+              const after = cellText.substring(matchEnd);
+              
+              // Create result with only first match highlighted
+              const result = `${before}<span style="background-color: #52796f !important; color: white !important; border-radius: 2px !important; display: inline !important; position: relative !important; z-index: 999 !important;">${matchText}</span>${after}`;
+              
+              // Update the cell content
+              cellDiv.innerHTML = result;
+              
+              // Mark as highlighted with this term
+              cell.setAttribute('data-highlighted', 'true');
+              cell.setAttribute('data-search-term', searchTerm);
+            }
+          } else if (cell.getAttribute('data-highlighted') === 'true') {
+            // Clear highlighting if this cell was previously highlighted
+            cellDiv.textContent = cellText;
+            cell.removeAttribute('data-highlighted');
+            cell.removeAttribute('data-search-term');
+          }
+        });
+      } catch (error) {
+        console.error("Error in direct DOM highlighting:", error);
+      }
+    };
+    
+    // Run immediately without a delay
+    applyHighlights();
+    
+    return () => {
+      // Nothing to clean up
+    };
+  }, [searchTerm, searchColumn, displayedData]);
 
   return (
     <div className="w-full flex flex-col" ref={tableRef}>
@@ -661,7 +613,8 @@ export function DataTableBase({
                     
                     const defaultRow = (
                       <tr
-                        key={`row-${row.id || index}`}
+                        // Force row to re-render when search term changes
+                        key={`row-${row.id || index}-${searchTerm}-${Date.now()}`}
                         onClick={() => onRowClick && onRowClick(row)}
                         className={cn(
                           "transition-colors",
@@ -670,48 +623,56 @@ export function DataTableBase({
                           onRowClick && "cursor-pointer"
                         )}
                       >
-                        {columns.map((column, colIndex) => (
-                          <td
-                            key={`cell-${row.id || index}-${column.accessor || column.id || colIndex}`}
-                            className={cn(
-                              "text-[#cad2c5] group-hover:underline text-sm p-0",
-                              column.type === "status" && "whitespace-nowrap",
-                            )}
-                            style={columnStyles[column.accessor]}
-                          >
-                            <div className="w-full h-full py-1 px-4">
-                            {(() => {
-                              // Only apply highlighting if we have a search term with at least one character
-                              // and we're searching in the current column
-                              const shouldHighlight = searchTerm && 
-                                                     searchTerm.length > 0 && 
-                                                     searchColumn === column.accessor;
-                              
-                              const cellValue = row[column.accessor];
-                              const columnType = column.type || inferColumnType(column.accessor);
-                              
-                              // If this cell has a custom renderer, use it
-                              if (column.cell) {
-                                return column.cell(cellValue, row);
-                              } 
-                              
-                              // For date columns, just format the date without highlighting
-                              if (columnType === 'date' || inferColumnType(column.accessor) === 'date') {
-                                const formattedDate = safeFormatDateTime(cellValue);
-                                return formattedDate;
-                              } 
-                              
-                              // For non-date columns with a search term, apply highlighting if we have a value
-                              if (shouldHighlight && cellValue) {
-                                return highlightMatch(cellValue, searchTerm, columnType);
-                              } 
-                              
-                              // For all other cases, just return the cell value
-                              return cellValue;
-                            })()}
-                            </div>
-                          </td>
-                        ))}
+                        {columns.map((column, colIndex) => {
+                          // Determine if this cell should be highlighted
+                          const shouldHighlight = searchTerm && 
+                                                 searchTerm.trim().length > 0 && 
+                                                 searchColumn === column.accessor;
+                          
+                          const cellValue = row[column.accessor];
+                          const columnType = column.type || inferColumnType(column.accessor);
+                          
+                          // Generate a more consistent key with searchTerm
+                          const cellKey = `cell-${row.id || index}-${column.accessor}-${searchTerm}`;
+
+                          return (
+                            <td
+                              key={cellKey}
+                              data-column={column.accessor}
+                              className={cn(
+                                "text-[#cad2c5] group-hover:underline text-sm p-0",
+                                column.type === "status" && "whitespace-nowrap",
+                                // Add debug class if this cell should have highlighting
+                                shouldHighlight && cellValue && String(cellValue).toLowerCase().includes(searchTerm.toLowerCase().trim()) && "has-highlight-debug"
+                              )}
+                              style={columnStyles[column.accessor]}
+                            >
+                              <div className="w-full h-full py-1 px-4">
+                              {(() => {
+                                // For date columns, just format the date without highlighting
+                                if (columnType === 'date' || inferColumnType(column.accessor) === 'date') {
+                                  const formattedDate = safeFormatDateTime(cellValue);
+                                  return formattedDate;
+                                }
+                                
+                                // If this cell has a custom renderer, use it
+                                if (column.cell) {
+                                  return column.cell(cellValue, row);
+                                }
+                                
+                                // For non-date columns with a search term, apply highlighting if we have a value
+                                if (shouldHighlight && cellValue && searchTerm && searchTerm.trim().length > 0 && 
+                                    String(cellValue).toLowerCase().includes(searchTerm.toLowerCase().trim())) {
+                                  return highlightMatch(cellValue, searchTerm);
+                                } 
+                                
+                                // For all other cases, just return the cell value
+                                return cellValue || "-";
+                              })()}
+                              </div>
+                            </td>
+                          );
+                        })}
                       </tr>
                     );
                     

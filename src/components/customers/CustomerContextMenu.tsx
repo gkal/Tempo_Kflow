@@ -19,6 +19,22 @@ export function CustomerContextMenu({
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const menuRef = React.useRef<HTMLDivElement>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+  
+  // Create portal container when component mounts
+  useEffect(() => {
+    const container = document.createElement('div');
+    container.setAttribute('data-context-menu-container', customerId);
+    document.body.appendChild(container);
+    setPortalContainer(container);
+    
+    // Clean up by removing the container when component unmounts
+    return () => {
+      if (document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
+    };
+  }, [customerId]);
   
   // Set up global context menu handler
   useEffect(() => {
@@ -55,6 +71,11 @@ export function CustomerContextMenu({
     // Clean up
     return () => {
       document.removeEventListener('contextmenu', handleGlobalContextMenu);
+      
+      // Clean up all force-hover classes when component unmounts
+      document.querySelectorAll('tr.force-hover').forEach(row => {
+        row.classList.remove('force-hover');
+      });
     };
   }, [customerId]);
   
@@ -93,7 +114,7 @@ export function CustomerContextMenu({
 
   // Render the context menu
   const renderContextMenu = () => {
-    if (!isOpen) return null;
+    if (!isOpen || !portalContainer) return null;
     
     return ReactDOM.createPortal(
       <div 
@@ -195,7 +216,7 @@ export function CustomerContextMenu({
           </div>
         </div>
       </div>,
-      document.body
+      portalContainer
     );
   };
 

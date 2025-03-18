@@ -491,7 +491,8 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
           .from("contacts")
           .select("id, full_name, position, created_at")
           .eq("customer_id", customerId)
-          .eq("status", "active");
+          .eq("status", "active")
+          .is("deleted_at", null);
 
         if (error) throw error;
         
@@ -1151,7 +1152,8 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
                         .from("contacts")
                         .select("id, full_name, position, created_at")
                         .eq("customer_id", customerId)
-                        .eq("status", "active");
+                        .eq("status", "active")
+                        .is("deleted_at", null);
 
                       if (error) throw error;
                       

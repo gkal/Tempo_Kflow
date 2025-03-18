@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { usePhoneFormat } from "@/hooks/usePhoneFormat";
 
 // Custom styles for select dropdown
 const selectStyles = `
@@ -102,6 +103,9 @@ const CustomerForm = ({
     primary_contact_id: "",
   });
 
+  // Phone formatting hook
+  const { phoneValue, handlePhoneChange, setPhone, inputRef } = usePhoneFormat(formData.telephone);
+
   const [contacts, setContacts] = useState([]);
   const [showContactDialog, setShowContactDialog] = useState(false);
   const [selectedContact, setSelectedContact] = useState(null);
@@ -110,6 +114,7 @@ const CustomerForm = ({
   const [contactToDelete, setContactToDelete] = useState<any>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteSuccessful, setIsDeleteSuccessful] = useState(false);
 
   // Fetch customer data if editing
   useEffect(() => {
@@ -148,6 +153,8 @@ const CustomerForm = ({
           notes: data.notes || "",
           primary_contact_id: data.primary_contact_id || "",
         });
+        // Update phone value in the custom hook
+        setPhone(data.telephone || "");
       }
     } catch (error) {
       console.error("Error fetching customer:", error);
@@ -163,7 +170,8 @@ const CustomerForm = ({
         .from("contacts")
         .select("*")
         .eq("customer_id", customerId)
-        .eq("status", "active");
+        .eq("status", "active")
+        .is("deleted_at", null);
 
       if (error) throw error;
       setContacts(data || []);
@@ -219,6 +227,16 @@ const CustomerForm = ({
     >,
   ) => {
     const { name, value } = e.target;
+    
+    // Handle telephone separately using our custom hook
+    if (name === "telephone") {
+      const result = handlePhoneChange(e as React.ChangeEvent<HTMLInputElement>);
+      setFormData((prev) => ({
+        ...prev,
+        [name]: result.value,
+      }));
+      return;
+    }
     
     // If this is a customer_type change from the dropdown, store it in temp state
     if (name === "customer_type" && tempCustomerType !== null) {
@@ -476,15 +494,10 @@ const CustomerForm = ({
         
       if (error) throw error;
       
-      // Refresh contacts list
-      await fetchContacts();
+      // Show success state
+      setIsDeleteSuccessful(true);
       
-      // Show success message
-      toast({
-        title: "Επιτυχία",
-        description: "Η επαφή διαγράφηκε με επιτυχία.",
-        variant: "default",
-      });
+      // Don't update UI yet to prevent flashing before user sees success message
     } catch (error) {
       console.error("Error deleting contact:", error);
       toast({
@@ -492,10 +505,35 @@ const CustomerForm = ({
         description: "Προέκυψε σφάλμα κατά τη διαγραφή της επαφής.",
         variant: "destructive",
       });
-    } finally {
-      setIsDeleting(false);
+      
+      // Close dialog on error
       setShowDeleteDialog(false);
       setContactToDelete(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+  
+  // Function to handle dialog close
+  const handleDeleteDialogClose = (open: boolean) => {
+    // Only close if the dialog is being closed
+    if (!open) {
+      if (isDeleteSuccessful) {
+        // Update UI after success and dialog close
+        fetchContacts();
+        
+        // Show success toast
+        toast({
+          title: "Επιτυχία",
+          description: "Η επαφή διαγράφηκε με επιτυχία.",
+          variant: "default",
+        });
+      }
+      
+      // Reset all dialog state
+      setContactToDelete(null);
+      setIsDeleteSuccessful(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -556,7 +594,7 @@ const CustomerForm = ({
                     <Input
                       id="telephone"
                       name="telephone"
-                      value={formData.telephone}
+                      value={phoneValue}
                       onChange={handleInputChange}
                       className="app-input"
                       disabled={viewOnly}
@@ -564,6 +602,7 @@ const CustomerForm = ({
                       autoComplete="off"
                       onInvalid={(e) => e.currentTarget.setCustomValidity('Παρακαλώ συμπληρώστε αυτό το πεδίο')}
                       onInput={(e) => e.currentTarget.setCustomValidity('')}
+                      ref={inputRef}
                     />
                   </div>
                 </div>
@@ -784,25 +823,82 @@ const CustomerForm = ({
         </div>
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent aria-describedby="delete-contact-description">
+        <AlertDialog 
+          open={showDeleteDialog} 
+          onOpenChange={(open) => {
+            // Prevent closing the dialog while deleting
+            if (!isDeleting && !open) {
+              handleDeleteDialogClose(open);
+            }
+          }}
+        >
+          <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-white">
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Contact</AlertDialogTitle>
-              <AlertDialogDescription id="delete-contact-description">
-                Are you sure you want to delete this contact? This action cannot be undone.
+              <AlertDialogTitle className="text-[#cad2c5]">
+                {isDeleteSuccessful 
+                  ? "Επιτυχής Διαγραφή" 
+                  : "Διαγραφή Επαφής"
+                }
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-[#84a98c]">
+                {isDeleting ? (
+                  <div className="flex flex-col items-center justify-center space-y-3 py-3">
+                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#52796f] border-t-transparent"></div>
+                    <p className="text-[#cad2c5]">Η διαγραφή βρίσκεται σε εξέλιξη. Παρακαλώ περιμένετε...</p>
+                    <p className="text-sm text-[#84a98c]">Αυτή η διαδικασία μπορεί να διαρκέσει μερικά δευτερόλεπτα.</p>
+                  </div>
+                ) : isDeleteSuccessful ? (
+                  <div className="flex flex-col items-center justify-center space-y-3 py-3">
+                    <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <p className="text-center text-green-500 font-medium">
+                      Η επαφή διαγράφηκε με επιτυχία!
+                    </p>
+                  </div>
+                ) : (
+                  "Είστε βέβαιοι ότι θέλετε να διαγράψετε αυτή την επαφή; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί."
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#52796f]/20">
-                Ακύρωση
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteContact}
-                className="bg-red-600 hover:bg-red-700 text-white"
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Διαγραφή..." : "Διαγραφή"}
-              </AlertDialogAction>
+            <AlertDialogFooter className="mt-4">
+              {isDeleteSuccessful ? (
+                <Button 
+                  onClick={() => handleDeleteDialogClose(false)}
+                  className="bg-[#52796f] hover:bg-[#52796f]/90 text-white"
+                >
+                  OK
+                </Button>
+              ) : (
+                <>
+                  <AlertDialogCancel 
+                    className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white" 
+                    disabled={isDeleting}
+                  >
+                    Άκυρο
+                  </AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={(e) => {
+                      e.preventDefault(); // Prevent default to handle manually
+                      handleDeleteContact();
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Διαγραφή...
+                      </>
+                    ) : "Διαγραφή"}
+                  </AlertDialogAction>
+                </>
+              )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

@@ -132,7 +132,8 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
             const { data: contactsData, error: contactsError } = await supabase
               .from("contacts")
               .select("id, full_name, email, telephone")
-              .in("id", batch);
+              .in("id", batch)
+              .is("deleted_at", null);
               
             if (contactsError) throw contactsError;
             
