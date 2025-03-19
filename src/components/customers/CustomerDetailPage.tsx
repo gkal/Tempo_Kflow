@@ -712,7 +712,18 @@ export default function CustomerDetailPage() {
             </Avatar>
             
             <div>
-              <h1 className="text-2xl font-bold text-[#cad2c5]">
+              <h1 
+                className="text-2xl font-bold text-[#cad2c5] cursor-pointer hover:text-[#a8c5b5] hover:underline transition-colors"
+                onClick={() => setShowCustomerDialog(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setShowCustomerDialog(true);
+                  }
+                }}
+                aria-label={`Επεξεργασία ${customer?.company_name || 'πελάτη'}`}
+              >
                 {customer?.company_name || (
                   <div className="flex items-center">
                     <svg className="animate-spin h-4 w-4 text-[#52796f] mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

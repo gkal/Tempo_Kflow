@@ -1242,12 +1242,12 @@ export default function CustomersPage() {
         const deletedAt = new Date().toISOString();
         
         // First delete sequence: Offers
-        const { error: offersError } = await supabase
-          .from('offers')
-          .update({ deleted_at: deletedAt })
-          .eq('customer_id', customerId);
+          const { error: offersError } = await supabase
+            .from('offers')
+            .update({ deleted_at: deletedAt })
+            .eq('customer_id', customerId);
           
-        if (offersError) {
+          if (offersError) {
           console.error("Error deleting offers:", offersError);
           throw new Error(`Σφάλμα κατά τη διαγραφή προσφορών: ${offersError.message}`);
         }
@@ -1257,10 +1257,10 @@ export default function CustomersPage() {
         // Get offer IDs
         updateOperation("Εύρεση στοιχείων προσφορών...");
         const { data: offerIds, error: offerIdsError } = await supabase
-          .from('offers')
-          .select('id')
-          .eq('customer_id', customerId);
-          
+            .from('offers')
+            .select('id')
+            .eq('customer_id', customerId);
+            
         if (offerIdsError) {
           console.error("Error fetching offer IDs:", offerIdsError);
           throw new Error(`Σφάλμα κατά την εύρεση προσφορών: ${offerIdsError.message}`);
@@ -1271,15 +1271,15 @@ export default function CustomersPage() {
           updateOperation(`Διαγραφή λεπτομερειών προσφορών (${offerIds.length})...`);
           for (const offer of offerIds) {
             const { error: offerDetailsError } = await supabase
-              .from('offer_details')
-              .update({ deleted_at: deletedAt })
+                .from('offer_details')
+                .update({ deleted_at: deletedAt })
               .eq('offer_id', offer.id);
-              
+                
             if (offerDetailsError) {
               console.error(`Error deleting details for offer ${offer.id}:`, offerDetailsError);
               throw new Error(`Σφάλμα κατά τη διαγραφή λεπτομερειών προσφοράς: ${offerDetailsError.message}`);
+              }
             }
-          }
           addCompletedOperation(`Λεπτομέρειες προσφορών (${offerIds.length}) διαγράφηκαν με επιτυχία`);
         }
         
@@ -1289,7 +1289,7 @@ export default function CustomersPage() {
           .from('customers')
           .update({ primary_contact_id: null })
           .eq('id', customerId);
-          
+        
         if (primaryContactError) {
           console.error("Error removing primary contact reference:", primaryContactError);
           throw new Error(`Σφάλμα κατά την κατάργηση κύριας επαφής: ${primaryContactError.message}`);
@@ -1299,12 +1299,12 @@ export default function CustomersPage() {
         
         // Third delete sequence: Contacts
         updateOperation("Διαγραφή επαφών...");
-        const { error: contactsError } = await supabase
-          .from('contacts')
-          .update({ deleted_at: deletedAt })
-          .eq('customer_id', customerId);
+          const { error: contactsError } = await supabase
+            .from('contacts')
+            .update({ deleted_at: deletedAt })
+            .eq('customer_id', customerId);
           
-        if (contactsError) {
+          if (contactsError) {
           console.error("Error deleting contacts:", contactsError);
           throw new Error(`Σφάλμα κατά τη διαγραφή επαφών: ${contactsError.message}`);
         }
@@ -1314,11 +1314,11 @@ export default function CustomersPage() {
         // Fourth delete sequence: Customer
         updateOperation("Διαγραφή πελάτη...");
         const { error: customerError } = await supabase.rpc('soft_delete_record', {
-          table_name: 'customers',
-          record_id: customerId
-        });
-        
-        if (customerError) {
+            table_name: 'customers',
+            record_id: customerId
+          });
+            
+            if (customerError) {
           console.error("Error deleting customer:", customerError);
           throw new Error(`Σφάλμα κατά τη διαγραφή πελάτη: ${customerError.message}`);
         }
@@ -1339,7 +1339,7 @@ export default function CustomersPage() {
             updated_at: new Date().toISOString()
           })
           .eq('id', customerId);
-          
+        
         if (deactivateError) {
           console.error("Error deactivating customer:", deactivateError);
           throw new Error(`Σφάλμα κατά την απενεργοποίηση πελάτη: ${deactivateError.message}`);
@@ -1352,11 +1352,11 @@ export default function CustomersPage() {
         if (statusFilter === 'active') {
           setCustomers(prev => prev.filter(c => c.id !== customerId));
           setFilteredCustomers(prev => prev.filter(c => c.id !== customerId));
-        } else {
-          setCustomers(prev => 
+    } else {
+      setCustomers(prev => 
             prev.map(c => c.id === customerId ? {...c, status: 'inactive'} : c)
           );
-          setFilteredCustomers(prev => 
+      setFilteredCustomers(prev => 
             prev.map(c => c.id === customerId ? {...c, status: 'inactive'} : c)
           );
         }
@@ -1384,7 +1384,7 @@ export default function CustomersPage() {
   // Create a rock-solid delete confirmation component
   const SimpleDeleteModal = () => {
     if (!customerToDelete) return null;
-    
+
     // State for tracking operations
     const [currentOperation, setCurrentOperation] = useState("");
     const [completedOperations, setCompletedOperations] = useState([]);
@@ -1393,7 +1393,7 @@ export default function CustomersPage() {
     const isAdmin = 
       user?.role?.toLowerCase() === 'admin' || 
       user?.role?.toLowerCase() === 'super user';
-    
+
     // Simple function to close the modal and reset state
     const closeModal = () => {
       if (isDeletingCustomer) return; // Don't close if deleting
@@ -1507,7 +1507,7 @@ export default function CustomersPage() {
             </div>
             <p className="text-green-400 font-medium text-lg mb-1">
               {isAdmin 
-                ? "Ο πελάτης διαγράφηκε με επιτυχία!"
+                        ? "Ο πελάτης διαγράφηκε με επιτυχία!"
                 : "Ο πελάτης απενεργοποιήθηκε με επιτυχία!"}
             </p>
             <p className="text-sm text-[#84a98c]">
@@ -1531,12 +1531,12 @@ export default function CustomersPage() {
             )}
           </div>
           <div className="flex justify-center mt-4">
-            <Button 
+              <Button 
               onClick={closeModal}
-              className="bg-[#52796f] hover:bg-[#52796f]/90 text-white"
-            >
+                className="bg-[#52796f] hover:bg-[#52796f]/90 text-white"
+              >
               Κλείσιμο
-            </Button>
+              </Button>
           </div>
         </>
       );
@@ -1558,16 +1558,16 @@ export default function CustomersPage() {
           <div className="flex justify-end space-x-3 mt-4">
             <Button 
               variant="outline"
-              className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white" 
+                  className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white" 
               onClick={closeModal}
-            >
-              Άκυρο
+                >
+                  Άκυρο
             </Button>
             <Button 
               onClick={handleDelete}
               className={isAdmin 
-                ? "bg-red-600 hover:bg-red-700 text-white" 
-                : "bg-[#52796f] hover:bg-[#3a5a44] text-white"}
+                    ? "bg-red-600 hover:bg-red-700 text-white" 
+                    : "bg-[#52796f] hover:bg-[#3a5a44] text-white"}
             >
               {isAdmin ? 'Διαγραφή' : 'Απενεργοποίηση'}
             </Button>
@@ -1633,7 +1633,7 @@ export default function CustomersPage() {
   const handleOpenOfferDialog = useCallback((customerId: string, source: string = "Email", offerId?: string) => {
     if (offerId) {
       openEditOfferDialog(customerId, offerId, refreshCustomers);
-    } else {
+        } else {
       openNewOfferDialog(customerId, source, refreshCustomers);
     }
   }, [refreshCustomers]);

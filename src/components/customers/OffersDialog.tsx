@@ -58,21 +58,22 @@ export interface OffersDialogProps {
 
 // Define the form values type
 interface OfferFormValues {
-  offer_date: string;
-  source: string;
-  amount: string;
-  requirements: string;
-  customer_comments: string;
-  our_comments: string;
-  offer_result: string;
-  result: any;
-  assigned_to: string;
-  hma: boolean;
-  certificate: string;
-  address: string;
-  postal_code: string;
-  town: string;
-  status: string;
+  offer_date?: string;
+  created_at?: string;
+  source?: string;
+  amount?: string;
+  requirements?: string;
+  customer_comments?: string;
+  our_comments?: string;
+  offer_result?: string;
+  result?: string;
+  assigned_to?: string;
+  hma?: boolean;
+  certificate?: string;
+  address?: string;
+  postal_code?: string;
+  town?: string;
+  status?: string;
 }
 
 // Create a context to share state between components
@@ -173,15 +174,16 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   
   // Format current date and time in ISO format for datetime-local input
   const formatCurrentDateTimeForInput = (date?: string) => {
-    const now = date ? new Date(date) : new Date();
-    // Format with timezone offset for Greece (UTC+3)
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    try {
+      const now = date ? new Date(date) : new Date();
+      now.setMilliseconds(0); // Reset milliseconds for consistency
+      
+      // First return a proper ISO string for the database
+      return now.toISOString();
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return new Date().toISOString();
+    }
   };
   
   const [currentDate, setCurrentDate] = useState(formatCurrentDateTimeForInput());
@@ -258,48 +260,56 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     return resultOptions.find(option => option.label === label)?.value || label;
   };
 
-  const defaultValues = useMemo(() => ({
-    offer_date: formatCurrentDateTimeForInput(),
-    source: defaultSource,
-    amount: "",
-    requirements: "",
-    customer_comments: "",
-    our_comments: "",
-    offer_result: "wait_for_our_answer",
-    result: null,
-    assigned_to: user?.id || "",
-    hma: false,
-    certificate: "",
-    address: "",
-    postal_code: "",
-    town: ""
-  }), [defaultSource, user?.id]);
+  const defaultValues = useMemo(() => {
+    // Create a single date string for both fields
+    const dateString = formatCurrentDateTimeForInput();
+    
+    return {
+      offer_date: dateString, // For UI display only
+      created_at: dateString, // This is what will be saved to DB
+      source: defaultSource,
+      amount: "",
+      requirements: "",
+      customer_comments: "",
+      our_comments: "",
+      offer_result: "wait_for_our_answer",
+      result: null,
+      assigned_to: user?.id || "",
+      hma: false,
+      certificate: "",
+      address: "",
+      postal_code: "",
+      town: ""
+    };
+  }, [defaultSource, user?.id]);
 
-  // Initialize the form
+  // Initialize form with react-hook-form
   const {
     register,
     watch,
     setValue,
+    reset,
     control,
-    formState,
     handleSubmit,
-    reset
+    formState,
   } = useForm<OfferFormValues>({
     defaultValues: {
-      offer_date: new Date().toISOString().split('T')[0],
-      source: '',
-      amount: '',
-      requirements: '',
-      customer_comments: '',
-      our_comments: '',
-      offer_result: '',
-      result: '',
-      assigned_to: '',
+      offer_date: formatCurrentDateTimeForInput(), // For UI display only
+      created_at: formatCurrentDateTimeForInput(), // This is what will be saved to DB
+      source: defaultSource,
+      amount: "",
+      requirements: "",
+      customer_comments: "",
+      our_comments: "",
+      offer_result: "wait_for_our_answer",
+      result: "none",
+      assigned_to: user?.id || "",
       hma: false,
-      certificate: '',
-      address: '',
-      postal_code: '',
-      town: ''
+      certificate: "",
+      address: "",
+      postal_code: "",
+      town: "",
+      status: "active"
     }
   });
   
@@ -406,44 +416,23 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
           
           const { data, error } = await supabase
             .from("offers")
-            .select("*, users!offers_assigned_to_fkey(fullname)")
+            .select("*")
             .eq("id", offerId)
-            .is("deleted_at", null)
             .single();
 
           if (error) {
-            // Check if it's a "no rows returned" error, which might mean the offer was soft-deleted
-            if (error.message?.includes('multiple (or no) rows returned') || error.details?.includes('contains 0 rows')) {
-              // Try to fetch the offer without the deleted_at filter to confirm it's soft-deleted
-              const { data: softDeletedOffer, error: softDeletedError } = await supabase
-                .from("offers")
-                .select("deleted_at")
-                .eq("id", offerId)
-                .single();
-                
-              if (!softDeletedError && softDeletedOffer && softDeletedOffer.deleted_at) {
-                // The offer exists but is soft-deleted
-                toast({
-                  title: "Offer Unavailable",
-                  description: "This offer has been deleted and cannot be edited.",
-                  variant: "destructive",
-                });
-                onOpenChange(false); // Close the dialog
-              } else {
-                // It's some other error
-                console.error("Error fetching offer data:", error);
-                throw error;
-              }
-            } else {
-              console.error("Error fetching offer data:", error);
-              throw error;
-            }
+            throw error;
           }
           
           if (data) {
+            // Get the date from created_at in the database
+            const dateString = data.created_at || formatCurrentDateTimeForInput();
+            
             // Reset the form first to clear any existing values
             reset({
-              offer_date: formatCurrentDateTimeForInput(data.created_at),
+              // Use created_at for both fields since offer_date doesn't exist in DB
+              offer_date: dateString,
+              created_at: dateString,
               source: data.source || defaultSource,
               amount: data.amount || "",
               requirements: data.requirements || "",
@@ -459,13 +448,8 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
               town: data.town || ""
             });
             
+            // Set the contact ID from the fetched data
             setSelectedContactId(data.contact_id || null);
-            
-            // Force a re-render to ensure the form values are displayed
-            setTimeout(() => {
-              // This will trigger a re-render of the form
-              const formValues = watch();
-            }, 0);
           }
         } catch (error) {
           console.error("Error fetching offer:", error);
@@ -479,7 +463,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       setIsEditing(false);
       reset(defaultValues);
     }
-  }, [offerId, open, defaultSource, currentDate, reset, setValue, user?.id, watch]);
+  }, [offerId, open, defaultSource, reset, setValue, user?.id]);
 
   // Fetch customer contacts
   useEffect(() => {
@@ -598,7 +582,6 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       // return false;
       
       // Instead, we'll allow the form to be submitted without a result
-      console.log("No result selected, but continuing anyway as requested");
     }
     
     // All validations passed
@@ -761,6 +744,9 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         }
       }
       
+      // Process date values, ensuring both fields are set
+      const createdAt = data.created_at || new Date().toISOString();
+      
       const offerData = {
         customer_id: customerId,
         source: data.source,
@@ -776,7 +762,9 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         certificate: data.certificate,
         address: data.address,
         tk: data.postal_code,
-        town: data.town
+        town: data.town,
+        // Only include created_at field which exists in the database
+        created_at: createdAt
       };
       
       // Variables to store data during the save process
@@ -825,8 +813,6 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
           }
         } else {
           // Create new offer
-          console.log("Creating new offer");
-          
           const { data: newOffer, error } = await supabase
             .from("offers")
             .insert({
@@ -840,8 +826,6 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
             console.error("Error creating offer:", error);
             throw error;
           }
-          
-          console.log("Successfully created offer:", newOffer);
 
           // Update the offer ID with the real one from the database
           savedOfferId = newOffer.id;
@@ -866,11 +850,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
             console.error("Error calling saveDetailsToDatabase:", error);
           }
         } else {
-          console.log("No details to save or saveDetailsToDatabase function not available", {
-            savedOfferId,
-            saveDetailsToDatabase: !!saveDetailsToDatabaseRef.current,
-            saveDetailsToDatabaseRefType: typeof saveDetailsToDatabaseRef.current
-          });
+          // We don't need to do anything here - no details to save
         }
         
         // STEP 3: Show success message and close dialog
