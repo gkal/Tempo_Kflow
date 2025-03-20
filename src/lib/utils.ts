@@ -162,3 +162,9 @@ export function formatPhoneNumber(
   
   return formattedNumber;
 }
+
+// Truncate text to a certain length
+export function truncate(text: string, length: number) {
+  if (!text) return "";
+  return text.length > length ? text.substring(0, length) + "..." : text;
+}

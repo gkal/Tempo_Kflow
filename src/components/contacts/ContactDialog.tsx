@@ -100,6 +100,10 @@ export function ContactDialog({
           internal_telephone: "",
           notes: "",
         });
+        
+        // Reset phone values in the custom hooks when adding a new contact
+        setTelephone("");
+        setMobile("");
       }
     } else {
       // Reset state when dialog closes
@@ -113,6 +117,22 @@ export function ContactDialog({
     if (!open) {
       setSuccess(false);
       setError(null);
+      
+      // Reset all form data including telephone fields when dialog closes
+      // This ensures that when opening a new contact dialog after closing, all fields are cleared
+      setFormData({
+        full_name: "",
+        position: "",
+        telephone: "",
+        mobile: "",
+        email: "",
+        internal_telephone: "",
+        notes: "",
+      });
+      
+      // Reset phone format state
+      setTelephone("");
+      setMobile("");
     }
   }, [open]);
 
@@ -360,6 +380,21 @@ export function ContactDialog({
           // Ensure position dialog is closed when contact dialog closes
           setPositionDialogOpen(false);
           setSelectedPosition(undefined);
+          
+          // Reset form data completely when dialog closes
+          setFormData({
+            full_name: "",
+            position: "",
+            telephone: "",
+            mobile: "",
+            email: "",
+            internal_telephone: "",
+            notes: "",
+          });
+          
+          // Explicitly reset phone values in the custom hooks
+          setTelephone("");
+          setMobile("");
         }
         onOpenChange(newOpen);
       }}>
