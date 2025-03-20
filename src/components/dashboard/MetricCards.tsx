@@ -107,6 +107,7 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
         const { data: customersData, error: customersError } = await supabase
           .from("customers")
           .select("*")
+          .is("deleted_at", null)
           .order('created_at', { ascending: false });
 
         if (customersError) throw customersError;
@@ -170,8 +171,11 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
     const previousMonth = currentMonth === 0 ? 11 : currentMonth - 1;
     const previousYear = currentMonth === 0 ? currentYear - 1 : currentYear;
     
+    // Filter out soft-deleted customers first
+    const activeCustomers = customersData.filter(customer => !customer.deleted_at);
+    
     // Simple approach: just check if the year and month match
-    const currentMonthCustomers = customersData.filter(customer => {
+    const currentMonthCustomers = activeCustomers.filter(customer => {
       const customerDate = new Date(customer.created_at);
       const customerMonth = customerDate.getUTCMonth();
       const customerYear = customerDate.getUTCFullYear();
@@ -182,7 +186,7 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
     });
     
     // Simple approach for previous month
-    const previousMonthCustomers = customersData.filter(customer => {
+    const previousMonthCustomers = activeCustomers.filter(customer => {
       const customerDate = new Date(customer.created_at);
       const customerMonth = customerDate.getUTCMonth();
       const customerYear = customerDate.getUTCFullYear();
@@ -260,7 +264,8 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
     setShowCustomerTable(!showCustomerTable);
     if (!showCustomerTable) {
       // When opening the table, show all customers from the current month
-      setFilteredCustomers(customerMetrics.customers);
+      // Make sure we only show non-deleted customers
+      setFilteredCustomers(customerMetrics.customers.filter(customer => !customer.deleted_at));
       setSearchTerm("");
       setSearchColumn("company_name");
     }
@@ -269,22 +274,25 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
   // Filter customers based on search term and column
   useEffect(() => {
     if (!searchTerm.trim()) {
-      setFilteredCustomers(customerMetrics.customers);
+      // When no search term, show all non-deleted customers from the current month
+      setFilteredCustomers(customerMetrics.customers.filter(customer => !customer.deleted_at));
       return;
     }
 
-    const filtered = customerMetrics.customers.filter(customer => {
-      const searchLower = searchTerm.toLowerCase();
-      
-      // Special case for primary contact
-      if (searchColumn === 'primary_contact_id' && customer.primary_contact) {
-        return customer.primary_contact.full_name.toLowerCase().includes(searchLower);
-      }
-      
-      // Handle regular properties
-      return customer[searchColumn] && 
-             String(customer[searchColumn]).toLowerCase().includes(searchLower);
-    });
+    const filtered = customerMetrics.customers
+      .filter(customer => !customer.deleted_at) // Always filter out deleted customers
+      .filter(customer => {
+        const searchLower = searchTerm.toLowerCase();
+        
+        // Special case for primary contact
+        if (searchColumn === 'primary_contact_id' && customer.primary_contact) {
+          return customer.primary_contact.full_name.toLowerCase().includes(searchLower);
+        }
+        
+        // Handle regular properties
+        return customer[searchColumn] && 
+              String(customer[searchColumn]).toLowerCase().includes(searchLower);
+      });
     
     setFilteredCustomers(filtered);
   }, [searchTerm, searchColumn, customerMetrics.customers]);
