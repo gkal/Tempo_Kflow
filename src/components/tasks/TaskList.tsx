@@ -194,8 +194,31 @@ export function TaskList({
       <TaskDialog 
         isOpen={isDialogOpen} 
         onClose={() => setIsDialogOpen(false)} 
+        taskId={null}
         offerId={offerId}
         onTaskCreated={fetchTasks}
+        onTaskStatusChange={async (taskId, newStatus) => {
+          if (onTaskStatusChange) {
+            await onTaskStatusChange(taskId, newStatus);
+          } else {
+            await supabase
+              .from('tasks')
+              .update({ status: newStatus })
+              .eq('id', taskId);
+            fetchTasks();
+          }
+        }}
+        onTaskDelete={async (taskId) => {
+          if (onTaskDelete) {
+            await onTaskDelete(taskId);
+          } else {
+            await supabase
+              .from('tasks')
+              .delete()
+              .eq('id', taskId);
+            fetchTasks();
+          }
+        }}
       />
     </div>
   );

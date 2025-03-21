@@ -150,7 +150,12 @@ export function TaskItem({ task, onStatusChange, onDelete }: TaskItemProps) {
         isOpen={isEditDialogOpen}
         onClose={() => setIsEditDialogOpen(false)}
         taskId={task.id}
-        onTaskCreated={onStatusChange}
+        onTaskCreated={async () => {
+          if (onStatusChange) onStatusChange();
+          return Promise.resolve();
+        }}
+        onTaskStatusChange={async () => Promise.resolve()}
+        onTaskDelete={async () => Promise.resolve()}
       />
     </>
   );

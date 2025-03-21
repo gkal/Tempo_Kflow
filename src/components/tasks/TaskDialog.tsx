@@ -18,6 +18,7 @@ interface TaskDialogProps {
   isOpen: boolean;
   onClose: () => void;
   taskId: string | null;
+  offerId?: string;
   onTaskCreated: () => Promise<void>;
   onTaskStatusChange: (taskId: string, newStatus: string) => Promise<void>;
   onTaskDelete: (taskId: string) => Promise<void>;
@@ -71,14 +72,14 @@ const statusOptions = [
   { value: "cancelled", label: "Ακυρώθηκε", color: "text-gray-400", bg: "bg-gray-500/10", icon: AlertCircle },
 ];
 
-export function TaskDialog({ isOpen, onClose, taskId, onTaskCreated, onTaskStatusChange, onTaskDelete }: TaskDialogProps) {
+export function TaskDialog({ isOpen, onClose, taskId, offerId: propOfferId, onTaskCreated, onTaskStatusChange, onTaskDelete }: TaskDialogProps) {
   const { user } = useAuth();
   const [task, setTask] = useState<Task | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
-  const [offerId, setOfferId] = useState<string | null>(null);
+  const [offerId, setOfferId] = useState<string | null>(propOfferId || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,8 +96,11 @@ export function TaskDialog({ isOpen, onClose, taskId, onTaskCreated, onTaskStatu
       fetchTask();
     } else {
       resetForm();
+      if (propOfferId) {
+        setOfferId(propOfferId);
+      }
     }
-  }, [taskId]);
+  }, [taskId, propOfferId]);
 
   const fetchUsers = async () => {
     try {
@@ -279,8 +283,14 @@ export function TaskDialog({ isOpen, onClose, taskId, onTaskCreated, onTaskStatu
     setTitle("");
     setDescription("");
     setDueDate("");
-    setAssignedTo(user ? user.id : "");
-    setOfferId(null);
+    setAssignedTo(user?.id || "");
+    // Only reset offerId if propOfferId is not provided
+    if (!propOfferId) {
+      setOfferId(null);
+    } else {
+      setOfferId(propOfferId);
+    }
+    setIsSubmitting(false);
     setError(null);
     setActiveTab("details");
   };
