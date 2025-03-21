@@ -8,6 +8,25 @@ export interface VersionEntry {
 
 export const VERSION_HISTORY: VersionEntry[] = [
   {
+    version: "1.5.3",
+    date: new Date().toLocaleDateString('en-GB').split('/').join('-'),
+    description: "Φίλτρο Τύπων Πελατών",
+    changes: [
+      "Προσθήκη φίλτρου για την εμφάνιση πελατών με βάση τον τύπο τους",
+      "Δυνατότητα πολλαπλής επιλογής τύπων πελατών με checkbox",
+      "Ενσωμάτωση φίλτρου τύπων δίπλα στην αναζήτηση πελατών"
+    ]
+  },
+  {
+    version: "1.5.2",
+    date: new Date().toLocaleDateString('en-GB').split('/').join('-'),
+    description: "Επέκταση Τύπων Πελατών",
+    changes: [
+      "Προσθήκη νέων τύπων πελατών: Εκτακτος Πελάτης και Εκτακτη Εταιρία",
+      "Ενημέρωση διεπαφής φόρμας πελάτη με τους νέους τύπους"
+    ]
+  },
+  {
     version: "1.5.1",
     date: "16-03-2025",
     description: "Βελτιωμένο Σύστημα Προσφορών με Απλοποιημένη Διαχείριση Λεπτομερειών",

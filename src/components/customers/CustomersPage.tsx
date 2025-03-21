@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, lazy, Suspense, useRef } fro
 import { useNavigate } from "react-router-dom";
 import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, Pencil, Trash2, ArrowLeft, Edit, Filter, EyeOff, ChevronRight, ChevronDown } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, ArrowLeft, Edit, Filter, EyeOff, ChevronRight, ChevronDown, Check } from "lucide-react";
 import { CloseButton } from "@/components/ui/close-button";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { supabase } from "@/lib/supabase";
@@ -47,6 +47,129 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+// Customer type filter component
+interface CustomerTypeFilterProps {
+  availableTypes: string[];
+  selectedTypes: string[];
+  onChange: (types: string[]) => void;
+}
+
+const customerTypeOptions = ["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές", "Εκτακτος Πελάτης", "Εκτακτη Εταιρία"];
+
+const CustomerTypeFilter: React.FC<CustomerTypeFilterProps> = ({ 
+  availableTypes, 
+  selectedTypes, 
+  onChange 
+}) => {
+  const allSelected = selectedTypes.length === 0;
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const handleToggleType = (type: string) => {
+    if (selectedTypes.includes(type)) {
+      // If already selected, remove it
+      onChange(selectedTypes.filter(t => t !== type));
+    } else {
+      // If not selected, add it
+      onChange([...selectedTypes, type]);
+    }
+  };
+  
+  const handleSelectAll = () => {
+    // If anything is selected, clear selection
+    onChange([]);
+  };
+
+  // Determine if filter is active
+  const isFilterActive = selectedTypes.length > 0;
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button 
+          variant="outline" 
+          className={`h-9 px-4 flex items-center gap-2 w-[102px] justify-between ${
+            isFilterActive 
+              ? 'bg-[#52796f] text-white border-0 shadow-[0_0_35px_8px_rgba(82,121,111,0.95)] filter-glow-extreme scale-105' 
+              : 'hover:bg-[#354f52] bg-[#2f3e46] border-0 text-[#cad2c5]'
+          }`}
+          title="Φίλτρο Τύπων Πελατών"
+        >
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            <span className="text-sm">Τύπος</span>
+          </div>
+          {isFilterActive ? 
+            <div className="w-4 h-4 flex items-center justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-yellow-300"
+              >
+                <path d="M9 18h6"></path>
+                <path d="M10 22h4"></path>
+                <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path>
+              </svg>
+            </div>
+            : 
+            <div className="w-4 h-4"></div>
+          }
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent 
+        className="w-56 p-0 bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] shadow-md overflow-hidden"
+        align="center"
+        sideOffset={8}
+        style={{ boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)" }}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div 
+          className="bg-[#2f3e46] text-[#cad2c5]"
+          style={{ padding: "0", margin: "0" }}
+        >
+          <button
+            className="w-full text-left bg-[#2f3e46] text-[#cad2c5] hover:bg-[#354f52] transition-colors duration-150 px-3 py-2 flex items-center gap-2 cursor-pointer"
+            onClick={handleSelectAll}
+            style={{ border: "none", outline: "none" }}
+          >
+            {allSelected ? (
+              <Check className="h-4 w-4 mr-2 text-[#84a98c]" />
+            ) : (
+              <div className="w-4 h-4 mr-2" />
+            )}
+            <span className="text-sm">Όλοι οι τύποι</span>
+          </button>
+          
+          <div className="h-px bg-[#52796f]/30 mx-3 my-1" style={{ margin: "4px 12px" }}></div>
+          
+          {customerTypeOptions.map((type) => (
+            <button
+              key={type}
+              className="w-full text-left bg-[#2f3e46] text-[#cad2c5] hover:bg-[#354f52] transition-colors duration-150 px-3 py-2 flex items-center gap-2 cursor-pointer"
+              onClick={() => handleToggleType(type)}
+              style={{ border: "none", outline: "none" }}
+            >
+              {selectedTypes.includes(type) ? (
+                <Check className="h-4 w-4 mr-2 text-[#84a98c]" />
+              ) : (
+                <div className="w-4 h-4 mr-2" />
+              )}
+              <span className="text-sm">{type}</span>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 // Add custom animation style at the top of the file
 const progressAnimationStyle = {
@@ -57,6 +180,41 @@ const progressAnimationStyle = {
   },
   ".animate-progress": {
     animation: "progress 1.5s ease-in-out infinite"
+  },
+  ".custom-scrollbar": {
+    scrollbarWidth: "thin",
+    scrollbarColor: "#52796f #2f3e46"
+  },
+  ".custom-scrollbar::-webkit-scrollbar": {
+    width: "6px"
+  },
+  ".custom-scrollbar::-webkit-scrollbar-track": {
+    background: "#2f3e46"
+  },
+  ".custom-scrollbar::-webkit-scrollbar-thumb": {
+    backgroundColor: "#52796f",
+    borderRadius: "20px"
+  },
+  ".custom-scrollbar::-webkit-scrollbar-thumb:hover": {
+    backgroundColor: "#84a98c"
+  },
+  "@keyframes filterGlow": {
+    "0%": { boxShadow: "0 0 15px rgba(82,121,111,0.7)" },
+    "50%": { boxShadow: "0 0 25px rgba(82,121,111,0.9)" },
+    "100%": { boxShadow: "0 0 15px rgba(82,121,111,0.7)" }
+  },
+  ".filter-glow": {
+    animation: "filterGlow 1.5s ease-in-out infinite"
+  },
+  "@keyframes filterGlowExtreme": {
+    "0%": { boxShadow: "0 0 20px 3px rgba(82,121,111,0.8)" },
+    "25%": { boxShadow: "0 0 35px 8px rgba(82,121,111,0.95)" },
+    "50%": { boxShadow: "0 0 45px 12px rgba(132,169,140,0.9)" },
+    "75%": { boxShadow: "0 0 35px 8px rgba(82,121,111,0.95)" },
+    "100%": { boxShadow: "0 0 20px 3px rgba(82,121,111,0.8)" }
+  },
+  ".filter-glow-extreme": {
+    animation: "filterGlowExtreme 2s ease-in-out infinite"
   }
 }
 
@@ -142,99 +300,116 @@ const CustomerRow = React.memo(({
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
             </div>
           ) : offers.length === 0 ? (
-            <div className="text-center py-4 text-[#84a98c]">
-              Δεν υπάρχουν προσφορές για αυτόν τον πελάτη
+            <div className="py-4 text-[#84a98c] flex flex-col items-center justify-center gap-3">
+              <div className="text-center">
+                Δεν υπάρχουν προσφορές για αυτόν τον πελάτη
+              </div>
             </div>
           ) : (
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-[#3a5258] text-[#a8c5b5]">
-                  <th className="px-2 py-2 text-left text-xs font-medium w-[160px]">Ημερομηνία</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ζήτηση Πελάτη</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ποσό</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium w-[140px]">Κατάσταση</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Αποτέλεσμα</th>
-                  <th className="px-3 py-2 text-center text-xs font-medium w-[50px]"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {offers.map((offer) => (
-                  <tr 
-                    key={offer.id} 
-                    className="border-t border-[#52796f]/30 hover:bg-[#354f52]/30 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditOffer(row.id, offer.id);
-                    }}
-                  >
-                    <td className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
-                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
-                      {offer.requirements 
-                        ? <TruncatedText 
-                            text={offer.requirements} 
-                            maxLength={50} 
-                            tooltipMaxWidth={800}
-                            multiLine={offer.requirements.length > 100}
-                            maxLines={2}
-                          />
-                        : "-"}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
-                      {offer.amount 
-                        ? <TruncatedText 
-                            text={offer.amount} 
-                            maxLength={50} 
-                            tooltipMaxWidth={800}
-                          />
-                        : "-"}
-                    </td>
-                    <td className="px-3 py-2 text-xs w-[140px]">
-                      <span className={`
-                        ${offer.offer_result === "wait_for_our_answer" ? "text-yellow-400" : 
-                          offer.offer_result === "wait_for_customer_answer" ? "text-blue-400" : 
-                          offer.offer_result === "ready" ? "text-green-400" : "text-gray-400"}
-                      `}>
-                        {formatStatus(offer.offer_result)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-xs w-[100px]">
-                      <span className={`
-                        ${offer.result === "success" ? "text-green-400" : 
-                          offer.result === "failed" ? "text-red-400" : 
-                          offer.result === "cancel" ? "text-yellow-400" :
-                          offer.result === "waiting" ? "text-purple-400" : "text-gray-400"}
-                      `}>
-                        {formatResult(offer.result)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-xs text-center w-[50px]">
-                      {isAdminOrSuperUser && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteOffer(row.id, offer.id);
-                                }}
-                                className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
-                              <p>Διαγραφή προσφοράς</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                    </td>
+            <div>
+              <div className="flex justify-between items-center mb-2 pr-4">
+                <h3 className="text-sm font-medium text-[#84a98c]">Προσφορές</h3>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCreateOffer(row.id, "Email");
+                  }}
+                  className="px-2 py-1 bg-[#52796f] hover:bg-[#3a5a44] text-white rounded-md flex items-center gap-1 text-xs transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  Νέα Προσφορά
+                </button>
+              </div>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-[#3a5258] text-[#a8c5b5]">
+                    <th className="px-2 py-2 text-left text-xs font-medium w-[160px]">Ημερομηνία</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ζήτηση Πελάτη</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ποσό</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium w-[140px]">Κατάσταση</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium w-[100px]">Αποτέλεσμα</th>
+                    <th className="px-3 py-2 text-center text-xs font-medium w-[50px]"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {offers.map((offer) => (
+                    <tr 
+                      key={offer.id} 
+                      className="border-t border-[#52796f]/30 hover:bg-[#354f52]/30 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditOffer(row.id, offer.id);
+                      }}
+                    >
+                      <td className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
+                      <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
+                        {offer.requirements 
+                          ? <TruncatedText 
+                              text={offer.requirements} 
+                              maxLength={50} 
+                              tooltipMaxWidth={800}
+                              multiLine={offer.requirements.length > 100}
+                              maxLines={2}
+                            />
+                          : "-"}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
+                        {offer.amount 
+                          ? <TruncatedText 
+                              text={offer.amount} 
+                              maxLength={50} 
+                              tooltipMaxWidth={800}
+                            />
+                          : "-"}
+                      </td>
+                      <td className="px-3 py-2 text-xs w-[140px]">
+                        <span className={`
+                          ${offer.offer_result === "wait_for_our_answer" ? "text-yellow-400" : 
+                            offer.offer_result === "wait_for_customer_answer" ? "text-blue-400" : 
+                            offer.offer_result === "ready" ? "text-green-400" : "text-gray-400"}
+                        `}>
+                          {formatStatus(offer.offer_result)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-xs w-[100px]">
+                        <span className={`
+                          ${offer.result === "success" ? "text-green-400" : 
+                            offer.result === "failed" ? "text-red-400" : 
+                            offer.result === "cancel" ? "text-yellow-400" :
+                            offer.result === "waiting" ? "text-purple-400" : "text-gray-400"}
+                        `}>
+                          {formatResult(offer.result)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-center w-[50px]">
+                        {isAdminOrSuperUser && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteOffer(row.id, offer.id);
+                                  }}
+                                  className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
+                                <p>Διαγραφή προσφοράς</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </td>
@@ -272,6 +447,23 @@ interface OffersDialogProps {
   defaultSource?: string;
 }
 
+// Add this useDebounce hook if it doesn't exist
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 export default function CustomersPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -296,6 +488,45 @@ export default function CustomersPage() {
       }
       .modal-appear {
         animation: modalAppear 0.2s ease-out forwards;
+      }
+      
+      @keyframes filterGlow {
+        0% { box-shadow: 0 0 15px rgba(82,121,111,0.7); }
+        50% { box-shadow: 0 0 25px rgba(82,121,111,0.9); }
+        100% { box-shadow: 0 0 15px rgba(82,121,111,0.7); }
+      }
+      .filter-glow {
+        animation: filterGlow 1.5s ease-in-out infinite;
+      }
+      
+      @keyframes filterGlowExtreme {
+        0% { box-shadow: 0 0 20px 3px rgba(82,121,111,0.8); }
+        25% { box-shadow: 0 0 35px 8px rgba(82,121,111,0.95); }
+        50% { box-shadow: 0 0 45px 12px rgba(132,169,140,0.9); }
+        75% { box-shadow: 0 0 35px 8px rgba(82,121,111,0.95); }
+        100% { box-shadow: 0 0 20px 3px rgba(82,121,111,0.8); }
+      }
+      .filter-glow-extreme {
+        animation: filterGlowExtreme 2s ease-in-out infinite;
+      }
+      
+      /* Custom scrollbar styles */
+      .custom-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #52796f #2f3e46;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #2f3e46;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #52796f;
+        border-radius: 20px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background-color: #84a98c;
       }
     `;
     
@@ -377,6 +608,11 @@ export default function CustomersPage() {
   const [loadingOffers, setLoadingOffers] = useState<Record<string, boolean>>({});
   const [showDeleteOfferDialog, setShowDeleteOfferDialog] = useState(false);
   const [offerToDelete, setOfferToDelete] = useState<{ customerId: string, offerId: string } | null>(null);
+  
+  // Customer type filter states
+  const [availableCustomerTypes, setAvailableCustomerTypes] = useState<string[]>(customerTypeOptions);
+  const [selectedCustomerTypes, setSelectedCustomerTypes] = useState<string[]>([]);
+  const debouncedCustomerTypes = useDebounce(selectedCustomerTypes, 300);
 
   // State to track if the dialog is ready to be shown
   const [isDialogReady, setIsDialogReady] = useState(false);
@@ -397,6 +633,16 @@ export default function CustomersPage() {
   
   // Add these near the top of the component with other state declarations
   const [realtimeEnabled, setRealtimeEnabled] = useState(true);
+  
+  // Add this to the component's state declarations
+  const [queryTime, setQueryTime] = useState<string>('');
+  
+  // Add these refs near other refs at the top of the component
+  const throttleTimeoutRef = useRef(null);
+  const requestIdCounter = useRef(0);
+  
+  // Move debouncedSearchTerm declaration before the fetchCustomers function
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
   // Add a function to set up real-time subscriptions
   const setupRealtimeSubscriptions = useCallback(() => {
@@ -580,7 +826,7 @@ export default function CustomersPage() {
         .is("deleted_at", null)
         .or('result.is.null,result.eq.pending,result.eq.,result.eq.none')
         .order("created_at", { ascending: false });
-
+      
       if (error) throw error;
       
       setCustomerOffers(prev => ({
@@ -605,7 +851,6 @@ export default function CustomersPage() {
             : customer
         )
       );
-      
     } catch (error) {
       console.error("Error fetching offers for customer:", error);
       toast({
@@ -618,81 +863,124 @@ export default function CustomersPage() {
     }
   }, [customerOffers]);
 
-  // Update fetchCustomers to exclude soft-deleted customers
-  const fetchCustomers = async (customersToExpand: string[] = []) => {
+  // Add a request ID tracking system to prevent duplicate calls
+  const lastRequestIdRef = useRef(0);
+  const fetchThrottleRef = useRef(false);
+  const fetchTimeoutRef = useRef(null);
+  
+  // Update fetchCustomers to be more efficient and prevent double rendering
+  const fetchCustomers = useCallback(async () => {
+    // Set loading state
+    setLoading(true);
+
+    // Set throttle timeout to prevent rapid successive calls
+    throttleTimeoutRef.current = setTimeout(() => {
+      throttleTimeoutRef.current = null;
+    }, 300); // 300ms throttle
+    
+    const requestId = ++requestIdCounter.current;
+    
     try {
-      setLoading(true);
-      
-      const from = page * pageSize;
-      const to = from + pageSize - 1;
-      
-      // First get all customers with their active offers count
+      // Build the initial query
       let query = supabase
-        .from("customers")
-        .select(`
-          *,
-          offers:offers(
-            id,
-            result,
-            deleted_at
-          )
-        `, { count: "exact" });
+        .from('customers')
+        .select('*, primary_contact_id')
+        .filter('deleted_at', 'is', null);
       
-      // Exclude soft-deleted customers 
-      query = query.is("deleted_at", null);
-      
-      if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
+      // Apply customer type filter if any are selected
+      if (selectedCustomerTypes.length > 0 && selectedCustomerTypes.length < availableCustomerTypes.length) {
+        query = query.in('customer_type', selectedCustomerTypes);
       }
       
-      if (searchTerm) {
-        query = query.ilike(`${searchColumn}`, `%${searchTerm}%`);
+      // Add status filter if not 'all'
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
       }
       
-      const { data: customersData, count, error: customersError } = await query
-        .range(from, to)
-        .order('company_name', { ascending: true });
-
-      if (customersError) throw customersError;
-
-      // Filter active offers client-side
-      const customersWithData = (customersData as Customer[])?.map(customer => {
-        const activeOffers = customer.offers?.filter(offer => 
-          !offer.deleted_at && // Filter out soft-deleted offers
-          (!offer.result || 
-          offer.result === 'pending' || 
-          offer.result === '' || 
-          offer.result === 'none')
-        ) || [];
-
-        return {
-          ...customer,
-          isExpanded: expandedCustomers[customer.id] || customersToExpand.includes(customer.id),
-          offers: customerOffers[customer.id] || [],
-          offersCount: activeOffers.length
-        };
-      }) || [];
+      // Execute the query
+      const response = await query.order('company_name');
       
-      setCustomers(customersWithData);
-      setFilteredCustomers(customersWithData);
-      setTotalCount(count || 0);
+      // Check if this is still the most recent request
+      if (requestId !== requestIdCounter.current) {
+        return;
+      }
       
-      // Prefetch offers for all visible customers with active offers
-      customersWithData.forEach(customer => {
-        if (customer.offersCount > 0) {
-          fetchCustomerOffers(customer.id);
-        }
-      });
+      if (response.error) {
+        throw response.error;
+      }
       
+      // Process data
+      const responseData = response.data || [];
+      
+      // Fetch offer counts for all customers
+      
+      // Get all customer IDs
+      const customerIds = responseData.map(customer => customer.id);
+      
+      // Fetch offer counts in a single query
+      const { data: offerCountsData, error: offerCountsError } = await supabase
+        .from('offers')
+        .select('customer_id, id')
+        .in('customer_id', customerIds)
+        .is('deleted_at', null)
+        .or('result.is.null,result.eq.pending,result.eq.,result.eq.none');
+      
+      if (offerCountsError) {
+        console.error('Error fetching offer counts:', offerCountsError);
+      } else {
+        // Create a map of customer IDs to offer counts
+        const offerCountMap = {};
+        offerCountsData.forEach(offer => {
+          if (!offerCountMap[offer.customer_id]) {
+            offerCountMap[offer.customer_id] = 0;
+          }
+          offerCountMap[offer.customer_id]++;
+        });
+        
+        // Add offer counts to customers
+        responseData.forEach(customer => {
+          customer.offersCount = offerCountMap[customer.id] || 0;
+        });
+      }
+      
+      // Apply client-side search filtering if searchTerm is present
+      let filteredData = responseData;
+      if (searchTerm && searchColumn) {
+        filteredData = responseData.filter(customer => {
+          const value = customer[searchColumn];
+          if (!value) return false;
+          return String(value).toLowerCase().includes(searchTerm.toLowerCase());
+        });
+      }
+      
+      // Update state directly
+      setCustomers(responseData);
+      setFilteredCustomers(filteredData);
+      
+      // Set a minimal query time for UI feedback
+      setQueryTime("0.00");
     } catch (error) {
-      console.error("Error fetching customers:", error);
+      console.error('Error fetching customers:', error);
+      toast({
+        title: "Σφάλμα",
+        description: "Δεν ήταν δυνατή η φόρτωση των πελατών.",
+        variant: "destructive",
+      });
     } finally {
+      // Always set loading to false
       setLoading(false);
     }
-  };
+  }, [supabase, selectedCustomerTypes, statusFilter, availableCustomerTypes.length, searchTerm, searchColumn]);
 
   // Update toggleCustomerExpanded to use cached data
   const toggleCustomerExpanded = async (customerId: string) => {
+    // Find the customer to check offer count
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer || (customer.offersCount || 0) === 0) {
+      // Don't expand customers with no offers
+      return;
+    }
+    
     const isCurrentlyExpanded = expandedCustomers[customerId] || false;
     
     // If we're expanding and don't have offers yet, fetch them
@@ -855,9 +1143,9 @@ export default function CustomersPage() {
         const isExpanded = row.isExpanded || false;
         const offersCount = row.offersCount || 0;
         
-        // Only show the expand arrow if there are offers
+        // Don't show anything if there are no offers
         if (offersCount === 0) {
-          return null;
+          return <div className="w-full h-full"></div>;
         }
         
         return (
@@ -1104,7 +1392,7 @@ export default function CustomersPage() {
       />
     );
     
-    // Wrap with context menu
+    // Always wrap with context menu
     return (
       <CustomerContextMenu 
         key={`context-${row.id}`} 
@@ -1115,15 +1403,6 @@ export default function CustomersPage() {
       </CustomerContextMenu>
     );
   }, [customerOffers, loadingOffers, columns, isAdminOrSuperUser, handleEditOffer, handleDeleteOffer, handleCreateOffer]);
-
-  // Fetch customers when user or filters change
-  useEffect(() => {
-    if (user) {
-      // Only fetch if refreshTrigger changes or statusFilter changes
-      // This prevents unnecessary fetches
-      fetchCustomers();
-    }
-  }, [user, statusFilter]); // Remove refreshTrigger to prevent cascading refreshes
 
   // Initialize dropdown options once on component mount
   useEffect(() => {
@@ -1139,20 +1418,6 @@ export default function CustomersPage() {
       setSelectedColumn(searchColumn);
     }
   }, []); // Empty dependency array means this runs only once when component mounts
-
-  // Handle search filtering
-  useEffect(() => {
-    if (searchTerm) {
-      const filtered = customers.filter(customer => {
-        const value = customer[searchColumn];
-        if (!value) return false;
-        return value.toString().toLowerCase().includes(searchTerm.toLowerCase());
-      });
-      setFilteredCustomers(filtered);
-    } else {
-      setFilteredCustomers(customers);
-    }
-  }, [searchTerm, searchColumn, customers]);
 
   const handleEditCustomer = (customer) => {
     setSelectedCustomer(customer);
@@ -1184,10 +1449,7 @@ export default function CustomersPage() {
 
   // Function to track and prevent duplicate delete operations
   const preventDuplicateDelete = (customerId) => {
-    console.log(`[PREVENT_DUP] Checking deletion for ${customerId}, current state: ${deletionInProgressRef.current}`);
-    
     if (deletionInProgressRef.current) {
-      console.log(`[PREVENT_DUP] Deletion already in progress, preventing duplicate`);
       return false;
     }
     
@@ -1196,7 +1458,6 @@ export default function CustomersPage() {
     
     // Auto-reset after 3 seconds as a safety measure
     setTimeout(() => {
-      console.log(`[PREVENT_DUP] Auto-resetting deletion flag after timeout`);
       deletionInProgressRef.current = false;
     }, 3000);
     
@@ -1205,7 +1466,6 @@ export default function CustomersPage() {
   
   // Function to clear deletion in progress flag
   const clearDeletionInProgress = () => {
-    console.log(`[PREVENT_DUP] Manually clearing deletion flag`);
     deletionInProgressRef.current = false;
   };
 
@@ -1638,6 +1898,41 @@ export default function CustomersPage() {
     }
   }, [refreshCustomers]);
 
+  // Set options for the search bar dropdown
+  useEffect(() => {
+    setOptions(searchColumns.map(col => ({ value: col.accessor, label: col.header })));
+    setSelectedColumn(searchColumns[0].accessor);
+  }, []);
+  
+  // This useEffect is not needed as filtering is applied in fetchCustomers
+  
+  // Refresh customers when customer type filter changes
+  useEffect(() => {
+    // Only fetch when the debounced value changes, not on every selection
+    fetchCustomers();
+  }, [debouncedCustomerTypes, statusFilter]);
+  
+  // This is implemented elsewhere in the file, no need to define it here
+
+  // Create a memoized version of the DataTable component to prevent unnecessary re-renders
+  const MemoizedDataTable = React.useMemo(() => (
+    <DataTableBase
+      key={`customers-table-${statusFilter}`}
+      columns={columns}
+      data={filteredCustomers}
+      isLoading={loading}
+      defaultSortColumn="company_name"
+      searchTerm={searchTerm}
+      searchColumn={searchColumn}
+      onRowClick={(row) => navigate(`/customers/${row.id}`)}
+      containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
+      rowClassName="hover:bg-[#354f52]/50 cursor-pointer group"
+      highlightedRowId={lastUpdatedCustomerId}
+      renderRow={renderCustomRow}
+      showOfferMessage={true}
+    />
+  ), [columns, filteredCustomers, loading, statusFilter, searchTerm, searchColumn, navigate, lastUpdatedCustomerId, renderCustomRow]);
+
   // If showing the form, render it instead of the customer list
   return (
     <div className="p-4">
@@ -1659,10 +1954,14 @@ export default function CustomersPage() {
 
       <div className="flex justify-between items-center mb-4">
         <div className="w-1/4">
-          {/* Empty div to maintain layout */}
+          {queryTime && (
+            <span className="text-xs text-[#84a98c]">
+              Χρόνος ερωτήματος: {queryTime}
+            </span>
+          )}
         </div>
         
-        <div className="flex-1 flex justify-center">
+        <div className="flex-1 flex justify-center items-center gap-2">
           <SearchBar
             placeholder="Αναζήτηση..."
             value={searchTerm}
@@ -1670,6 +1969,11 @@ export default function CustomersPage() {
             options={options}
             selectedColumn={selectedColumn}
             onColumnChange={handleColumnChange}
+          />
+          <CustomerTypeFilter
+            availableTypes={availableCustomerTypes}
+            selectedTypes={selectedCustomerTypes}
+            onChange={setSelectedCustomerTypes}
           />
         </div>
         
@@ -1727,21 +2031,7 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <DataTableBase
-        key={`customers-table-${statusFilter}`}
-        columns={columns}
-        data={filteredCustomers}
-        isLoading={loading}
-        defaultSortColumn="company_name"
-        searchTerm={searchTerm}
-        searchColumn={searchColumn}
-        onRowClick={(row) => navigate(`/customers/${row.id}`)}
-        containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
-        rowClassName="hover:bg-[#354f52]/50 cursor-pointer group"
-        highlightedRowId={lastUpdatedCustomerId}
-        renderRow={renderCustomRow}
-        showOfferMessage={true}
-      />
+      {MemoizedDataTable}
 
       {/* Add CustomerDialog component */}
       <CustomerDialog

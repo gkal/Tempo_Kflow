@@ -650,7 +650,7 @@ const CustomerForm = ({
                   </div>
                   <div className="w-2/3">
                     <GlobalDropdown
-                      options={["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές"]}
+                      options={["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές", "Εκτακτος Πελάτης", "Εκτακτη Εταιρία"]}
                       value={formData.customer_type}
                       onSelect={(value) => {
                         setTempCustomerType(value);
