@@ -274,25 +274,22 @@ const MetricCards = ({ metrics }: MetricCardsProps) => {
   // Filter customers based on search term and column
   useEffect(() => {
     if (!searchTerm.trim()) {
-      // When no search term, show all non-deleted customers from the current month
-      setFilteredCustomers(customerMetrics.customers.filter(customer => !customer.deleted_at));
+      setFilteredCustomers(customerMetrics.customers);
       return;
     }
 
-    const filtered = customerMetrics.customers
-      .filter(customer => !customer.deleted_at) // Always filter out deleted customers
-      .filter(customer => {
-        const searchLower = searchTerm.toLowerCase();
-        
-        // Special case for primary contact
-        if (searchColumn === 'primary_contact_id' && customer.primary_contact) {
-          return customer.primary_contact.full_name.toLowerCase().includes(searchLower);
-        }
-        
-        // Handle regular properties
-        return customer[searchColumn] && 
-              String(customer[searchColumn]).toLowerCase().includes(searchLower);
-      });
+    const filtered = customerMetrics.customers.filter(customer => {
+      const searchLower = searchTerm.toLowerCase();
+      
+      // Special case for primary contact
+      if (searchColumn === 'primary_contact_id' && customer.primary_contact) {
+        return customer.primary_contact.full_name.toLowerCase().includes(searchLower);
+      }
+      
+      // Handle regular properties
+      return customer[searchColumn] && 
+             String(customer[searchColumn]).toLowerCase().includes(searchLower);
+    });
     
     setFilteredCustomers(filtered);
   }, [searchTerm, searchColumn, customerMetrics.customers]);

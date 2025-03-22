@@ -28,6 +28,28 @@ import {
 } from "@/components/ui/alert-dialog";
 import { usePhoneFormat } from "@/hooks/usePhoneFormat";
 
+// Map of normalized customer types that match the database constraint
+const CUSTOMER_TYPE_MAP = {
+  "Εταιρεία": "Εταιρεία,",
+  "Ιδιώτης": "Ιδιώτης,",
+  "Δημόσιο": "Δημόσιο,",
+  "Οικοδομές": "Οικοδομές",
+  "Εκτακτος": "Εκτακτος",
+  "Εκτακτος πελάτης": "Εκτακτος πελάτης",
+  "Εκτακτη εταιρία": "Εκτακτη εταιρία"
+};
+
+// Display options for customer types - to match exactly what's in the database
+const CUSTOMER_TYPE_OPTIONS = [
+  "Εταιρεία", 
+  "Ιδιώτης", 
+  "Δημόσιο", 
+  "Οικοδομές",
+  "Εκτακτος",
+  "Εκτακτος πελάτης",
+  "Εκτακτη εταιρία"
+];
+
 // Custom styles for select dropdown
 const selectStyles = `
   select {
@@ -142,7 +164,7 @@ const CustomerForm = ({
           company_name: data.company_name || "",
           afm: data.afm || "",
           doy: data.doy || "",
-          customer_type: data.customer_type || "Εταιρεία",
+          customer_type: CUSTOMER_TYPE_MAP[data.customer_type] || data.customer_type || "Εταιρεία",
           address: data.address || "",
           postal_code: data.postal_code || "",
           town: data.town || "",
@@ -240,10 +262,11 @@ const CustomerForm = ({
     
     // If this is a customer_type change from the dropdown, store it in temp state
     if (name === "customer_type" && tempCustomerType !== null) {
-      // Use the temp value that was set by the dropdown
+      // Use the normalized temp value
+      const normalizedValue = CUSTOMER_TYPE_MAP[tempCustomerType] || tempCustomerType;
       setFormData((prev) => ({
         ...prev,
-        customer_type: tempCustomerType,
+        customer_type: normalizedValue,
       }));
       // Reset the temp value
       setTempCustomerType(null);
@@ -304,7 +327,16 @@ const CustomerForm = ({
       ...formData,
       ...(tempCustomerType !== null ? { customer_type: tempCustomerType } : {})
     };
-    console.log("Submission data prepared:", submissionData);
+    
+    // CRITICAL FIX: Ensure customer_type is ALWAYS one of the allowed values
+    const allowedCustomerTypes = ["Εταιρεία,", "Ιδιώτης,", "Δημόσιο,", "Οικοδομές", "Εκτακτος", "Εκτακτος πελάτης", "Εκτακτη εταιρία"];
+    if (!allowedCustomerTypes.includes(submissionData.customer_type)) {
+      console.log("Warning: customer_type not in allowed list, forcing to 'Εταιρεία,'");
+      submissionData.customer_type = "Εταιρεία,"; // Use a safe default value
+    }
+    
+    // ❗ IMPORTANT: Debug log of the actual value being sent to the database
+    console.log("FINAL customer_type value:", submissionData.customer_type);
     
     // Validation checks
     console.log("Starting validation checks");
@@ -376,16 +408,22 @@ const CustomerForm = ({
         document.dispatchEvent(new CustomEvent('customer-form-success'));
       } else {
         console.log("Creating new customer");
+        
+        // Use the actual customer_type selected by the user
+        const insertData = {
+          ...submissionData,
+          created_by: user?.id,
+          modified_by: user?.id,
+          status: "active",
+          primary_contact_id: null,
+        };
+        
+        console.log("Insertion data with customer_type:", insertData);
+        
         // Create new customer
         const { data, error } = await supabase
           .from("customers")
-          .insert([{
-            ...submissionData,
-            created_by: user?.id,
-            modified_by: user?.id,
-            status: "active",
-            primary_contact_id: null,
-          }])
+          .insert([insertData])
           .select();
 
         if (error) {
@@ -650,10 +688,12 @@ const CustomerForm = ({
                   </div>
                   <div className="w-2/3">
                     <GlobalDropdown
-                      options={["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές", "Εκτακτος Πελάτης", "Εκτακτη Εταιρία"]}
+                      options={CUSTOMER_TYPE_OPTIONS}
                       value={formData.customer_type}
                       onSelect={(value) => {
-                        setTempCustomerType(value);
+                        // Store the normalized value
+                        const normalizedValue = CUSTOMER_TYPE_MAP[value] || value;
+                        setTempCustomerType(normalizedValue);
                       }}
                       placeholder="Επιλέξτε τύπο πελάτη"
                     />

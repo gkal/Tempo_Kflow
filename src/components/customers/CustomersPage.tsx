@@ -56,7 +56,8 @@ interface CustomerTypeFilterProps {
   onChange: (types: string[]) => void;
 }
 
-const customerTypeOptions = ["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές", "Εκτακτος Πελάτης", "Εκτακτη Εταιρία"];
+// These must match exactly what's allowed in the database
+const customerTypeOptions = ["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές", "Εκτακτος", "Εκτακτος πελάτης", "Εκτακτη εταιρία"];
 
 const CustomerTypeFilter: React.FC<CustomerTypeFilterProps> = ({ 
   availableTypes, 
