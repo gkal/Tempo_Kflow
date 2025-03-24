@@ -1,11 +1,21 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { Undo2, Trash2, AlertCircle, User, Building, FileText, CheckSquare, Phone, Check } from "lucide-react";
-import { formatDateTime } from "@/lib/utils";
+import {
+  Undo2,
+  Trash2,
+  AlertCircle,
+  Users,
+  Building,
+  FileText,
+  CheckSquare,
+  Phone,
+  Check,
+  TableIcon
+} from "lucide-react";
+import { formatDateTime } from "@/utils/formatUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,15 +37,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/use-toast";
+import { createPrefixedLogger } from "@/utils/loggingUtils";
+// Add AppTabs import
+import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
+
+// Create a logger for this component
+const logger = createPrefixedLogger('RecoveryPage');
 
 // Define the tables that have soft delete enabled
 const TABLES_WITH_SOFT_DELETE = [
   { id: 'customers' as TableType, name: 'Πελάτες', icon: Building },
-  { id: 'contacts' as TableType, name: 'Επαφές', icon: User },
+  { id: 'contacts' as TableType, name: 'Επαφές', icon: Users },
   { id: 'offers' as TableType, name: 'Προσφορές', icon: FileText },
   { id: 'offer_details' as TableType, name: 'Λεπτομέρειες Προσφορών', icon: FileText },
   { id: 'tasks' as TableType, name: 'Εργασίες', icon: CheckSquare },
-  { id: 'users' as TableType, name: 'Χρήστες', icon: User }
+  { id: 'users' as TableType, name: 'Χρήστες', icon: Users }
 ];
 
 // Type for deleted records
@@ -590,11 +606,11 @@ export default function RecoveryPage() {
       let recordName = getRecordTitle(recordToRestore.record, activeTab);
       setRecordName(recordName);
       
-      console.log(`Starting restoration of ${activeTab} record:`, recordToRestore.record.id);
+      logger.info(`Starting restoration of ${activeTab} record:`, recordToRestore.record.id);
       
       // Special handling for offers to check if associated customer exists
       if (isActiveTab(activeTab, 'offers') && recordToRestore.record.customer_id) {
-        console.log(`Checking associated customer: ${recordToRestore.record.customer_id}`);
+        logger.debug(`Checking associated customer: ${recordToRestore.record.customer_id}`);
         
         // Check if the customer exists (deleted or not)
         const { data: existingCustomer } = await supabase
@@ -603,11 +619,11 @@ export default function RecoveryPage() {
           .eq('id', recordToRestore.record.customer_id)
           .single();
         
-        console.log('Customer check result:', existingCustomer);
+        logger.debug('Customer check result:', existingCustomer);
           
         // If customer exists but is deleted, restore it first
         if (existingCustomer && existingCustomer.deleted_at !== null) {
-          console.log(`Restoring associated customer: ${existingCustomer.id}`);
+          logger.info(`Restoring associated customer: ${existingCustomer.id}`);
           
           const { error: customerRestoreError } = await supabase
             .from('customers')
@@ -615,23 +631,26 @@ export default function RecoveryPage() {
             .eq('id', recordToRestore.record.customer_id);
             
           if (customerRestoreError) {
-            console.error("Error restoring associated customer:", customerRestoreError);
-            throw new Error("Failed to restore associated customer");
+            logger.error('Error restoring associated customer:', customerRestoreError);
+            toast({
+              title: "Σφάλμα",
+              description: "Προέκυψε σφάλμα κατά την ανάκτηση του συσχετισμένου πελάτη",
+              variant: "destructive",
+            });
+          } else {
+            logger.info(`Successfully restored associated customer: ${existingCustomer.id}`);
+            toast({
+              title: "Επιτυχία",
+              description: "Ο συσχετισμένος πελάτης ανακτήθηκε επιτυχώς",
+              variant: "default",
+            });
           }
-
-          // Log success
-          console.log(`Successfully restored associated customer: ${existingCustomer.id}`);
-          toast({
-            title: "Επιτυχία",
-            description: "Ο συσχετισμένος πελάτης ανακτήθηκε επιτυχώς",
-            variant: "default",
-          });
         }
       }
       
       // If offer_details, check if offer needs restoration
       if (isActiveTab(activeTab, 'offer_details') && recordToRestore.record.offer_id) {
-        console.log(`Checking associated offer: ${recordToRestore.record.offer_id}`);
+        logger.debug(`Checking associated offer: ${recordToRestore.record.offer_id}`);
         
         // Check if the offer exists but is deleted
         const { data: existingOffer } = await supabase
@@ -640,13 +659,13 @@ export default function RecoveryPage() {
           .eq('id', recordToRestore.record.offer_id)
           .single();
         
-        console.log('Offer check result:', existingOffer);
+        logger.debug('Offer check result:', existingOffer);
           
         // If offer exists but is deleted, restore it too
         if (existingOffer && existingOffer.deleted_at !== null) {
           // First check if the customer associated with this offer is deleted
           if (existingOffer.customer_id) {
-            console.log(`Checking customer of offer: ${existingOffer.customer_id}`);
+            logger.debug(`Checking customer of offer: ${existingOffer.customer_id}`);
             
             const { data: existingCustomer } = await supabase
               .from('customers')
@@ -654,11 +673,11 @@ export default function RecoveryPage() {
               .eq('id', existingOffer.customer_id)
               .single();
             
-            console.log('Customer of offer check result:', existingCustomer);
+            logger.debug('Customer of offer check result:', existingCustomer);
               
             // If customer exists but is deleted, restore it first
             if (existingCustomer && existingCustomer.deleted_at !== null) {
-              console.log(`Restoring customer of offer: ${existingCustomer.id}`);
+              logger.info(`Restoring customer of offer: ${existingCustomer.id}`);
               
               const { error: customerRestoreError } = await supabase
                 .from('customers')
@@ -666,22 +685,25 @@ export default function RecoveryPage() {
                 .eq('id', existingOffer.customer_id);
                 
               if (customerRestoreError) {
-                console.error("Error restoring associated customer:", customerRestoreError);
-                throw new Error("Failed to restore associated customer");
+                logger.error('Error restoring associated customer:', customerRestoreError);
+                toast({
+                  title: "Σφάλμα",
+                  description: "Προέκυψε σφάλμα κατά την ανάκτηση του συσχετισμένου πελάτη",
+                  variant: "destructive",
+                });
+              } else {
+                logger.info(`Successfully restored associated customer: ${existingCustomer.id}`);
+                toast({
+                  title: "Επιτυχία",
+                  description: "Ο συσχετισμένος πελάτης ανακτήθηκε επιτυχώς",
+                  variant: "default",
+                });
               }
-
-              // Log success
-              console.log(`Successfully restored associated customer: ${existingCustomer.id}`);
-              toast({
-                title: "Επιτυχία",
-                description: "Ο συσχετισμένος πελάτης ανακτήθηκε επιτυχώς",
-                variant: "default",
-              });
             }
           }
 
           // Now restore the offer
-          console.log(`Restoring associated offer: ${existingOffer.id}`);
+          logger.info(`Restoring associated offer: ${existingOffer.id}`);
           
           const { error: offerRestoreError } = await supabase
             .from('offers')
@@ -689,22 +711,25 @@ export default function RecoveryPage() {
             .eq('id', recordToRestore.record.offer_id);
             
           if (offerRestoreError) {
-            console.error("Error restoring associated offer:", offerRestoreError);
-            throw new Error("Failed to restore associated offer");
+            logger.error('Error restoring associated offer:', offerRestoreError);
+            toast({
+              title: "Σφάλμα",
+              description: "Προέκυψε σφάλμα κατά την ανάκτηση της συσχετισμένης προσφοράς",
+              variant: "destructive",
+            });
+          } else {
+            logger.info(`Successfully restored associated offer: ${existingOffer.id}`);
+            toast({
+              title: "Επιτυχία",
+              description: "Η συσχετισμένη προσφορά ανακτήθηκε επιτυχώς",
+              variant: "default",
+            });
           }
-
-          // Log success
-          console.log(`Successfully restored associated offer: ${existingOffer.id}`);
-          toast({
-            title: "Επιτυχία",
-            description: "Η συσχετισμένη προσφορά ανακτήθηκε επιτυχώς",
-            variant: "default",
-          });
         }
       }
       
       // Restore the main record
-      console.log(`Restoring main ${activeTab} record: ${recordToRestore.record.id}`);
+      logger.info(`Restoring main ${activeTab} record: ${recordToRestore.record.id}`);
       
       const { error: restoreError } = await supabase
         .from(activeTab)
@@ -712,36 +737,26 @@ export default function RecoveryPage() {
         .eq('id', recordToRestore.record.id);
         
       if (restoreError) {
-        console.error("Error restoring main record:", restoreError);
-        throw restoreError;
-      }
-      
-      // If this is an offer, also restore any associated offer_details
-      if (isActiveTab(activeTab, 'offers')) {
-        // Restore any offer_details related to this offer
-        console.log(`Restoring offer_details for offer: ${recordToRestore.record.id}`);
+        logger.error('Error restoring main record:', restoreError);
+        toast({
+          title: "Σφάλμα",
+          description: "Προέκυψε σφάλμα κατά την ανάκτηση της εγγραφής",
+          variant: "destructive",
+        });
+      } else {
+        logger.info('Restoration complete');
         
-        const { error: detailsError } = await supabase
-          .from('offer_details')
-          .update({ deleted_at: null })
-          .eq('offer_id', recordToRestore.record.id);
-        
-        if (detailsError) {
-          console.warn('Could not restore related offer details:', detailsError);
-        } else {
-          console.log('Successfully restored offer details');
-        }
+        // Refresh data
+        refreshDeletedRecords();
       }
-      
-      // Only set successful after all operations complete
-      console.log('Restoration complete');
-      setIsRestoringSuccessful(true);
-      setIsRestoring(false);
-      
-      // Refresh data
-      refreshDeletedRecords();
     } catch (error) {
-      console.error("Error during restoration:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast({
+        variant: "destructive",
+        title: "Σφάλμα κατά την ανάκτηση της εγγραφής",
+        description: errorMessage,
+      });
+      logger.error('Error during restoration', error);
       
       // Show error toast
       toast({
@@ -787,14 +802,14 @@ export default function RecoveryPage() {
               .eq('id', record.customer_id);
               
             if (customerRestoreError) {
-              console.error('Could not restore associated customer:', customerRestoreError);
+              logger.error('Could not restore associated customer:', customerRestoreError);
               toast({
                 title: "Προειδοποίηση",
                 description: "Δεν ήταν δυνατή η ανάκτηση του συσχετισμένου πελάτη",
                 variant: "destructive",
               });
             } else {
-              console.log(`Successfully restored associated customer: ${record.customer_id}`);
+              logger.info(`Successfully restored associated customer: ${record.customer_id}`);
             }
           }
         }
@@ -825,14 +840,14 @@ export default function RecoveryPage() {
                   .eq('id', offerData.customer_id);
                   
                 if (customerRestoreError) {
-                  console.error('Could not restore associated customer:', customerRestoreError);
+                  logger.error('Could not restore associated customer:', customerRestoreError);
                   toast({
                     title: "Προειδοποίηση",
                     description: "Δεν ήταν δυνατή η ανάκτηση του συσχετισμένου πελάτη",
                     variant: "destructive",
                   });
                 } else {
-                  console.log(`Successfully restored associated customer: ${offerData.customer_id}`);
+                  logger.info(`Successfully restored associated customer: ${offerData.customer_id}`);
                 }
               }
             }
@@ -844,14 +859,14 @@ export default function RecoveryPage() {
               .eq('id', record.offer_id);
               
             if (offerRestoreError) {
-              console.error('Could not restore associated offer:', offerRestoreError);
+              logger.error('Could not restore associated offer:', offerRestoreError);
               toast({
                 title: "Προειδοποίηση",
                 description: "Δεν ήταν δυνατή η ανάκτηση της συσχετισμένης προσφοράς",
                 variant: "destructive",
               });
             } else {
-              console.log(`Successfully restored associated offer: ${record.offer_id}`);
+              logger.info(`Successfully restored associated offer: ${record.offer_id}`);
             }
           }
         }
@@ -863,7 +878,7 @@ export default function RecoveryPage() {
           .eq('id', selectedRecord.id); // Use the ID from the DeletedRecord object
           
         if (restoreError) {
-          console.error('Could not restore record:', restoreError);
+          logger.error('Could not restore record:', restoreError);
           throw restoreError;
         }
         
@@ -876,7 +891,7 @@ export default function RecoveryPage() {
             .eq('offer_id', selectedRecord.id); // Use the ID from the DeletedRecord object
           
           if (detailsError) {
-            console.warn('Could not restore related offer details:', detailsError);
+            logger.warn('Could not restore related offer details:', detailsError);
             // Don't throw here since this is not critical
           }
         }
@@ -889,7 +904,7 @@ export default function RecoveryPage() {
       // Refresh the data to show the changes
       refreshDeletedRecords();
     } catch (error) {
-      console.error('Error during batch restoration:', error);
+      logger.error('Error during batch restoration:', error);
       
       toast({
         title: "Σφάλμα",
@@ -1228,193 +1243,161 @@ export default function RecoveryPage() {
         </Button>
       </div>
       
-      <Card className="mb-4 bg-[#354f52] border-[#52796f]">
-        <CardContent className="p-3">
-          <div className="text-sm text-[#cad2c5]">
-            Εδώ μπορείτε να δείτε και να ανακτήσετε εγγραφές που έχουν διαγραφεί τις τελευταίες 30 ημέρες.
-            Μετά από 30 ημέρες, οι διαγραμμένες εγγραφές διαγράφονται οριστικά από το σύστημα.
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value as TableType)} className="text-[#cad2c5]">
-        <TabsList className="mb-6 bg-[#2f3e46] border border-[#52796f]">
-          {TABLES_WITH_SOFT_DELETE.map(table => (
-            <TabsTrigger 
-              key={table.id} 
-              value={table.id}
-              className="data-[state=active]:bg-[#52796f] data-[state=active]:text-[#cad2c5]"
-            >
-              <table.icon className="h-4 w-4 mr-2" />
-              {table.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        
-        {TABLES_WITH_SOFT_DELETE.map(table => (
-          <TabsContent key={table.id} value={table.id}>
-            <Card className="bg-[#354f52] border-[#52796f]">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    <TableIcon className="h-5 w-5 mr-2 text-[#84a98c]" />
-                    <h2 className="text-lg font-semibold text-[#cad2c5]">Διαγραμμένα → {table.name}</h2>
-                  </div>
-                  
-                  {selectedRecords.length > 0 && (
-                    <Button
-                      variant="outline"
-                      className="flex items-center bg-[#52796f] hover:bg-[#52796f]/80 text-[#cad2c5] border-[#52796f]"
-                      onClick={() => setShowBatchRestoreDialog(true)}
-                      disabled={isRestoring}
-                    >
-                      <Undo2 className="h-4 w-4 mr-2" />
-                      Ανάκτηση Επιλεγμένων ({selectedRecords.length})
-                    </Button>
-                  )}
+      <div className="flex flex-col gap-4">
+        {/* Tabs for different entity types */}
+        <AppTabs value={activeTab} onValueChange={(value) => setActiveTab(value as TableType)}>
+          <AppTabsList>
+            {TABLES_WITH_SOFT_DELETE.map((table) => {
+              const Icon = table.icon;
+              return (
+                <AppTabsTrigger 
+                  key={table.id} 
+                  value={table.id}
+                >
+                  <Icon className="h-4 w-4 mr-2" />
+                  {table.name}
+                </AppTabsTrigger>
+              );
+            })}
+          </AppTabsList>
+          
+          {/* Batch actions */}
+          {selectedRecords.length > 0 && (
+            <div className="bg-[#354f52] p-3 m-4 rounded-md flex items-center justify-between">
+              <div className="text-sm text-[#cad2c5]">
+                <span className="font-medium">{selectedRecords.length}</span> εγγραφές επιλεγμένες
+              </div>
+              <Button
+                onClick={() => setShowBatchRestoreDialog(true)}
+                className="bg-[#52796f] hover:bg-[#3a5a44] text-white flex items-center"
+                size="sm"
+              >
+                <Undo2 className="h-4 w-4 mr-2" />
+                Μαζική Ανάκτηση
+              </Button>
+            </div>
+          )}
+          
+          {/* Content for each tab */}
+          {TABLES_WITH_SOFT_DELETE.map((table) => (
+            <AppTabsContent key={table.id} value={table.id}>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="text-xl font-semibold text-[#cad2c5] flex items-center">
+                  <table.icon className="h-5 w-5 mr-2" />
+                  Διαγραμμένες εγγραφές - {table.name}
                 </div>
                 
-                {loading ? (
-                  <div className="flex justify-center items-center py-12">
-                    <div className="flex flex-col items-center">
-                      <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#52796f] border-t-transparent" />
-                      <div className="mt-4 text-[#cad2c5]">Φόρτωση διαγραμμένων εγγραφών...</div>
-                    </div>
+                {deletedRecords.length > 0 && (
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={toggleSelectAll}
+                      variant="outline"
+                      size="sm"
+                      className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white"
+                    >
+                      {selectedRecords.length === deletedRecords.length ? "Αποεπιλογή Όλων" : "Επιλογή Όλων"}
+                    </Button>
+                    <Button
+                      onClick={() => refreshDeletedRecords()}
+                      variant="outline"
+                      size="sm"
+                      className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white"
+                    >
+                      Ανανέωση
+                    </Button>
                   </div>
-                ) : deletedRecords.length === 0 ? (
-                  <div className="text-center py-12 text-[#84a98c]">
-                    <Trash2 className="h-12 w-12 mx-auto mb-4 text-[#52796f] opacity-50" />
-                    <span>Δεν υπάρχουν διαγραμμένες εγγραφές για {table.name}.</span>
-                  </div>
-                ) : (
-                  <div className="scrollable-table-container">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12 text-[#cad2c5]">
-                            <Checkbox
-                              checked={selectedRecords.length === deletedRecords.length}
-                              onCheckedChange={toggleSelectAll}
-                              className="border-[#52796f]"
+                )}
+              </div>
+              
+              {loading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#52796f] border-t-transparent"></div>
+                </div>
+              ) : deletedRecords.length > 0 ? (
+                <div className="scrollable-table-container">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox 
+                            checked={selectedRecords.length === deletedRecords.length && deletedRecords.length > 0}
+                            onCheckedChange={() => toggleSelectAll()}
+                            aria-label="Επιλογή όλων"
+                          />
+                        </TableHead>
+                        <TableHead>Εγγραφή</TableHead>
+                        <TableHead>Λεπτομέρειες</TableHead>
+                        <TableHead className="w-[180px]">Ημ/νία Διαγραφής</TableHead>
+                        <TableHead className="w-[120px] text-right">Ενέργειες</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {deletedRecords.map((record) => (
+                        <TableRow key={record.id}>
+                          <TableCell>
+                            <Checkbox 
+                              checked={selectedRecords.some(selected => selected.id === record.id)}
+                              onCheckedChange={() => toggleRecordSelection(record)}
+                              aria-label="Επιλογή εγγραφής"
                             />
-                          </TableHead>
-                          <TableHead className="text-[#cad2c5]">Εγγραφή</TableHead>
-                          <TableHead className="text-[#cad2c5]">Διαγράφηκε</TableHead>
-                          <TableHead className="text-right text-[#cad2c5]">Ενέργειες</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      
-                      <TableBody className="divide-y divide-[#52796f]">
-                        {deletedRecords.map(record => (
-                          <TableRow 
-                            key={record.id}
-                            className="bg-[#354f52] hover:bg-[#2f3e46]"
-                          >
-                            <TableCell>
-                              <Checkbox 
-                                checked={selectedRecords.some(selected => selected.id === record.id)} 
-                                onCheckedChange={() => toggleRecordSelection(record)}
-                                className="border-[#52796f]"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium text-[#cad2c5] flex items-center">
-                                  {getRecordTitle(record.record, table.id)}
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="text-[#84a98c] p-0 h-auto text-xs hover:text-[#cad2c5] ml-2"
-                                    onClick={() => handleViewDetails(record)}
-                                  >
-                                    Προβολή λεπτομερειών
-                                  </Button>
-                                </div>
-                                <div className="text-xs text-[#84a98c] mt-1">
-                                  {table.id === 'contacts' && record.record.customer_id && (
-                                    <div className="flex items-center">
-                                      <span className="text-[#84a98c] text-xs mr-1">Πελάτης:</span>
-                                      <CustomerName customerId={record.record.customer_id} />
-                                    </div>
-                                  )}
-                                  {table.id === 'offers' && record.record.customer_id && (
-                                    <div className="flex items-center">
-                                      <span className="text-[#84a98c] text-xs mr-1">Πελάτης:</span>
-                                      <CustomerName customerId={record.record.customer_id} />
-                                    </div>
-                                  )}
-                                  {table.id === 'offer_details' && record.record.offer_id && (
-                                    <div className="flex items-center">
-                                      <span className="text-[#84a98c] text-xs mr-1">Προσφορά:</span>
-                                      <OfferName offerId={record.record.offer_id} />
-                                    </div>
-                                  )}
-                                  {table.id === 'customers' && record.record.afm && (
-                                    <div className="flex items-center">
-                                      <span className="text-[#84a98c] text-xs mr-1">ΑΦΜ:</span>
-                                      <span>{record.record.afm}</span>
-                                    </div>
-                                  )}
-                                  {table.id === 'tasks' && record.record.status && (
-                                    <div className="flex items-center">
-                                      <span className="text-[#84a98c] text-xs mr-1">Κατάσταση:</span>
-                                      <Badge variant="outline" className="text-xs">
-                                        {record.record.status}
-                                      </Badge>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-[#84a98c] text-sm">
-                              {formatDateTime(record.deleted_at)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button 
-                                variant="outline"
-                                size="sm"
-                                className="flex items-center bg-[#52796f] hover:bg-[#52796f]/80 text-[#cad2c5] border-[#52796f]"
+                          </TableCell>
+                          <TableCell className="font-medium">{getRecordTitle(record.record, activeTab)}</TableCell>
+                          <TableCell>
+                            {getRecordDetails(record.record, activeTab)}
+                          </TableCell>
+                          <TableCell>{formatDateTime(record.deleted_at)}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end space-x-2">
+                              <Button
                                 onClick={() => {
                                   setRecordToRestore(record);
                                   setShowRestoreDialog(true);
                                 }}
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white"
                               >
-                                <Undo2 className="h-3 w-3 mr-1" />
-                                Ανάκτηση
+                                <Undo2 className="h-4 w-4" />
                               </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center p-8 border border-dashed border-[#52796f] rounded-lg bg-[#354f52]">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-[#2f3e46] flex items-center justify-center mb-4">
+                    <Check className="h-6 w-6 text-[#84a98c]" />
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        ))}
-      </Tabs>
+                  <h3 className="text-xl font-medium text-[#cad2c5] mb-1">Δεν υπάρχουν διαγραμμένες εγγραφές</h3>
+                  <p className="text-[#84a98c]">Δεν βρέθηκαν διαγραμμένες εγγραφές για {table.name.toLowerCase()}</p>
+                </div>
+              )}
+            </AppTabsContent>
+          ))}
+        </AppTabs>
+      </div>
       
-      {renderRestoreDialog()}
-      {renderBatchRestoreDialog()}
-      
-      {/* Purge Confirmation Dialog */}
+      {/* Purge old records confirmation dialog */}
       <AlertDialog open={showPurgeDialog} onOpenChange={setShowPurgeDialog}>
-        <AlertDialogContent className="bg-[#354f52] border-[#52796f] text-[#cad2c5]">
+        <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#cad2c5]">Επιβεβαίωση Εκκαθάρισης</AlertDialogTitle>
-            <div className="text-[#84a98c] text-sm">
-              Αυτή η ενέργεια θα διαγράψει οριστικά όλες τις εγγραφές που έχουν διαγραφεί πριν από 30 ημέρες.
-              Αυτή η ενέργεια δεν μπορεί να αναιρεθεί. Θέλετε να συνεχίσετε;
-            </div>
+            <AlertDialogTitle className="text-[#cad2c5]">Εκκαθάριση Παλαιών Εγγραφών</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#84a98c]">
+              Αυτή η ενέργεια θα διαγράψει μόνιμα τις εγγραφές που έχουν σημανθεί ως διαγραμμένες για περισσότερες από 30 ημέρες.
+              <br /><br />
+              Αυτή η ενέργεια είναι μη αναστρέψιμη και δεν μπορείτε να ανακτήσετε αυτές τις εγγραφές στο μέλλον.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-[#2f3e46] text-[#cad2c5] hover:bg-[#2f3e46]/80 border-[#52796f]">
+            <AlertDialogCancel className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white">
               Άκυρο
             </AlertDialogCancel>
             <AlertDialogAction 
               onClick={handlePurgeOldRecords}
-              className="bg-red-500 hover:bg-red-600 text-white"
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
               Εκκαθάριση
             </AlertDialogAction>
@@ -1422,179 +1405,144 @@ export default function RecoveryPage() {
         </AlertDialogContent>
       </AlertDialog>
       
-      {/* Record Details Dialog */}
-      <AlertDialog open={showRecordDetailsDialog} onOpenChange={setShowRecordDetailsDialog}>
-        <AlertDialogContent className="bg-[#354f52] border-[#52796f] text-[#cad2c5] max-w-2xl max-h-[80vh] overflow-auto">
+      {/* Record details dialog */}
+      <AlertDialog 
+        open={showRecordDetailsDialog} 
+        onOpenChange={setShowRecordDetailsDialog}
+      >
+        <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-white max-w-3xl max-h-[80vh] overflow-y-auto">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#cad2c5] flex items-center justify-between">
-              <span>Λεπτομέρειες Διαγραμμένης Εγγραφής</span>
-              <Badge className="bg-[#52796f] text-[#cad2c5]">
-                {activeTab === 'customers' ? 'Πελάτης' : 
-                 activeTab === 'contacts' ? 'Επαφή' : 
-                 activeTab === 'offers' ? 'Προσφορά' :
-                 activeTab === 'offer_details' ? 'Λεπτομέρεια Προσφοράς' :
-                 activeTab === 'tasks' ? 'Εργασία' : 'Χρήστης'}
-              </Badge>
+            <AlertDialogTitle className="text-[#cad2c5] flex items-center">
+              <TableIcon className="h-5 w-5 mr-2" />
+              Λεπτομέρειες Διαγραμμένης Εγγραφής
             </AlertDialogTitle>
           </AlertDialogHeader>
           
           {recordDetails && (
-            <div className="py-4">
-              <div className="grid grid-cols-1 gap-4">
-                {/* Display warnings about missing parent records */}
-                {isCheckingRelations ? (
-                  <span className="bg-[#2f3e46] rounded p-3 text-center block">
-                    <span className="flex items-center justify-center space-x-2">
-                      <span>Έλεγχος σχετικών εγγραφών...</span>
-                      <span className="h-2 w-2 bg-[#84a98c] rounded-full animate-bounce"></span>
-                      <span className="h-2 w-2 bg-[#84a98c] rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                      <span className="h-2 w-2 bg-[#84a98c] rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                    </span>
-                  </span>
-                ) : (
-                  <div className="space-y-3">
-                    {isActiveTab(activeTab, 'offers') && recordDetails.record.customer_id && relatedRecordsExist.customer === false && (
-                      <div className="bg-amber-900/30 border border-amber-500/50 rounded p-3">
-                        <div className="flex items-center">
-                          <AlertCircle className="h-4 w-4 text-amber-500 mr-2" />
-                          <span className="text-amber-200">
-                            Προειδοποίηση: Ο πελάτης αυτής της προσφοράς δεν υπάρχει ή είναι διαγραμμένος.
-                            Μπορεί να χρειαστεί να ανακτήσετε πρώτα τον πελάτη.
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {isActiveTab(activeTab, 'contacts') && recordDetails.record.customer_id && relatedRecordsExist.customer === false && (
-                      <div className="bg-amber-900/30 border border-amber-500/50 rounded p-3">
-                        <div className="flex items-center">
-                          <AlertCircle className="h-4 w-4 text-amber-500 mr-2" />
-                          <span className="text-amber-200">
-                            Προειδοποίηση: Ο πελάτης αυτής της επαφής δεν υπάρχει ή είναι διαγραμμένος.
-                            Μπορεί να χρειαστεί να ανακτήσετε πρώτα τον πελάτη.
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {isActiveTab(activeTab, 'offer_details') && recordDetails.record.offer_id && relatedRecordsExist.offer === false && (
-                      <div className="bg-amber-900/30 border border-amber-500/50 rounded p-3">
-                        <div className="flex items-center">
-                          <AlertCircle className="h-4 w-4 text-amber-500 mr-2" />
-                          <span className="text-amber-200">
-                            Προειδοποίηση: Η προσφορά αυτής της λεπτομέρειας δεν υπάρχει ή είναι διαγραμμένη.
-                            Πρέπει να ανακτήσετε πρώτα την προσφορά.
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                <div className="bg-[#2f3e46] rounded-md p-4 border border-[#52796f]">
-                  <h3 className="text-lg font-medium text-[#cad2c5] mb-3">
+            <div className="my-4">
+              <div className="flex flex-col gap-4">
+                <div className="p-4 bg-[#354f52] rounded-lg">
+                  <h3 className="text-lg font-medium text-[#cad2c5] mb-2">
                     {getRecordTitle(recordDetails.record, activeTab)}
                   </h3>
                   
-                  <div className="text-sm">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {Object.entries(recordDetails.record).map(([key, value]) => {
-                        // Skip internal fields or null values
-                        if (key === 'id' || key === 'deleted_at' || value === null || value === '') return null;
-                        
-                        // For foreign keys, show linked entity names when possible
-                        if (key === 'customer_id' && typeof value === 'string') {
-                          return (
-                            <div key={key} className="flex flex-col">
-                              <span className="text-[#84a98c] text-xs">Πελάτης:</span>
-                              <div className="mt-1">
-                                <CustomerName customerId={value as string} />
-                              </div>
-                            </div>
-                          );
-                        }
-                        
-                        if (key === 'offer_id' && typeof value === 'string') {
-                          return (
-                            <div key={key} className="flex flex-col">
-                              <span className="text-[#84a98c] text-xs">Προσφορά:</span>
-                              <div className="mt-1">
-                                <OfferName offerId={value as string} />
-                              </div>
-                            </div>
-                          );
-                        }
-                        
-                        if (key === 'user_id' && typeof value === 'string') {
-                          return (
-                            <div key={key} className="flex flex-col">
-                              <span className="text-[#84a98c] text-xs">Χρήστης:</span>
-                              <div className="mt-1">
-                                <UserName userId={value as string} />
-                              </div>
-                            </div>
-                          );
-                        }
-                        
-                        // Format dates
-                        if ((key.includes('date') || key.includes('at')) && typeof value === 'string') {
-                          return (
-                            <div key={key} className="flex flex-col">
-                              <span className="text-[#84a98c] text-xs">{key}:</span>
-                              <span className="mt-1">{formatDateTime(value as string)}</span>
-                            </div>
-                          );
-                        }
-                        
-                        // Handle complex objects (like arrays or nested objects)
-                        if (typeof value === 'object') {
-                          return (
-                            <div key={key} className="flex flex-col col-span-2">
-                              <span className="text-[#84a98c] text-xs">{key}:</span>
-                              <pre className="mt-1 text-xs bg-[#2f3e46] p-2 rounded overflow-auto max-h-40 border border-[#52796f] text-[#cad2c5]">
-                                {JSON.stringify(value, null, 2)}
-                              </pre>
-                            </div>
-                          );
-                        }
-                        
-                        return (
-                          <div key={key} className="flex flex-col">
-                            <span className="text-[#84a98c] text-xs">{key}:</span>
-                            <span className="mt-1">{value as string}</span>
-                          </div>
-                        );
-                      })}
+                  <div className="text-sm text-[#84a98c] mb-2 flex items-center">
+                    <span className="mr-1">Διαγράφηκε στις:</span> 
+                    {formatDateTime(recordDetails.deleted_at)}
+                  </div>
+                  
+                  {/* Display warnings for related records */}
+                  {isCheckingRelations ? (
+                    <div className="flex items-center text-sm text-[#84a98c] my-2">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-[#84a98c]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Έλεγχος συσχετισμένων εγγραφών...
                     </div>
+                  ) : (
+                    <>
+                      {isActiveTab(activeTab, 'offers') && 
+                        recordDetails.record.customer_id && 
+                        relatedRecordsExist.hasOwnProperty('customer') && (
+                        <div className={`flex items-center text-sm ${
+                          relatedRecordsExist.customer ? 'text-green-500' : 'text-amber-500'
+                        } my-2 p-2 rounded-md ${
+                          relatedRecordsExist.customer ? 'bg-green-900/20' : 'bg-amber-900/20'
+                        }`}>
+                          {relatedRecordsExist.customer ? (
+                            <Check className="h-4 w-4 mr-2" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 mr-2" />
+                          )}
+                          {relatedRecordsExist.customer 
+                            ? 'Ο πελάτης αυτής της προσφοράς υπάρχει.' 
+                            : 'Ο πελάτης αυτής της προσφοράς έχει διαγραφεί και θα ανακτηθεί αυτόματα.'}
+                        </div>
+                      )}
+                      
+                      {isActiveTab(activeTab, 'contacts') && 
+                        recordDetails.record.customer_id && 
+                        relatedRecordsExist.hasOwnProperty('customer') && (
+                        <div className={`flex items-center text-sm ${
+                          relatedRecordsExist.customer ? 'text-green-500' : 'text-amber-500'
+                        } my-2 p-2 rounded-md ${
+                          relatedRecordsExist.customer ? 'bg-green-900/20' : 'bg-amber-900/20'
+                        }`}>
+                          {relatedRecordsExist.customer ? (
+                            <Check className="h-4 w-4 mr-2" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 mr-2" />
+                          )}
+                          {relatedRecordsExist.customer 
+                            ? 'Ο πελάτης αυτής της επαφής υπάρχει.' 
+                            : 'Ο πελάτης αυτής της επαφής έχει διαγραφεί και θα ανακτηθεί αυτόματα.'}
+                        </div>
+                      )}
+                      
+                      {isActiveTab(activeTab, 'offer_details') && 
+                        recordDetails.record.offer_id && 
+                        relatedRecordsExist.hasOwnProperty('offer') && (
+                        <div className={`flex items-center text-sm ${
+                          relatedRecordsExist.offer ? 'text-green-500' : 'text-amber-500'
+                        } my-2 p-2 rounded-md ${
+                          relatedRecordsExist.offer ? 'bg-green-900/20' : 'bg-amber-900/20'
+                        }`}>
+                          {relatedRecordsExist.offer ? (
+                            <Check className="h-4 w-4 mr-2" />
+                          ) : (
+                            <AlertCircle className="h-4 w-4 mr-2" />
+                          )}
+                          {relatedRecordsExist.offer 
+                            ? 'Η προσφορά αυτής της λεπτομέρειας υπάρχει.' 
+                            : 'Η προσφορά αυτής της λεπτομέρειας έχει διαγραφεί και θα ανακτηθεί αυτόματα.'}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium text-[#cad2c5] mb-2">Λεπτομέρειες:</h4>
+                    {getRecordDetails(recordDetails.record, activeTab)}
                   </div>
                 </div>
                 
-                <div className="text-sm text-[#84a98c]">
-                  <div>Διαγράφηκε: {formatDateTime(recordDetails.deleted_at)}</div>
+                <div className="p-4 bg-[#354f52] rounded-lg">
+                  <h4 className="text-sm font-medium text-[#cad2c5] mb-2">Δεδομένα JSON:</h4>
+                  <pre className="text-xs bg-[#2f3e46] p-3 rounded-md overflow-auto max-h-60 border border-[#52796f] text-[#cad2c5]">
+                    {JSON.stringify(recordDetails.record, null, 2)}
+                  </pre>
                 </div>
               </div>
             </div>
           )}
           
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-[#2f3e46] text-[#cad2c5] hover:bg-[#2f3e46]/80 border-[#52796f]">
+          <AlertDialogFooter className="border-t border-[#52796f] pt-4 mt-4">
+            <AlertDialogCancel className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white">
               Κλείσιμο
             </AlertDialogCancel>
-            <Button
-              variant="default"
-              className="bg-[#52796f] hover:bg-[#52796f]/80 text-[#cad2c5]"
-              onClick={() => {
-                setRecordToRestore(recordDetails);
-                setShowRecordDetailsDialog(false);
-                setShowRestoreDialog(true);
-              }}
-            >
-              <Undo2 className="h-4 w-4 mr-2" />
-              Ανάκτηση
-            </Button>
+            {recordDetails && (
+              <Button 
+                onClick={() => {
+                  setRecordToRestore(recordDetails);
+                  setShowRecordDetailsDialog(false);
+                  setShowRestoreDialog(true);
+                }}
+                className="bg-[#52796f] hover:bg-[#3a5a44] text-white flex items-center"
+              >
+                <Undo2 className="h-4 w-4 mr-2" />
+                Ανάκτηση
+              </Button>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Batch restore dialog */}
+      {renderBatchRestoreDialog()}
+      
+      {/* Restore confirmation dialog */}
+      {renderRestoreDialog()}
     </div>
   );
 } 

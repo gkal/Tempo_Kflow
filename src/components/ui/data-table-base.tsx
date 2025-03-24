@@ -18,30 +18,28 @@ import {
 import { Search, ChevronUp, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchBarStyles } from "@/lib/styles/search-bar";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDateTime, safeFormatDateTime, extractDateParts } from "@/utils/formatUtils";
 import React from "react";
+import { classNames } from "@/lib/styles/utils";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
-type SortDirection = "asc" | "desc";
+// Types
+export type SortDirection = "asc" | "desc";
+type ColumnType = "id" | "name" | "status" | "date" | "description" | "numeric" | "default";
+type ColumnPriority = "high" | "medium" | "low";
 
-interface Column {
+export interface Column {
   header: string;
   accessor: string;
   sortable?: boolean;
   cell?: (value: any, row?: any) => React.ReactNode;
-  type?:
-    | "id"
-    | "name"
-    | "status"
-    | "date"
-    | "description"
-    | "numeric"
-    | "default";
-  priority?: "high" | "medium" | "low";
+  type?: ColumnType;
+  priority?: ColumnPriority;
   id?: string;
   width?: string;
 }
 
-interface DataTableBaseProps {
+export interface DataTableBaseProps {
   columns: Column[];
   data: any[];
   defaultSortColumn?: string;
@@ -72,6 +70,78 @@ interface DataTableBaseProps {
   footerHint?: string;
 }
 
+// Utility functions - could be moved to separate file
+
+const inferColumnType = (accessor: string): ColumnType => {
+  if (accessor.includes('date') || accessor.includes('created_at') || accessor.includes('updated_at')) {
+    return 'date';
+  }
+  
+  if (accessor.includes('amount') || accessor.includes('price') || accessor.includes('total')) {
+    return 'numeric';
+  }
+  
+  return 'default';
+};
+
+const getColumnWidth = (column: Column): string => {
+  const type = column.type || inferColumnType(column.accessor);
+  
+  switch (type) {
+    case 'id':
+      return 'w-24';
+    case 'name':
+      return 'w-1/5';
+    case 'status':
+      return 'w-24';
+    case 'date':
+      return 'w-40';
+    case 'description':
+      return 'w-1/4';
+    case 'numeric':
+      return 'w-24';
+    default:
+      return '';
+  }
+};
+
+// Highlight text with search term
+const highlightMatch = (text: any, searchTerm: string): React.ReactNode => {
+  if (!text || !searchTerm || searchTerm.trim() === '') {
+    return text || "-";
+  }
+  
+  try {
+    const textStr = String(text);
+    const searchTermLower = searchTerm.trim().toLowerCase();
+    const textLower = textStr.toLowerCase();
+    
+    if (!textLower.includes(searchTermLower)) {
+      return textStr;
+    }
+    
+    // Find first match only for better performance
+    const index = textLower.indexOf(searchTermLower);
+    if (index === -1) return textStr;
+    
+    const beforeMatch = textStr.substring(0, index);
+    const match = textStr.substring(index, index + searchTermLower.length);
+    const afterMatch = textStr.substring(index + searchTermLower.length);
+    
+    return (
+      <span key={`highlight-${searchTerm}-${textStr.substring(0, 10)}`}>
+        {beforeMatch}
+        <span className="bg-[#52796f] text-white px-0.5 rounded-sm">{match}</span>
+        {afterMatch}
+      </span>
+    );
+  } catch (error) {
+    console.error("Error in highlighting:", error);
+    return text;
+  }
+};
+
+// Main component
 export function DataTableBase({
   columns,
   data,
@@ -82,7 +152,7 @@ export function DataTableBase({
   searchPlaceholder = "",
   rowClassName = "",
   containerClassName = "",
-  showSearch = false, // Default to false since search is now external
+  showSearch = false,
   pageSize = 50,
   tableId = "default-table",
   isLoading = false,
@@ -92,6 +162,8 @@ export function DataTableBase({
   showOfferMessage = false,
   footerHint,
   onRowClick,
+  emptyStateMessage = "No data found",
+  loadingStateMessage = "Loading data...",
 }: DataTableBaseProps) {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -100,171 +172,17 @@ export function DataTableBase({
     key: defaultSortColumn,
     direction: defaultSortDirection,
   });
-  // Search state is now passed as props
-  const [filteredData, setFilteredData] = useState([]);
-  const [displayedData, setDisplayedData] = useState([]);
+  const [filteredData, setFilteredData] = useState<any[]>([]);
+  const [displayedData, setDisplayedData] = useState<any[]>([]);
   const [page, setPage] = useState(1);
-  const [transformedData, setTransformedData] = useState([]);
-  const loader = useRef(null);
+  const loader = useRef<HTMLTableRowElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
-
-  // Helper function to safely format dates
-  const safeFormatDateTime = (dateStr: string | Date): string => {
-    try {
-      // Handle null or undefined
-      if (!dateStr) {
-        return "-";
-      }
-      
-      // Handle already formatted dates to prevent double formatting
-      if (typeof dateStr === 'string') {
-        // Check if it's already in Greek format (DD/MM/YYYY HH:MM:SS [π.μ./μ.μ.])
-        if (/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2} [πμ.]{4}$/.test(dateStr)) {
-          return dateStr;
-        }
-        
-        // Check if it's already in simple date format (DD/MM/YYYY)
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
-          return dateStr;
-        }
-      }
-      
-      return formatDateTime(dateStr);
-    } catch (error) {
-      console.error("Error formatting date:", error);
-      return String(dateStr) || "-";
-    }
-  };
-
-  // Handle sorting
-  const handleSort = (key: string) => {
-    let direction: SortDirection = "asc";
-    if (sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc";
-    }
-    setSortConfig({ key, direction });
-  };
-
-  // Helper function to extract date parts for sorting
-  const extractDateParts = (dateStr: string): { year: string, month: string, day: string, full: string } => {
-    try {
-      // Try to parse as ISO date first
-      const date = new Date(dateStr);
-      if (!isNaN(date.getTime())) {
-        return {
-          year: date.getFullYear().toString(),
-          month: (date.getMonth() + 1).toString().padStart(2, '0'),
-          day: date.getDate().toString().padStart(2, '0'),
-          full: date.toISOString()
-        };
-      }
-      
-      // Try to parse Greek format DD/MM/YYYY
-      const parts = dateStr.split('/');
-      if (parts.length === 3) {
-        return {
-          day: parts[0],
-          month: parts[1],
-          year: parts[2].split(' ')[0], // Remove time part if exists
-          full: `${parts[2]}-${parts[1]}-${parts[0]}` // ISO-like for comparison
-        };
-      }
-      
-      return { year: '0000', month: '00', day: '00', full: '' };
-    } catch (error) {
-      return { year: '0000', month: '00', day: '00', full: '' };
-    }
-  };
-
-  // Filter and sort data when props change
-  useEffect(() => {
-    // Transform data for display
-    const transformed = data.map(item => {
-      // Create a copy of the item
-      const newItem = { ...item };
-      
-      // Format date fields for display
-      columns.forEach(column => {
-        if (column.type === 'date' || inferColumnType(column.accessor) === 'date') {
-          if (newItem[column.accessor]) {
-            newItem[`_formatted_${column.accessor}`] = safeFormatDateTime(newItem[column.accessor]);
-          }
-        }
-      });
-      
-      return newItem;
-    });
-    
-    setTransformedData(transformed);
-    
-    // Apply search filter if searchTerm is provided
-    let filtered = transformed;
-    if (searchTerm && searchColumn) {
-      filtered = transformed.filter(item => {
-        const value = item[searchColumn];
-        if (value === undefined || value === null) return false;
-        
-        const stringValue = String(value).toLowerCase();
-        const searchTermLower = searchTerm.toLowerCase();
-        
-        // For date columns, search in the formatted value
-        if (columns.find(col => col.accessor === searchColumn && (col.type === 'date' || inferColumnType(searchColumn) === 'date'))) {
-          const formattedValue = item[`_formatted_${searchColumn}`] || safeFormatDateTime(value);
-          return formattedValue.toLowerCase().includes(searchTermLower);
-        }
-        
-        return stringValue.includes(searchTermLower);
-      });
-    }
-    
-    // Sort the filtered data
-    const sorted = sortData(filtered, sortConfig.key, sortConfig.direction);
-    setFilteredData(sorted);
-    
-    // Reset pagination
-    setPage(1);
-    setDisplayedData(sorted.slice(0, pageSize));
-  }, [data, searchTerm, searchColumn, sortConfig, columns]);
-
-  // Infer column type from accessor name
-  const inferColumnType = (accessor: string) => {
-    if (/date|created_at|updated_at|timestamp/i.test(accessor)) {
-      return 'date';
-    }
-    return 'default';
-  };
-
-  // Get column width based on priority or type
-  const getColumnWidth = (column: Column) => {
-    // Use explicit width if provided
-    if (column.width) return column.width;
-    
-    if (column.priority === 'high') return 'w-1/4';
-    if (column.priority === 'medium') return 'w-1/6';
-    if (column.priority === 'low') return 'w-1/12';
-    
-    // Default widths based on column type
-    switch (column.type || inferColumnType(column.accessor)) {
-      case 'id':
-        return 'w-20';
-      case 'name':
-        return 'w-1/5';
-      case 'status':
-        return 'w-24';
-      case 'date':
-        return 'w-40';
-      case 'description':
-        return 'w-1/4';
-      case 'numeric':
-        return 'w-24';
-      default:
-        return '';
-    }
-  };
+  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
+  const [showEmptyState, setShowEmptyState] = useState(false);
 
   // Sort data based on column and direction
-  const sortData = (data, sortColumn, sortDirection) => {
-    return [...data].sort((a, b) => {
+  const sortData = useCallback((dataToSort: any[], sortColumn: string, sortDirection: SortDirection) => {
+    return [...dataToSort].sort((a, b) => {
       // Get values to compare
       let aValue = a[sortColumn];
       let bValue = b[sortColumn];
@@ -305,122 +223,26 @@ export function DataTableBase({
       bValue = String(bValue).toLowerCase();
       
       // Compare values
-      if (sortDirection === 'asc') {
-        return aValue.localeCompare(bValue);
-      } else {
-        return bValue.localeCompare(aValue);
-      }
+      return sortDirection === 'asc'
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
     });
-  };
+  }, [columns]);
 
-  // Load more data when scrolling
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && displayedData.length < filteredData.length) {
-          const nextPage = page + 1;
-          const nextData = filteredData.slice(0, nextPage * pageSize);
-          setDisplayedData(nextData);
-          setPage(nextPage);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (loader.current) {
-      observer.observe(loader.current);
+  // Handle sort click
+  const handleSort = (key: string) => {
+    let direction: SortDirection = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
     }
-
-    return () => {
-      if (loader.current) {
-        observer.unobserve(loader.current);
-      }
-    };
-  }, [displayedData, filteredData, page, pageSize]);
-
-  // Modify the highlightMatch function to add strong !important styles
-  const highlightMatch = (text: any, searchTerm: string): React.ReactNode => {
-    if (!text || !searchTerm || searchTerm.trim() === '') {
-      return text || "-";
-    }
-    
-    try {
-      const textStr = String(text);
-      const searchTermLower = searchTerm.trim().toLowerCase();
-      const textLower = textStr.toLowerCase();
-      
-      // Find all matches
-      const matches: { index: number; length: number }[] = [];
-      let currentIndex = 0;
-      
-      // Collect all matches
-      while ((currentIndex = textLower.indexOf(searchTermLower, currentIndex)) !== -1) {
-        matches.push({ index: currentIndex, length: searchTermLower.length });
-        currentIndex += searchTermLower.length;
-      }
-      
-      if (matches.length === 0) {
-        return textStr;
-      }
-      
-      // Apply highlights to all matches at once
-      let result = '';
-      let lastIndex = 0;
-      
-      for (const match of matches) {
-        // Text before match
-        result += textStr.substring(lastIndex, match.index);
-        
-        // Highlighted match with very aggressive styling
-        const highlightedText = textStr.substring(match.index, match.index + match.length);
-        result += `<span style="background-color: #52796f !important; color: white !important; padding: 0 2px !important; border-radius: 2px !important; display: inline !important; position: relative !important; z-index: 999 !important;">${highlightedText}</span>`;
-        
-        lastIndex = match.index + match.length;
-      }
-      
-      // Add any remaining text
-      if (lastIndex < textStr.length) {
-        result += textStr.substring(lastIndex);
-      }
-      
-      // Return with unique key based on both content and search term
-      return (
-        <span 
-          key={`highlight-${searchTerm}-${textStr.substring(0, 10)}-${Date.now()}`}
-          dangerouslySetInnerHTML={{ __html: result }} 
-        />
-      );
-    } catch (error) {
-      console.error("Error in highlighting:", error);
-      return text;
-    }
-  };
-
-  // Create a style object for each column to ensure consistent widths
-  const columnStyles = columns.reduce((acc, column, index) => {
-    const width = column.width || getColumnWidth(column);
-    acc[column.accessor] = {
-      width: width,
-      minWidth: column.width ? undefined : '100px',
-    };
-    return acc;
-  }, {});
-
-  // Add a new function to handle search input focus
-  const handleSearchFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    // Select all text in the input when it receives focus
-    e.target.select();
-    // Call the external handler if provided
-    if (onSearchFocus) {
-      onSearchFocus(e);
-    }
+    setSortConfig({ key, direction });
   };
 
   // Add a utility function for debouncing
-  const useDebounce = (fn, delay) => {
+  const useDebounce = (fn: Function, delay: number) => {
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     
-    const debouncedFn = useCallback((...args) => {
+    const debouncedFn = useCallback((...args: any[]) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -441,305 +263,357 @@ export function DataTableBase({
     return debouncedFn;
   };
 
-  // Add a new useEffect to handle direct DOM manipulation for highlighting
+  // Focus handler with select-all behavior
+  const handleSearchFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.select();
+    if (onSearchFocus) {
+      onSearchFocus(e);
+    }
+  };
+
+  // Process and sort data whenever data or sort config changes
   useEffect(() => {
-    // Create a more efficient highlight function
-    const applyHighlights = () => {
-      try {
-        // Skip highlighting if search term is empty
-        if (!searchTerm || !searchColumn || searchTerm.trim() === '') {
-          // Only clear if we know there was a previous search
-          const cells = document.querySelectorAll(`table tbody td[data-highlighted="true"]`);
-          if (cells.length > 0) {
-            cells.forEach(cell => {
-              const cellDiv = cell.querySelector('div');
-              if (cellDiv && cellDiv.innerHTML.includes('background-color')) {
-                // Get the original text without highlighting
-                const plainText = cellDiv.textContent || '';
-                cellDiv.textContent = plainText;
-                cell.removeAttribute('data-highlighted');
-              }
-            });
-          }
-          return;
-        }
-        
-        // Optimize query - only target cells in the current column
-        const selector = `table tbody td[data-column="${searchColumn}"]`;
-        const cells = document.querySelectorAll(selector);
-        const searchStr = searchTerm.toLowerCase().trim();
-        
-        cells.forEach(cell => {
-          const cellDiv = cell.querySelector('div');
-          if (!cellDiv) return;
-          
-          const cellText = cellDiv.textContent || '';
-          if (!cellText) return;
-          
-          const textLower = cellText.toLowerCase();
-          const hasMatch = textLower.includes(searchStr);
-          
-          if (hasMatch) {
-            // Only re-highlight if needed
-            if (cell.getAttribute('data-highlighted') !== 'true' || 
-                cell.getAttribute('data-search-term') !== searchTerm) {
-              
-              // Find only the first match
-              const firstMatchIndex = textLower.indexOf(searchStr);
-              const matchEnd = firstMatchIndex + searchStr.length;
-              
-              // Apply highlighting to only the first match
-              const before = cellText.substring(0, firstMatchIndex);
-              const matchText = cellText.substring(firstMatchIndex, matchEnd);
-              const after = cellText.substring(matchEnd);
-              
-              // Create result with only first match highlighted
-              const result = `${before}<span style="background-color: #52796f !important; color: white !important; border-radius: 2px !important; display: inline !important; position: relative !important; z-index: 999 !important;">${matchText}</span>${after}`;
-              
-              // Update the cell content
-              cellDiv.innerHTML = result;
-              
-              // Mark as highlighted with this term
-              cell.setAttribute('data-highlighted', 'true');
-              cell.setAttribute('data-search-term', searchTerm);
-            }
-          } else if (cell.getAttribute('data-highlighted') === 'true') {
-            // Clear highlighting if this cell was previously highlighted
-            cellDiv.textContent = cellText;
-            cell.removeAttribute('data-highlighted');
-            cell.removeAttribute('data-search-term');
-          }
-        });
-      } catch (error) {
-        console.error("Error in direct DOM highlighting:", error);
-      }
-    };
+    if (!data || !Array.isArray(data)) {
+      setFilteredData([]);
+      return;
+    }
     
-    // Run immediately without a delay
-    applyHighlights();
+    const sortedData = sortData(data, sortConfig.key, sortConfig.direction);
+    setFilteredData(sortedData);
+    
+    // Reset pagination when data changes
+    setPage(1);
+    setDisplayedData(sortedData.slice(0, pageSize));
+  }, [data, sortConfig, sortData, pageSize]);
+
+  // Handle infinite scrolling
+  useEffect(() => {
+    if (!loader.current) return;
+    
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && displayedData.length < filteredData.length) {
+          const nextPage = page + 1;
+          const nextData = filteredData.slice(0, nextPage * pageSize);
+          setDisplayedData(nextData);
+          setPage(nextPage);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(loader.current);
+    
+    return () => observer.disconnect();
+  }, [displayedData, filteredData, page, pageSize]);
+
+  // When data changes, consider it an attempted load
+  useEffect(() => {
+    if (!isLoading && !hasAttemptedLoad) {
+      setHasAttemptedLoad(true);
+    }
+  }, [data, isLoading]);
+
+  // Delay showing empty state to prevent flashing
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
+    if (!isLoading && hasAttemptedLoad && data.length === 0) {
+      // If we're not loading and have no data, show empty state after longer delay
+      timer = setTimeout(() => {
+        setShowEmptyState(true);
+      }, 1000); // Increased to 1 second to ensure better UX
+    } else {
+      setShowEmptyState(false);
+    }
     
     return () => {
-      // Nothing to clean up
+      if (timer) clearTimeout(timer);
     };
-  }, [searchTerm, searchColumn, displayedData]);
+  }, [isLoading, hasAttemptedLoad, data.length]);
 
-  return (
-    <div className="w-full flex flex-col" ref={tableRef}>
-      {/* If you have a search input inside this component, add the onFocus handler */}
-      {showSearch && (
-        <div className="mb-4">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              type="text"
-              placeholder="Search..."
-              className={cn(
-                searchBarStyles.inputClasses,
-                searchBarStyles.containerClasses
+  // Create column styles map for consistent widths
+  const columnStyles = columns.reduce<Record<string, React.CSSProperties>>((acc, column) => {
+    const width = column.width || getColumnWidth(column);
+    acc[column.accessor] = {
+      width: width,
+      minWidth: column.width ? undefined : '100px',
+    };
+    return acc;
+  }, {});
+
+  // JSX for loading state
+  const renderLoading = () => (
+    <tr key="loading-row">
+      <td colSpan={columns.length} className="text-center py-8">
+        <div className="flex justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#84a98c]"></div>
+        </div>
+      </td>
+    </tr>
+  );
+
+  // JSX for empty state
+  const renderEmptyState = () => (
+    <div className="p-4 text-center text-[#cad2c5]/70 text-sm">
+      {isLoading ? loadingStateMessage : emptyStateMessage}
+    </div>
+  );
+
+  // JSX for table header
+  const renderTableHeader = () => (
+    <thead className="bg-[#2f3e46] sticky top-0 z-20 shadow-sm after:content-[''] after:absolute after:left-0 after:right-0 after:bottom-0 after:h-[1px] after:bg-[#52796f] after:z-10">
+      <tr className="hover:bg-transparent">
+        {columns.map((column, index) => (
+          <th
+            key={`header-${column.accessor || column.id || index}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              column.sortable !== false && handleSort(column.accessor);
+            }}
+            className={cn(
+              "text-[#84a98c] select-none relative p-0 text-left font-normal text-sm",
+              column.sortable !== false && "cursor-pointer hover:text-[#cad2c5]"
+            )}
+            style={columnStyles[column.accessor]}
+          >
+            <div className="flex items-center py-1 px-3 w-full h-full">
+              <span>{column.header}</span>
+              {column.sortable !== false && (
+                <span className="ml-1 inline-block w-3 text-center">
+                  {sortConfig.key === column.accessor ? (
+                    <span className="text-white" style={{ fontSize: '10px' }}>
+                      {sortConfig.direction === "asc" ? "↑" : "↓"}
+                    </span>
+                  ) : (
+                    <span className="invisible" style={{ fontSize: '10px' }}>↓</span>
+                  )}
+                </span>
               )}
-              value={searchTerm}
-              onChange={(e) => {/* your existing search handler */}}
-              onFocus={handleSearchFocus}
-            />
-          </div>
-        </div>
-      )}
-      
-      {/* Main table container with fixed header */}
-      <div className="relative overflow-hidden border border-[#52796f] rounded-md">
-        {/* Container with both horizontal and vertical scrollbars */}
-        <div
-          className="overflow-x-auto overflow-y-auto scrollbar-visible"
-          style={{ maxHeight: "calc(70vh - 8rem)", height: "750px" }}
-        >
-          {/* Table with fixed layout */}
-          <div className="min-w-full inline-block align-middle">
-            <table className="min-w-full table-fixed border-collapse">
-              {/* Fixed header */}
-              <thead className="bg-[#2f3e46] sticky top-0 z-20 shadow-sm after:content-[''] after:absolute after:left-0 after:right-0 after:bottom-0 after:h-[1px] after:bg-[#52796f] after:z-10">
-                <tr className="hover:bg-transparent">
-                  {columns.map((column, index) => (
-                    <th
-                      key={`header-${column.accessor || column.id || index}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        column.sortable !== false && handleSort(column.accessor);
-                      }}
-                      className={cn(
-                        "text-[#84a98c] select-none relative p-0 text-left font-normal text-sm",
-                        column.sortable && "cursor-pointer hover:text-[#cad2c5]"
-                      )}
-                      style={columnStyles[column.accessor]}
-                    >
-                      <div className="flex items-center py-1 px-3 w-full h-full">
-                        <span>{column.header}</span>
-                        {column.sortable !== false && (
-                          <span className="ml-1 inline-block w-3 text-center">
-                            {sortConfig.key === column.accessor ? (
-                              <span className="text-white" style={{ fontSize: '10px' }}>
-                                {sortConfig.direction === "asc" ? "↑" : "↓"}
-                              </span>
-                            ) : (
-                              <span className="invisible" style={{ fontSize: '10px' }}>↓</span>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              {/* Table body */}
-              <tbody className="divide-y divide-[#52796f]/30">
-                {isLoading ? (
-                  <tr key="loading-row">
-                    <td colSpan={columns.length} className="text-center py-8">
-                      <div className="flex justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#84a98c]"></div>
-                      </div>
-                    </td>
-                  </tr>
-                ) : displayedData.length === 0 ? (
-                  <tr key="no-data-row">
-                    <td colSpan={columns.length} className="text-center py-8 text-[#84a98c]">
-                      {searchTerm ? "Δεν βρέθηκαν αποτελέσματα" : "Δεν υπάρχουν δεδομένα"}
-                    </td>
-                  </tr>
-                ) : (
-                  displayedData.map((row, index) => {
-                    // Skip rendering if row is null or undefined
-                    if (!row) return null;
-                    
-                    const defaultRow = (
-                      <tr
-                        // Force row to re-render when search term changes
-                        key={`row-${row.id || index}-${searchTerm}-${Date.now()}`}
-                        onClick={() => onRowClick && onRowClick(row)}
-                        className={cn(
-                          "transition-colors",
-                          rowClassName,
-                          highlightedRowId === row.id && "bg-[#52796f]/20",
-                          onRowClick && "cursor-pointer"
-                        )}
-                      >
-                        {columns.map((column, colIndex) => {
-                          // Determine if this cell should be highlighted
-                          const shouldHighlight = searchTerm && 
-                                                 searchTerm.trim().length > 0 && 
-                                                 searchColumn === column.accessor;
-                          
-                          const cellValue = row[column.accessor];
-                          const columnType = column.type || inferColumnType(column.accessor);
-                          
-                          // Generate a more consistent key with searchTerm
-                          const cellKey = `cell-${row.id || index}-${column.accessor}-${searchTerm}`;
-
-                          return (
-                            <td
-                              key={cellKey}
-                              data-column={column.accessor}
-                              className={cn(
-                                "text-[#cad2c5] group-hover:underline text-sm p-0",
-                                column.type === "status" && "whitespace-nowrap",
-                                // Add debug class if this cell should have highlighting
-                                shouldHighlight && cellValue && String(cellValue).toLowerCase().includes(searchTerm.toLowerCase().trim()) && "has-highlight-debug"
-                              )}
-                              style={columnStyles[column.accessor]}
-                            >
-                              <div className="w-full h-full py-1 px-4">
-                              {(() => {
-                                // For date columns, just format the date without highlighting
-                                if (columnType === 'date' || inferColumnType(column.accessor) === 'date') {
-                                  const formattedDate = safeFormatDateTime(cellValue);
-                                  return formattedDate;
-                                }
-                                
-                                // If this cell has a custom renderer, use it
-                                if (column.cell) {
-                                  return column.cell(cellValue, row);
-                                }
-                                
-                                // For non-date columns with a search term, apply highlighting if we have a value
-                                if (shouldHighlight && cellValue && searchTerm && searchTerm.trim().length > 0 && 
-                                    String(cellValue).toLowerCase().includes(searchTerm.toLowerCase().trim())) {
-                                  return highlightMatch(cellValue, searchTerm);
-                                } 
-                                
-                                // For all other cases, just return the cell value
-                                return cellValue || "-";
-                              })()}
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                    
-                    // Safely call renderRow if provided
-                    if (renderRow) {
-                      try {
-                        return renderRow(row, index, defaultRow);
-                      } catch (error) {
-                        console.error("Error in renderRow:", error);
-                        return defaultRow;
-                      }
-                    }
-                    
-                    return defaultRow;
-                  })
-                )}
-
-                {/* Loader for infinite scrolling */}
-                {isLoading && displayedData.length > 0 && (
-                  <tr key="infinite-scroll-loader" ref={loader}>
-                    <td colSpan={columns.length} className="text-center py-4">
-                      <div className="flex items-center justify-center py-4">
-                        <svg className="animate-spin h-6 w-6 text-[#52796f]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      
-      {/* Total records count */}
-      <div className="mt-3 mb-1 text-sm text-[#84a98c] px-2 flex justify-between items-center font-medium pt-2">
-        <div className="text-left italic text-xs">
-          {footerHint ? (
-            <span>{footerHint}</span>
-          ) : showOfferMessage ? (
-            <span>Παρακαλώ πατήστε δεξί κλικ για να προσθέσετε προσφορά</span>
-          ) : null}
-        </div>
-        <div>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-4">
-              <svg className="animate-spin h-6 w-6 text-[#52796f]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
             </div>
-          ) : filteredData.length === 0 ? (
-            <span>Δεν βρέθηκαν εγγραφές</span>
-          ) : filteredData.length === 1 ? (
-            <span>Βρέθηκε 1 εγγραφή</span>
-          ) : displayedData.length < filteredData.length ? (
-            <span>Εμφανίζονται <strong className="text-[#cad2c5]">{displayedData.length}</strong> από <strong className="text-[#cad2c5]">{filteredData.length}</strong> εγγραφές</span>
-          ) : (
-            <span>Βρέθηκαν <strong className="text-[#cad2c5]">{filteredData.length}</strong> εγγραφές</span>
-          )}
-          {!isLoading && searchTerm && (
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+
+  // JSX for rendering a table row
+  const renderTableRow = (row: any, index: number) => {
+    // Skip rendering if row is null or undefined
+    if (!row) return null;
+    
+    const rowKey = `row-${row.id || index}-${searchTerm}`;
+    
+    const defaultRow = (
+      <tr
+        key={rowKey}
+        onClick={() => onRowClick && onRowClick(row)}
+        className={cn(
+          "transition-colors",
+          rowClassName,
+          highlightedRowId === row.id && "bg-[#52796f]/20",
+          onRowClick && "cursor-pointer"
+        )}
+      >
+        {columns.map((column, colIndex) => {
+          const shouldHighlight = searchTerm && 
+                                 searchTerm.trim().length > 0 && 
+                                 searchColumn === column.accessor;
+          
+          const cellValue = row[column.accessor];
+          const columnType = column.type || inferColumnType(column.accessor);
+          const cellKey = `cell-${row.id || index}-${column.accessor}-${searchTerm}`;
+
+          return (
+            <td
+              key={cellKey}
+              data-column={column.accessor}
+              className={cn(
+                "text-[#cad2c5] group-hover:underline text-sm p-0",
+                columnType === "status" && "whitespace-nowrap"
+              )}
+              style={columnStyles[column.accessor]}
+            >
+              <div className="w-full h-full py-1 px-4">
+              {(() => {
+                // Date columns
+                if (columnType === 'date') {
+                  return safeFormatDateTime(cellValue);
+                }
+                
+                // Custom cell renderer
+                if (column.cell) {
+                  return column.cell(cellValue, row);
+                }
+                
+                // Apply highlighting if needed
+                if (shouldHighlight && cellValue && searchTerm && 
+                    String(cellValue).toLowerCase().includes(searchTerm.toLowerCase().trim())) {
+                  return highlightMatch(cellValue, searchTerm);
+                } 
+                
+                // Default case
+                return cellValue || "-";
+              })()}
+              </div>
+            </td>
+          );
+        })}
+      </tr>
+    );
+    
+    // Safely call renderRow if provided
+    if (renderRow) {
+      try {
+        return renderRow(row, index, defaultRow);
+      } catch (error) {
+        console.error("Error in renderRow:", error);
+        return defaultRow;
+      }
+    }
+    
+    return defaultRow;
+  };
+
+  // JSX for infinite scroll loader
+  const renderScrollLoader = () => (
+    <tr key="infinite-scroll-loader" ref={loader}>
+      <td colSpan={columns.length} className="text-center py-4">
+        <div className="flex items-center justify-center py-4">
+          <svg className="animate-spin h-6 w-6 text-[#52796f]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </td>
+    </tr>
+  );
+
+  // JSX for footer content
+  const renderFooter = () => {
+    let contentRight = null;
+    
+    if (isLoading) {
+      contentRight = (
+        <div className="flex items-center justify-center">
+          <svg className="animate-spin h-6 w-6 text-[#52796f]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      );
+    } else if (filteredData.length === 0) {
+      contentRight = <span>Δεν βρέθηκαν εγγραφές</span>;
+    } else if (filteredData.length === 1) {
+      contentRight = <span>Βρέθηκε 1 εγγραφή</span>;
+    } else if (displayedData.length < filteredData.length) {
+      contentRight = (
+        <span>
+          Εμφανίζονται <strong className="text-[#cad2c5]">{displayedData.length}</strong> από <strong className="text-[#cad2c5]">{filteredData.length}</strong> εγγραφές
+        </span>
+      );
+    } else {
+      contentRight = (
+        <span>
+          Βρέθηκαν <strong className="text-[#cad2c5]">{filteredData.length}</strong> εγγραφές
+          {searchTerm && (
             <span> για την αναζήτηση "<strong className="text-[#cad2c5]">{searchTerm}</strong>"</span>
           )}
+        </span>
+      );
+    }
+    
+    return (
+      <div className="text-sm text-[#84a98c] text-right mt-1">
+        {contentRight}
+      </div>
+    );
+  };
+
+  // JSX for loading state in the table
+  const renderTableLoading = () => (
+    <TableRow>
+      <TableCell colSpan={columns.length} className="h-32 text-center">
+        <div className="flex flex-col items-center justify-center">
+          <LoadingSpinner 
+            fullScreen={false} 
+            message={loadingStateMessage || "Φόρτωση δεδομένων..."} 
+            delayBeforeSpinner={300} // Show spinner faster to reduce perception of slowness
+          />
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+
+  // JSX for empty state in the table
+  const renderTableEmptyState = () => (
+    <TableRow>
+      <TableCell colSpan={columns.length} className="h-24 text-center">
+        <div className="p-4 text-center text-[#cad2c5]/70 text-sm">
+          {emptyStateMessage || "Δεν βρέθηκαν δεδομένα"}
+          {searchTerm && (
+            <div className="mt-1">
+              Δοκιμάστε διαφορετικούς όρους αναζήτησης
+            </div>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+
+  return (
+    <>
+      <div className={`relative overflow-hidden ${containerClassName}`}>
+        {/* Search bar */}
+        {showSearch && (
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+              <Input
+                type="text"
+                placeholder={searchPlaceholder || "Search..."}
+                className={cn(
+                  searchBarStyles.inputClasses,
+                  searchBarStyles.containerClasses
+                )}
+                value={searchTerm}
+                onChange={(e) => {/* Handled externally */}}
+                onFocus={handleSearchFocus}
+              />
+            </div>
+          </div>
+        )}
+        
+        {/* Main table container */}
+        <div className="relative overflow-hidden border border-[#52796f] rounded-md bg-[#2f3e46]">
+          <div
+            className="overflow-x-auto overflow-y-auto scrollbar-visible"
+            style={{ maxHeight: "calc(70vh - 8rem)", height: "750px" }}
+          >
+            <div className="min-w-full inline-block align-middle">
+              <table className="min-w-full table-fixed border-collapse">
+                {renderTableHeader()}
+
+                <tbody className="divide-y divide-[#52796f]/30">
+                  {isLoading && !displayedData.length ? (
+                    renderTableLoading()
+                  ) : !isLoading && data.length === 0 && showEmptyState ? (
+                    renderTableEmptyState()
+                  ) : (
+                    displayedData.map((row, index) => renderTableRow(row, index))
+                  )}
+
+                  {/* Loader for infinite scrolling */}
+                  {isLoading && displayedData.length > 0 && renderScrollLoader()}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+      
+      {/* Footer - completely outside the main container */}
+      {renderFooter()}
+    </>
   );
 }

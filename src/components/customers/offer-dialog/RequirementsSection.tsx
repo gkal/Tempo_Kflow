@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { Input } from "@/components/ui/input";
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
-import { useFormWatch } from "@/lib/form-helpers";
+import { useFormWatch } from "@/utils/formHelpers";
 
 const RequirementsSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);
@@ -18,14 +18,14 @@ const RequirementsSection = () => {
   };
 
   return (
-    <div className="section-requirements bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full">
+    <div className="section-requirements bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full" style={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
       <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
         <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
           ΕΠΙΠΛΕΟΝ ΣΤΟΙΧΕΙΑ
         </h2>
       </div>
       <div className="p-2 space-y-2">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2" style={{ position: 'relative', zIndex: 15, pointerEvents: 'auto' }}>
           <div className="flex items-center">
             <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
               ΗΜΑ
@@ -39,7 +39,7 @@ const RequirementsSection = () => {
                       : 'bg-[#354f52] border border-[#52796f]'
                   }`}
                   onClick={toggleHma}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: 'pointer', position: 'relative', zIndex: 20, pointerEvents: 'auto' }}
                 >
                   <div 
                     className={`absolute top-1 w-4 h-4 rounded-full transition-transform duration-200 ease-in-out ${
@@ -52,7 +52,7 @@ const RequirementsSection = () => {
                 <span 
                   className={`ml-2 text-sm ${hmaValue ? 'text-[#84a98c]' : 'text-[#cad2c5]'}`}
                   onClick={toggleHma}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: 'pointer', position: 'relative', zIndex: 20, pointerEvents: 'auto' }}
                 >
                   {hmaValue ? 'Ναι' : 'Όχι'}
                 </span>

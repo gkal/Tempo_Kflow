@@ -1,34 +1,49 @@
-// Custom event system for notifications
-// This provides a reliable way to notify components about new notifications
+/**
+ * Custom event system for notifications
+ * Provides a reliable way to notify components about notification events
+ */
 
-// Create a custom event type
 export type NotificationEventType = 'new-notification' | 'notification-read' | 'notifications-cleared';
 
-// Define the event data structure
+export type NotificationData = {
+  id: string;
+  content: string;
+  timestamp: string;
+  read: boolean;
+  [key: string]: any;
+};
+
 export interface NotificationEventData {
   type: NotificationEventType;
   notificationId?: string;
-  notification?: any;
+  notification?: NotificationData;
   userId?: string;
 }
 
-// Create a class to manage notification events
-class NotificationEventManager {
-  private listeners: Map<NotificationEventType, Function[]> = new Map();
+type EventListener = (data: NotificationEventData) => void;
 
-  // Add a listener for a specific event type
-  public addEventListener(type: NotificationEventType, callback: Function) {
+class NotificationEventManager {
+  private listeners: Map<NotificationEventType, EventListener[]> = new Map();
+
+  /**
+   * Adds an event listener for a specific notification event type
+   * @returns Function to remove this specific listener
+   */
+  public addEventListener(type: NotificationEventType, callback: EventListener): () => void {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, []);
     }
-    this.listeners.get(type)?.push(callback);
     
-    // Return a function to remove this listener
+    const listeners = this.listeners.get(type);
+    listeners?.push(callback);
+    
     return () => this.removeEventListener(type, callback);
   }
 
-  // Remove a listener
-  public removeEventListener(type: NotificationEventType, callback: Function) {
+  /**
+   * Removes a specific event listener
+   */
+  public removeEventListener(type: NotificationEventType, callback: EventListener): void {
     const listeners = this.listeners.get(type);
     if (!listeners) return;
     
@@ -38,11 +53,12 @@ class NotificationEventManager {
     }
   }
 
-  // Dispatch an event to all listeners
-  public dispatchEvent(data: NotificationEventData) {
-    console.log(`Dispatching notification event: ${data.type}`, data);
+  /**
+   * Dispatches an event to all registered listeners
+   */
+  public dispatchEvent(data: NotificationEventData): void {
     const listeners = this.listeners.get(data.type);
-    if (!listeners) return;
+    if (!listeners || listeners.length === 0) return;
     
     listeners.forEach(callback => {
       try {
@@ -54,11 +70,13 @@ class NotificationEventManager {
   }
 }
 
-// Create and export a singleton instance
+// Singleton instance
 export const notificationEvents = new NotificationEventManager();
 
-// Helper function to notify about a new notification
-export function notifyNewNotification(notification: any, userId: string) {
+/**
+ * Notifies about a new notification
+ */
+export function notifyNewNotification(notification: NotificationData, userId: string): void {
   notificationEvents.dispatchEvent({
     type: 'new-notification',
     notification,
@@ -66,8 +84,10 @@ export function notifyNewNotification(notification: any, userId: string) {
   });
 }
 
-// Helper function to notify about a read notification
-export function notifyNotificationRead(notificationId: string, userId: string) {
+/**
+ * Notifies that a notification was read
+ */
+export function notifyNotificationRead(notificationId: string, userId: string): void {
   notificationEvents.dispatchEvent({
     type: 'notification-read',
     notificationId,
@@ -75,8 +95,10 @@ export function notifyNotificationRead(notificationId: string, userId: string) {
   });
 }
 
-// Helper function to notify about cleared notifications
-export function notifyNotificationsCleared(userId: string) {
+/**
+ * Notifies that all notifications were cleared
+ */
+export function notifyNotificationsCleared(userId: string): void {
   notificationEvents.dispatchEvent({
     type: 'notifications-cleared',
     userId

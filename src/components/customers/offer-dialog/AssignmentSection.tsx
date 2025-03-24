@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
-import { useFormWatch } from "@/lib/form-helpers";
+import { useFormWatch } from "@/utils/formHelpers";
 
 const AssignmentSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);
@@ -48,7 +48,6 @@ const AssignmentSection = () => {
             value={getUserNameById(assignedTo || "")}
             onSelect={(value) => {
               const userId = getUserIdByName(value);
-              console.log(`Setting assigned_to to: ${userId} (from name: ${value})`);
               setValue("assigned_to", userId);
             }}
             placeholder="Επιλέξτε χρήστη"

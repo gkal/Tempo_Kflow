@@ -1,21 +1,15 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 
-type FormContextType = {
+interface FormContextType {
   showFormInfo: boolean;
   currentForm: string | null;
   toggleFormInfo: () => void;
   registerForm: (formName: string | null) => void;
-};
+}
 
-// Create the context with default values
-export const FormContext = createContext<FormContextType>({
-  showFormInfo: false,
-  currentForm: null,
-  toggleFormInfo: () => {},
-  registerForm: () => {},
-});
+// Create the context
+export const FormContext = createContext<FormContextType | undefined>(undefined);
 
-// Create a provider component
 export function FormProvider({ children }: { children: React.ReactNode }) {
   const [showFormInfo, setShowFormInfo] = useState(false);
   const [currentForm, setCurrentForm] = useState<string | null>(null);
@@ -42,7 +36,6 @@ export function FormProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Export the hook to use the context
 export function useFormContext() {
   const context = useContext(FormContext);
   if (!context) {
@@ -51,8 +44,7 @@ export function useFormContext() {
   return context;
 }
 
-// Helper hook for forms to register themselves
-export const useFormRegistration = (formName: string, isOpen: boolean) => {
+export function useFormRegistration(formName: string, isOpen: boolean) {
   const { registerForm } = useFormContext();
   
   useEffect(() => {
@@ -61,7 +53,4 @@ export const useFormRegistration = (formName: string, isOpen: boolean) => {
       return () => registerForm(null);
     }
   }, [isOpen, formName, registerForm]);
-};
-
-// Also export the context itself in case it's needed
-export default FormContext; 
+} 

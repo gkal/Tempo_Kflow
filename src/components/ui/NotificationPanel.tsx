@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Bell, Check, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
@@ -7,28 +7,38 @@ import { formatDistanceToNow } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { notifyNotificationRead } from '@/lib/notificationEvents';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '@/utils/styleUtils';
+
+// Define strict types
+type NotificationType = 'task' | 'message' | 'system' | 'offer';
+
+interface NotificationSender {
+  fullname: string;
+}
+
+interface NotificationTask {
+  offer_id: string;
+  title: string;
+}
+
+interface NotificationOffer {
+  customer: {
+    fullname: string;
+  };
+}
 
 interface Notification {
   id: string;
   user_id: string;
   sender_id: string;
   message: string;
-  type: string;
+  type: NotificationType;
   read: boolean;
   created_at: string;
   related_task_id?: string;
-  sender?: {
-    fullname: string;
-  };
-  task?: {
-    offer_id: string;
-    title: string;
-  };
-  offer?: {
-    customer: {
-      fullname: string;
-    };
-  };
+  sender?: NotificationSender;
+  task?: NotificationTask;
+  offer?: NotificationOffer;
 }
 
 interface NotificationPanelProps {
@@ -36,48 +46,137 @@ interface NotificationPanelProps {
   onClose: () => void;
 }
 
-export function NotificationPanel({ isOpen, onClose }: NotificationPanelProps) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [newNotificationText, setNewNotificationText] = useState('');
-  const [showNewNotificationForm, setShowNewNotificationForm] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
+// Utility functions
+const formatRelativeTime = (dateString: string): string => {
+  try {
+    return formatDistanceToNow(new Date(dateString), { 
+      addSuffix: true,
+      locale: el
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'πρόσφατα';
+  }
+};
 
-  // Handle closing animation
-  const handleClose = () => {
-    setIsClosing(true);
-    setTimeout(() => {
-      setIsClosing(false);
-      onClose();
-    }, 300); // Match animation duration
+// Reusable components
+interface NotificationActionButtonProps {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  variant?: 'default' | 'destructive';
+}
+
+const NotificationActionButton = ({
+  onClick,
+  icon,
+  label,
+  variant = 'default'
+}: NotificationActionButtonProps) => (
+  <Button
+    onClick={onClick}
+    variant={variant === 'destructive' ? 'destructive' : 'outline'}
+    size="sm"
+    className="gap-1 ml-2"
+  >
+    {icon}
+    <span className="whitespace-nowrap">{label}</span>
+  </Button>
+);
+
+interface NotificationItemProps {
+  notification: Notification;
+  onMarkAsRead: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onClick: (notification: Notification) => Promise<void>;
+}
+
+const NotificationItem = React.memo(({
+  notification,
+  onMarkAsRead,
+  onDelete,
+  onClick
+}: NotificationItemProps) => {
+  // Format the message with context from related entities
+  const formatMessage = (notification: Notification): string => {
+    let message = notification.message;
+    
+    // Add task info if available
+    if (notification.task?.title) {
+      message += ` για την εργασία "${notification.task.title}"`;
+    }
+    
+    // Add sender info if available
+    if (notification.sender?.fullname) {
+      message = `${notification.sender.fullname} ${message}`;
+    }
+    
+    // Add customer info if available
+    if (notification.offer?.customer?.fullname) {
+      message += ` (${notification.offer.customer.fullname})`;
+    }
+    
+    return message;
   };
 
-  // Fetch notifications
-  useEffect(() => {
-    if (isOpen && user) {
-      fetchNotifications();
-    }
-  }, [isOpen, user]);
+  return (
+    <div className="border-b border-gray-200 dark:border-gray-700 p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+      <div className="flex items-start">
+        <div 
+          className="flex-grow cursor-pointer" 
+          onClick={() => onClick(notification)}
+        >
+          <p className="text-sm">{formatMessage(notification)}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {formatRelativeTime(notification.created_at)}
+          </p>
+        </div>
+        <div className="flex ml-4">
+          <NotificationActionButton
+            onClick={() => onMarkAsRead(notification.id)}
+            icon={<Check size={16} />}
+            label="Διαβασμένο"
+          />
+          <NotificationActionButton
+            onClick={() => onDelete(notification.id)}
+            icon={<Trash2 size={16} />}
+            label="Διαγραφή"
+            variant="destructive"
+          />
+        </div>
+      </div>
+    </div>
+  );
+});
 
-  const fetchNotifications = async () => {
-    if (!user) return;
+NotificationItem.displayName = 'NotificationItem';
+
+// Custom hook for notifications
+const useNotifications = (userId: string | undefined, isOpen: boolean) => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchNotifications = useCallback(async () => {
+    if (!userId) return;
     
     setLoading(true);
+    setError(null);
     
     try {
       // 1. Get notifications
       const { data: notificationsData, error: notificationsError } = await supabase
         .from('notifications')
         .select('*')
-        .eq('user_id', user.id)
-        .eq('read', false)  // Only get unread notifications
+        .eq('user_id', userId)
+        .eq('read', false)
         .order('created_at', { ascending: false });
 
       if (notificationsError) throw notificationsError;
-      if (!notificationsData) return;
+      if (!notificationsData) {
+        setNotifications([]);
+        return;
+      }
 
       // 2. Get unique IDs for related data
       const taskIds = notificationsData.map(n => n.related_task_id).filter(Boolean);
@@ -121,100 +220,133 @@ export function NotificationPanel({ isOpen, onClose }: NotificationPanelProps) {
 
         return {
           ...notification,
-          sender: sender ? { fullname: sender.fullname } : null,
+          sender: sender ? { fullname: sender.fullname } : undefined,
           task: task ? {
             offer_id: task.offer_id,
             title: task.title
-          } : null,
+          } : undefined,
           offer: offer?.customer ? {
             customer: {
               fullname: offer.customer.company_name
             }
-          } : null
+          } : undefined
         };
       });
 
       setNotifications(transformedNotifications);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setError('Αδυναμία φόρτωσης ειδοποιήσεων');
     } finally {
       setLoading(false);
     }
+  }, [userId]);
+
+  useEffect(() => {
+    if (isOpen && userId) {
+      fetchNotifications();
+    }
+  }, [isOpen, userId, fetchNotifications]);
+
+  return { notifications, loading, error, fetchNotifications, setNotifications };
+};
+
+// Main component
+export function NotificationPanel({ isOpen, onClose }: NotificationPanelProps) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [newNotificationText, setNewNotificationText] = useState('');
+  const [showNewNotificationForm, setShowNewNotificationForm] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  
+  const { 
+    notifications, 
+    loading, 
+    error, 
+    fetchNotifications, 
+    setNotifications 
+  } = useNotifications(user?.id, isOpen);
+
+  // Handle closing animation
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsClosing(false);
+      onClose();
+    }, 300); // Match animation duration
   };
 
   const markAsRead = async (notificationId: string) => {
     if (!user) return;
     
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read: true })
-      .eq('id', notificationId);
-    
-    if (!error) {
-      setNotifications(prev => 
-        prev.map(notification => 
-          notification.id === notificationId 
-            ? { ...notification, read: true } 
-            : notification
-        )
-      );
-      // Notify that a notification has been read
-      notifyNotificationRead(notificationId, user.id);
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
+      // Send notification to parent component
+      notifyNotificationRead();
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
     }
   };
 
   const markAllAsRead = async () => {
     if (!user || notifications.length === 0) return;
     
-    const unreadIds = notifications
-      .filter(notification => !notification.read)
-      .map(notification => notification.id);
-    
-    if (unreadIds.length === 0) return;
-    
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read: true })
-      .in('id', unreadIds);
-    
-    if (!error) {
-      setNotifications(prev => 
-        prev.map(notification => ({ ...notification, read: true }))
-      );
-      // Notify that all notifications have been read
-      unreadIds.forEach(id => notifyNotificationRead(id, user.id));
+    try {
+      const notificationIds = notifications.map(n => n.id);
+      
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .in('id', notificationIds);
+        
+      if (error) throw error;
+      
+      // Clear all notifications
+      setNotifications([]);
+      
+      // Send notification to parent component
+      notifyNotificationRead();
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
     }
   };
 
   const createNotification = async () => {
     if (!user || !newNotificationText.trim()) return;
     
-    const newNotification = {
-      user_id: user.id,
-      sender_id: user.id, // Add sender_id when creating notification
-      message: newNotificationText.trim(),
-      type: 'manual',
-      read: false,
-      created_at: new Date().toISOString()
-    };
-    
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert(newNotification)
-      .select()
-      .single();
-    
-    if (data && !error) {
-      // Add sender information to the new notification
-      const notificationWithSender = {
-        ...data,
-        sender: { fullname: user.fullname }
+    try {
+      const newNotification = {
+        user_id: user.id,
+        sender_id: user.id,
+        message: newNotificationText.trim(),
+        type: 'system' as NotificationType,
+        read: false
       };
       
-      setNotifications(prev => [notificationWithSender, ...prev]);
-      setNewNotificationText('');
-      setShowNewNotificationForm(false);
-    } else {
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert(newNotification)
+        .select('*')
+        .single();
+        
+      if (error) throw error;
+      
+      if (data) {
+        setNotifications(prev => [data, ...prev]);
+        setNewNotificationText('');
+        setShowNewNotificationForm(false);
+      }
+    } catch (error) {
       console.error('Error creating notification:', error);
     }
   };
@@ -222,211 +354,154 @@ export function NotificationPanel({ isOpen, onClose }: NotificationPanelProps) {
   const deleteNotification = async (notificationId: string) => {
     if (!user) return;
     
-    const { error } = await supabase
-      .from('notifications')
-      .delete()
-      .eq('id', notificationId);
-    
-    if (!error) {
-      setNotifications(prev => 
-        prev.filter(notification => notification.id !== notificationId)
-      );
-    } else {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (error) {
       console.error('Error deleting notification:', error);
     }
   };
 
-  // Format relative time
-  const formatRelativeTime = (dateString: string) => {
-    try {
-      return formatDistanceToNow(new Date(dateString), { 
-        addSuffix: true,
-        locale: el 
-      });
-    } catch (error) {
-      return 'Unknown time';
-    }
-  };
-
-  // Handle notification click
   const handleNotificationClick = async (notification: Notification) => {
-    if (notification.task?.offer_id) {
-      // Mark as read before navigating
-      if (!notification.read) {
-        await markAsRead(notification.id);
+    if (!user) return;
+    
+    try {
+      // Mark as read first
+      await markAsRead(notification.id);
+      
+      // Navigate to relevant page based on notification type
+      if (notification.related_task_id) {
+        navigate(`/tasks/${notification.related_task_id}`);
       }
-      // Navigate to the offer with the task dialog open
-      navigate(`/offers?offerId=${notification.task.offer_id}&openTask=true`);
-      onClose();
+      
+      // Close panel after navigation
+      handleClose();
+    } catch (error) {
+      console.error('Error handling notification click:', error);
     }
-  };
-
-  // Format message with bold customer name
-  const formatMessage = (notification: Notification) => {
-    if (notification.type === 'task_assigned' && notification.offer?.customer?.fullname) {
-      const customerName = notification.offer.customer.fullname;
-      return (
-        <p className={`text-sm ${notification.read ? 'text-[#84a98c]' : 'text-[#cad2c5]'}`}>
-          {notification.message.split(customerName).map((part, index, array) => (
-            <React.Fragment key={index}>
-              {part}
-              {index < array.length - 1 && (
-                <strong className="font-bold">{customerName}</strong>
-              )}
-            </React.Fragment>
-          ))}
-        </p>
-      );
-    }
-    return (
-      <p className={`text-sm ${notification.read ? 'text-[#84a98c]' : 'text-[#cad2c5]'}`}>
-        {notification.message}
-      </p>
-    );
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm" 
-        onClick={handleClose}
-      />
-      
-      {/* Panel */}
-      <div 
-        ref={panelRef}
-        className={`relative bg-[#2f3e46] border-l border-[#52796f] h-full w-80 md:w-96 overflow-auto shadow-xl ${
-          isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'
-        }`}
-      >
-        <div className="sticky top-0 bg-[#2f3e46] z-10 p-4 border-b border-[#52796f] flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-[#cad2c5] flex items-center">
-            <Bell className="h-5 w-5 mr-2" />
-            Ειδοποιήσεις
-          </h2>
-          <button 
-            onClick={handleClose}
-            className="text-[#84a98c] hover:text-[#cad2c5] transition-colors rounded-full p-1 hover:bg-[#354f52]/50"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-25">
+      <div className="flex min-h-screen items-end justify-center text-center sm:block">
+        {/* Background overlay */}
+        <div
+          className="fixed inset-0 bg-black bg-opacity-40 transition-opacity"
+          onClick={handleClose}
+          aria-hidden="true"
+        ></div>
         
-        <div className="p-4">
-          {/* Actions */}
-          <div className="flex justify-between mb-4">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={markAllAsRead}
-              className="text-xs border-[#52796f] text-[#84a98c] hover:bg-[#354f52] hover:text-[#cad2c5]"
-              disabled={!notifications.some(n => !n.read)}
-            >
-              <Check className="h-3 w-3 mr-1" />
-              Σημείωση όλων ως αναγνωσμένα
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowNewNotificationForm(prev => !prev)}
-              className="text-xs border-[#52796f] text-[#84a98c] hover:bg-[#354f52] hover:text-[#cad2c5]"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Νέα
-            </Button>
+        {/* Notification panel */}
+        <div
+          ref={panelRef}
+          className={cn(
+            "fixed right-0 top-0 bottom-0 w-full max-w-md bg-white dark:bg-gray-900 shadow-lg transform transition-transform duration-300 ease-in-out overflow-hidden",
+            isClosing ? 'translate-x-full' : 'translate-x-0'
+          )}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center">
+              <Bell className="h-5 w-5 mr-2 text-blue-500" />
+              <h2 className="text-lg font-medium">Ειδοποιήσεις</h2>
+            </div>
+            <div className="flex">
+              {notifications.length > 0 && (
+                <Button 
+                  onClick={markAllAsRead} 
+                  variant="outline" 
+                  size="sm" 
+                  className="mr-2 gap-1"
+                >
+                  <Check size={16} />
+                  <span>Όλα διαβασμένα</span>
+                </Button>
+              )}
+              <Button 
+                onClick={handleClose} 
+                variant="ghost" 
+                size="sm" 
+                className="rounded-full p-1 h-8 w-8 flex items-center justify-center"
+                aria-label="Κλείσιμο"
+              >
+                <X size={18} />
+              </Button>
+            </div>
+          </div>
+          
+          {/* Notification list */}
+          <div className="overflow-y-auto h-[calc(100%-8rem)]">
+            {loading ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+              </div>
+            ) : error ? (
+              <div className="text-center p-4 text-red-500">{error}</div>
+            ) : notifications.length === 0 ? (
+              <div className="text-center p-8 text-gray-500 dark:text-gray-400">
+                <p>Δεν έχετε νέες ειδοποιήσεις</p>
+              </div>
+            ) : (
+              notifications.map(notification => (
+                <NotificationItem
+                  key={notification.id}
+                  notification={notification}
+                  onMarkAsRead={markAsRead}
+                  onDelete={deleteNotification}
+                  onClick={handleNotificationClick}
+                />
+              ))
+            )}
           </div>
           
           {/* New notification form */}
-          {showNewNotificationForm && (
-            <div className="mb-4 p-4 bg-[#354f52] rounded-lg shadow-inner">
-              <textarea
-                value={newNotificationText}
-                onChange={(e) => setNewNotificationText(e.target.value)}
-                placeholder="Εισάγετε το μήνυμα ειδοποίησης..."
-                className="w-full p-3 mb-3 bg-[#2f3e46] border border-[#52796f] rounded-md text-[#cad2c5] text-sm focus:ring-1 focus:ring-[#84a98c] focus:border-[#84a98c]"
-                rows={3}
-              />
-              <div className="flex justify-end">
-                <Button 
-                  size="sm"
-                  onClick={createNotification}
-                  className="text-xs bg-[#52796f] hover:bg-[#52796f]/80 text-[#cad2c5]"
-                  disabled={!newNotificationText.trim()}
-                >
-                  Δημιουργία
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Notifications list */}
-          {loading ? (
-            <div className="flex justify-center items-center p-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#84a98c]" />
-            </div>
-          ) : notifications.length === 0 ? (
-            <div className="text-center py-12 px-4">
-              <Bell className="h-12 w-12 text-[#52796f]/50 mx-auto mb-3" />
-              <p className="text-[#84a98c] text-sm">Δεν υπάρχουν ειδοποιήσεις</p>
-              <p className="text-[#84a98c]/70 text-xs mt-1">
-                Οι ειδοποιήσεις θα εμφανιστούν εδώ όταν τις λάβετε
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {notifications.map((notification) => (
-                <div 
-                  key={notification.id} 
-                  className={`p-4 rounded-lg ${notification.read 
-                    ? 'bg-[#2f3e46]/80 border border-[#52796f]/20' 
-                    : 'bg-[#354f52] border border-[#52796f] shadow-md'} ${
-                    notification.task?.offer_id ? 'cursor-pointer hover:bg-[#354f52]/80' : ''
-                  }`}
-                  onClick={() => handleNotificationClick(notification)}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <div className="flex items-center">
-                        {!notification.read && (
-                          <span className="h-2 w-2 bg-red-500 rounded-full mr-2 animate-pulse" />
-                        )}
-                        <span className="text-xs text-[#84a98c]">
-                          {formatRelativeTime(notification.created_at)}
-                        </span>
-                      </div>
-                      {notification.sender && (
-                        <span className="text-xs text-[#84a98c]/80 mt-1">
-                          Από: {notification.sender.fullname}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex space-x-1">
-                      {!notification.read && (
-                        <button 
-                          onClick={() => markAsRead(notification.id)}
-                          className="text-[#84a98c] hover:text-[#cad2c5] transition-colors p-1 rounded hover:bg-[#354f52]/50"
-                          title="Σημείωση ως αναγνωσμένο"
-                        >
-                          <Check className="h-4 w-4" />
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => deleteNotification(notification.id)}
-                        className="text-[#84a98c] hover:text-red-400 transition-colors p-1 rounded hover:bg-[#354f52]/50"
-                        title="Διαγραφή ειδοποίησης"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                  {formatMessage(notification)}
+          <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+            {showNewNotificationForm ? (
+              <div className="space-y-3">
+                <textarea
+                  value={newNotificationText}
+                  onChange={(e) => setNewNotificationText(e.target.value)}
+                  placeholder="Γράψτε το κείμενο της ειδοποίησης..."
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md p-2 text-sm"
+                  rows={2}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button 
+                    onClick={() => setShowNewNotificationForm(false)} 
+                    variant="ghost" 
+                    size="sm"
+                  >
+                    Άκυρο
+                  </Button>
+                  <Button 
+                    onClick={createNotification} 
+                    disabled={!newNotificationText.trim()} 
+                    size="sm"
+                  >
+                    Αποστολή
+                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ) : (
+              <Button 
+                onClick={() => setShowNewNotificationForm(true)}
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <Plus size={16} />
+                <span>Δημιουργία ειδοποίησης</span>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

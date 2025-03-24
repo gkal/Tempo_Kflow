@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { supabase } from "@/lib/supabase";
-import { formatDateTime } from "@/lib/utils";
+import { supabase } from '@/lib/supabaseClient';
+import { formatDateTime } from "@/utils/formatUtils";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
@@ -50,7 +49,8 @@ import {
 import { openNewOfferDialog, openEditOfferDialog } from './OfferDialogManager';
 import { CustomerDialog } from "./CustomerDialog";
 import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
-import { TruncatedText } from "@/components/ui/truncated-text";
+import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
+import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -607,7 +607,7 @@ export default function CustomerDetailPage() {
     if (!text) return "—";
     if (text.length <= maxLength) return text;
     
-    return <TruncatedText 
+    return <TruncateWithTooltip 
       text={text} 
       maxLength={maxLength} 
       tooltipMaxWidth={800}
@@ -730,6 +730,7 @@ export default function CustomerDetailPage() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
+                    Loading...
                   </div>
                 )}
               </h1>
@@ -870,372 +871,370 @@ export default function CustomerDetailPage() {
 
           {/* Right Column */}
           <div className="w-full lg:w-2/3">
-            <Tabs defaultValue="summary" className="w-full">
-              <div className="relative">
-                <TabsList className="bg-[#2f3e46] border border-[#52796f] border-b-0 rounded-t-lg w-full justify-start z-10 p-1 gap-1">
-                  <TabsTrigger
-                    value="summary"
-                    className="data-[state=active]:bg-[#354f52] data-[state=active]:text-[#cad2c5] data-[state=active]:border-b-0 text-[#84a98c] rounded-t-lg px-6 py-2 transition-all"
-                  >
-                    Σύνοψη
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="details"
-                    className="data-[state=active]:bg-[#354f52] data-[state=active]:text-[#cad2c5] data-[state=active]:border-b-0 text-[#84a98c] rounded-t-lg px-6 py-2 transition-all"
-                  >
-                    Λεπτομέρειες
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+            <div className="grid grid-cols-1 gap-4">
+              <Card className="bg-[#2f3e46] border-[#52796f]">
+                <CardContent className="p-6">
+                  <AppTabs defaultValue="summary">
+                    <AppTabsList>
+                      <AppTabsTrigger value="summary">
+                        Σύνοψη
+                      </AppTabsTrigger>
+                      <AppTabsTrigger value="details">
+                        Λεπτομέρειες
+                      </AppTabsTrigger>
+                    </AppTabsList>
+                    
+                    <AppTabsContent value="summary">
+                      <Card className="bg-[#354f52] border-[#52796f] mb-4 rounded-t-none notes-section">
+                        <CardContent className="p-4">
+                          <h2 className="text-lg font-semibold mb-2 text-[#a8c5b5]">
+                            Σημειώσεις
+                          </h2>
+                          <div className="section-content custom-scrollbar">
+                            <p className="text-[#cad2c5] text-sm">
+                              {customer.notes || "Δεν υπάρχουν σημειώσεις."}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-              <TabsContent value="summary" className="mt-0 border-t-0 -mt-[1px]">
-                <Card className="bg-[#354f52] border-[#52796f] mb-4 rounded-t-none notes-section">
-                  <CardContent className="p-4">
-                    <h2 className="text-lg font-semibold mb-2 text-[#a8c5b5]">
-                      Σημειώσεις
-                    </h2>
-                    <div className="section-content custom-scrollbar">
-                      <p className="text-[#cad2c5] text-sm">
-                        {customer.notes || "Δεν υπάρχουν σημειώσεις."}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <Card className="bg-[#354f52] border-[#52796f] recent-offers-section">
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-semibold text-[#a8c5b5]">
+                              Πρόσφατες Προσφορές
+                            </h2>
+                          </div>
 
-                <Card className="bg-[#354f52] border-[#52796f] recent-offers-section">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-semibold text-[#a8c5b5]">
-                        Πρόσφατες Προσφορές
-                      </h2>
-                    </div>
+                          {loadingOffers ? (
+                            <div className="flex items-center justify-center h-[220px]">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#84a98c]"></div>
+                            </div>
+                          ) : recentOffers.length === 0 ? (
+                            <div className="flex items-center justify-center h-[220px] text-[#84a98c]">
+                              Δεν υπάρχουν προσφορές για αυτόν τον πελάτη.
+                            </div>
+                          ) :
+                            <div style={{ height: "280px", overflowY: "auto" }} className="custom-scrollbar">
+                              <div className="space-y-4">
+                                {recentOffers.map((offer) => (
+                                  <div
+                                    key={offer.id}
+                                    className="flex flex-col p-4 bg-[#2f3e46] rounded-lg cursor-pointer hover:bg-[#2f3e46]/80 transition-colors"
+                                    onClick={() => handleEditOffer(offer.id)}
+                                  >
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex items-center space-x-4">
+                                        <div className="font-medium text-[#cad2c5] truncate max-w-[600px]">
+                                          {truncateText(offer.amount || "- -", 50)}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <span
+                                          className={`px-2 py-1 rounded-full text-xs ${getStatusClass(offer.offer_result)}`}
+                                        >
+                                          {formatStatus(offer.offer_result)}
+                                        </span>
+                                        <span
+                                          className={`px-2 py-1 rounded-full text-xs ${getResultClass(offer.result)}`}
+                                        >
+                                          {formatResult(offer.result)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="mt-2 text-sm text-[#84a98c] flex items-center">
+                                      <span>{offer.assigned_user?.fullname || "Μη ανατεθειμένη"}</span>
+                                      {offer.created_at && (
+                                        <span className="ml-2 text-xs text-[#84a98c]/70">
+                                          • {formatDateTime(offer.created_at)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          }
+                        </CardContent>
+                      </Card>
+                    </AppTabsContent>
+                    
+                    <AppTabsContent value="details">
+                      <Card className="bg-[#354f52] border-[#52796f] rounded-t-none">
+                        <CardContent className="p-6">
+                          {/* Customer Information Section */}
+                          <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden mb-6">
+                            <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
+                              <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                                ΣΤΟΙΧΕΙΑ ΠΕΛΑΤΗ
+                              </h2>
+                            </div>
+                            <div className="p-4">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* Basic Information */}
+                                <div>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        Επωνυμία
+                                      </div>
+                                      <div className="text-sm font-normal">
+                                        {customer.company_name || "—"}
+                                      </div>
+                                    </div>
 
-                    {loadingOffers ? (
-                      <div className="flex items-center justify-center h-[220px]">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#84a98c]"></div>
-                      </div>
-                    ) : recentOffers.length === 0 ? (
-                      <div className="flex items-center justify-center h-[220px] text-[#84a98c]">
-                        Δεν υπάρχουν προσφορές για αυτόν τον πελάτη.
-                      </div>
-                    ) :
-                      <div style={{ height: "280px", overflowY: "auto" }} className="custom-scrollbar">
-                        <div className="space-y-4">
-                          {recentOffers.map((offer) => (
-                            <div
-                              key={offer.id}
-                              className="flex flex-col p-4 bg-[#2f3e46] rounded-lg cursor-pointer hover:bg-[#2f3e46]/80 transition-colors"
-                              onClick={() => handleEditOffer(offer.id)}
-                            >
-                              <div className="flex items-start justify-between">
-                                <div className="flex items-center space-x-4">
-                                  <div className="font-medium text-[#cad2c5] truncate max-w-[600px]">
-                                    {truncateText(offer.amount || "- -", 50)}
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        Τύπος Πελάτη
+                                      </div>
+                                      <div className="text-sm font-normal">
+                                        {customer.customer_type || "Εταιρεία"}
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">ΑΦΜ</div>
+                                      <div className="text-sm font-normal">{customer.afm || "—"}</div>
+                                    </div>
+
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">ΔΟΥ</div>
+                                      <div className="text-sm font-normal">{customer.doy || "—"}</div>
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                  <span
-                                    className={`px-2 py-1 rounded-full text-xs ${getStatusClass(offer.offer_result)}`}
-                                  >
-                                    {formatStatus(offer.offer_result)}
-                                  </span>
-                                  <span
-                                    className={`px-2 py-1 rounded-full text-xs ${getResultClass(offer.result)}`}
-                                  >
-                                    {formatResult(offer.result)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="mt-2 text-sm text-[#84a98c] flex items-center">
-                                <span>{offer.assigned_user?.fullname || "Μη ανατεθειμένη"}</span>
-                                {offer.created_at && (
-                                  <span className="ml-2 text-xs text-[#84a98c]/70">
-                                    • {formatDateTime(offer.created_at)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    }
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="details" className="mt-0 border-t-0 -mt-[1px]">
-                <Card className="bg-[#354f52] border-[#52796f] rounded-t-none">
-                  <CardContent className="p-6">
-                    {/* Customer Information Section */}
-                    <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden mb-6">
-                      <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
-                        <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                          ΣΤΟΙΧΕΙΑ ΠΕΛΑΤΗ
-                        </h2>
-                      </div>
-                      <div className="p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          {/* Basic Information */}
-                          <div>
-                            <div className="space-y-3">
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                  Επωνυμία
-                                </div>
-                                <div className="text-sm font-normal">
-                                  {customer.company_name || "—"}
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                  Τύπος Πελάτη
-                                </div>
-                                <div className="text-sm font-normal">
-                                  {customer.customer_type || "Εταιρεία"}
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">ΑΦΜ</div>
-                                <div className="text-sm font-normal">{customer.afm || "—"}</div>
-                              </div>
-
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">ΔΟΥ</div>
-                                <div className="text-sm font-normal">{customer.doy || "—"}</div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Contact Information */}
-                          <div>
-                            <div className="space-y-3">
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                  Τηλέφωνο
-                                </div>
-                                <div className="text-sm font-normal">
-                                  {customer.telephone || "—"}
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">Email</div>
-                                <div className="text-sm font-normal">
-                                  {customer.email || "—"}
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                  Ιστοσελίδα
-                                </div>
-                                <div className="text-sm font-normal">
-                                  {customer.webpage || "—"}
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">Fax</div>
-                                <div className="text-sm font-normal">
-                                  {customer.fax_number || "—"}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Address Information */}
-                          <div>
-                            <div className="space-y-3">
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                  Διεύθυνση
-                                </div>
-                                <div className="text-sm font-normal">
-                                  {customer.address || "—"}
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">Τ.Κ.</div>
-                                <div className="text-sm font-normal">
-                                  {customer.postal_code || "—"}
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">Πόλη</div>
-                                <div className="text-sm font-normal">
-                                  {customer.town || "—"}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Additional fields */}
-                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-                          {Object.entries(customer).map(([key, value]) => {
-                            // Skip fields that are already displayed or belong to other categories
-                            if (['id', 'company_name', 'customer_type', 'afm', 'doy', 
-                                 'address', 'postal_code', 'town', 
-                                 'telephone', 'email', 'webpage', 'fax_number',
-                                 'notes', 'status', 'created_at', 'updated_at', 
-                                 'created_by', 'modified_by', 'primary_contact_id'].includes(key)) {
-                              return null;
-                            }
-                            
-                            // Skip object values and null/undefined values
-                            if (typeof value === 'object' || value === null || value === undefined) {
-                              return null;
-                            }
-                            
-                            // Skip history-related fields
-                            if (key.includes('date') || key.includes('time') || key.includes('by') || 
-                                key.includes('history') || key.includes('log')) {
-                              return null;
-                            }
-                            
-                            // Display any other fields that might exist
-                            return (
-                              <div key={key}>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                  {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}
-                                </div>
-                                <div className="text-sm font-normal">{value.toString() || "—"}</div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* History Section */}
-                    <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-                      <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f] flex justify-between items-center">
-                        <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                          ΙΣΤΟΡΙΚΟ
-                        </h2>
-                        <div className="flex items-center">
-                          <span className="text-xs text-[#84a98c] mr-2 font-bold">Κατάσταση:</span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            customer.status === 'active' 
-                              ? 'bg-green-900/30 text-green-300' 
-                              : 'bg-red-900/30 text-red-300'
-                          }`}>
-                            {customer.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* Creation Information Section */}
-                          <div className="bg-[#354f52]/30 p-3 rounded-md">
-                            <h3 className="text-xs font-semibold text-[#a8c5b5] mb-3 uppercase">Δημιουργία</h3>
-                            <div className="space-y-3">
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                  Δημιουργήθηκε από
-                                </div>
-                                <div className="text-sm font-normal">
-                                  {customer.created_by?.fullname || "—"}
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                  Ημερομηνία δημιουργίας
-                                </div>
-                                <div className="text-sm font-normal">
-                                  {formatDateTime(customer.created_at)}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Modification Information Section */}
-                          <div className="bg-[#354f52]/30 p-3 rounded-md">
-                            <h3 className="text-xs font-semibold text-[#a8c5b5] mb-3 uppercase">Τροποποίηση</h3>
-                            <div className="space-y-3">
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                  Τελευταία τροποποίηση από
-                                </div>
-                                <div className="text-sm font-normal">
-                                  {customer.modified_by?.fullname || "—"}
-                                </div>
-                              </div>
-
-                              <div>
-                                <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                  Ημερομηνία τροποποίησης
-                                </div>
-                                <div className="text-sm font-normal">
-                                  {formatDateTime(customer.updated_at)}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Additional history fields */}
-                        {Object.entries(customer).some(([key, value]) => 
-                          !['id', 'company_name', 'customer_type', 'afm', 'doy', 
-                            'address', 'postal_code', 'town', 
-                            'telephone', 'email', 'webpage', 'fax_number',
-                            'notes', 'status', 'created_at', 'updated_at', 
-                            'created_by', 'modified_by', 'primary_contact_id'].includes(key) &&
-                          (key.includes('date') || key.includes('time') || key.includes('by') || 
-                           key.includes('history') || key.includes('log')) &&
-                          typeof value !== 'object' && value !== null && value !== undefined
-                        ) && (
-                          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <h3 className="text-xs font-semibold text-[#a8c5b5] col-span-full mt-2 mb-1">
-                              Επιπλέον Πληροφορίες
-                            </h3>
-                            {Object.entries(customer).map(([key, value]) => {
-                              // Only include fields that might be related to history but aren't already displayed
-                              if (['id', 'company_name', 'customer_type', 'afm', 'doy', 
-                                   'address', 'postal_code', 'town', 
-                                   'telephone', 'email', 'webpage', 'fax_number',
-                                   'notes', 'status', 'created_at', 'updated_at', 
-                                   'created_by', 'modified_by', 'primary_contact_id'].includes(key)) {
-                                return null;
-                              }
-                              
-                              // Include fields that might be related to history (containing 'date', 'time', etc.)
-                              if (key.includes('date') || key.includes('time') || key.includes('by') || 
-                                  key.includes('history') || key.includes('log')) {
-                                // Skip object values and null/undefined values
-                                if (typeof value === 'object' || value === null || value === undefined) {
-                                  return null;
-                                }
                                 
-                                return (
-                                  <div key={key}>
-                                    <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                      {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}
+                                {/* Contact Information */}
+                                <div>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        Τηλέφωνο
+                                      </div>
+                                      <div className="text-sm font-normal">
+                                        {customer.telephone || "—"}
+                                      </div>
                                     </div>
-                                    <div className="text-sm font-normal">
-                                      {key.includes('date') || key.includes('time') 
-                                        ? formatDateTime(value.toString()) 
-                                        : value.toString() || "—"}
+
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">Email</div>
+                                      <div className="text-sm font-normal">
+                                        {customer.email || "—"}
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        Ιστοσελίδα
+                                      </div>
+                                      <div className="text-sm font-normal">
+                                        {customer.webpage || "—"}
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">Fax</div>
+                                      <div className="text-sm font-normal">
+                                        {customer.fax_number || "—"}
+                                      </div>
                                     </div>
                                   </div>
-                                );
-                              }
+                                </div>
+                                
+                                {/* Address Information */}
+                                <div>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        Διεύθυνση
+                                      </div>
+                                      <div className="text-sm font-normal">
+                                        {customer.address || "—"}
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">Τ.Κ.</div>
+                                      <div className="text-sm font-normal">
+                                        {customer.postal_code || "—"}
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">Πόλη</div>
+                                      <div className="text-sm font-normal">
+                                        {customer.town || "—"}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                               
-                              return null;
-                            })}
+                              {/* Additional fields */}
+                              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {Object.entries(customer).map(([key, value]) => {
+                                  // Skip fields that are already displayed or belong to other categories
+                                  if (['id', 'company_name', 'customer_type', 'afm', 'doy', 
+                                       'address', 'postal_code', 'town', 
+                                       'telephone', 'email', 'webpage', 'fax_number',
+                                       'notes', 'status', 'created_at', 'updated_at', 
+                                       'created_by', 'modified_by', 'primary_contact_id'].includes(key)) {
+                                    return null;
+                                  }
+                                  
+                                  // Skip object values and null/undefined values
+                                  if (typeof value === 'object' || value === null || value === undefined) {
+                                    return null;
+                                  }
+                                  
+                                  // Skip history-related fields
+                                  if (key.includes('date') || key.includes('time') || key.includes('by') || 
+                                      key.includes('history') || key.includes('log')) {
+                                    return null;
+                                  }
+                                  
+                                  // Display any other fields that might exist
+                                  return (
+                                    <div key={key}>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}
+                                      </div>
+                                      <div className="text-sm font-normal">{value.toString() || "—"}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+
+                          {/* History Section */}
+                          <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+                            <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f] flex justify-between items-center">
+                              <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                                ΙΣΤΟΡΙΚΟ
+                              </h2>
+                              <div className="flex items-center">
+                                <span className="text-xs text-[#84a98c] mr-2 font-bold">Κατάσταση:</span>
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  customer.status === 'active' 
+                                    ? 'bg-green-900/30 text-green-300' 
+                                    : 'bg-red-900/30 text-red-300'
+                                }`}>
+                                  {customer.status === 'active' ? 'Ενεργός' : 'Ανενεργός'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="p-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Creation Information Section */}
+                                <div className="bg-[#354f52]/30 p-3 rounded-md">
+                                  <h3 className="text-xs font-semibold text-[#a8c5b5] mb-3 uppercase">Δημιουργία</h3>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        Δημιουργήθηκε από
+                                      </div>
+                                      <div className="text-sm font-normal">
+                                        {customer.created_by?.fullname || "—"}
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        Ημερομηνία δημιουργίας
+                                      </div>
+                                      <div className="text-sm font-normal">
+                                        {formatDateTime(customer.created_at)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Modification Information Section */}
+                                <div className="bg-[#354f52]/30 p-3 rounded-md">
+                                  <h3 className="text-xs font-semibold text-[#a8c5b5] mb-3 uppercase">Τροποποίηση</h3>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        Τελευταία τροποποίηση από
+                                      </div>
+                                      <div className="text-sm font-normal">
+                                        {customer.modified_by?.fullname || "—"}
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        Ημερομηνία τροποποίησης
+                                      </div>
+                                      <div className="text-sm font-normal">
+                                        {formatDateTime(customer.updated_at)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Additional history fields */}
+                              {Object.entries(customer).some(([key, value]) => 
+                                !['id', 'company_name', 'customer_type', 'afm', 'doy', 
+                                  'address', 'postal_code', 'town', 
+                                  'telephone', 'email', 'webpage', 'fax_number',
+                                  'notes', 'status', 'created_at', 'updated_at', 
+                                  'created_by', 'modified_by', 'primary_contact_id'].includes(key) &&
+                                (key.includes('date') || key.includes('time') || key.includes('by') || 
+                                 key.includes('history') || key.includes('log')) &&
+                                typeof value !== 'object' && value !== null && value !== undefined
+                              ) && (
+                                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                  <h3 className="text-xs font-semibold text-[#a8c5b5] col-span-full mt-2 mb-1">
+                                    Επιπλέον Πληροφορίες
+                                  </h3>
+                                  {Object.entries(customer).map(([key, value]) => {
+                                    // Only include fields that might be related to history but aren't already displayed
+                                    if (['id', 'company_name', 'customer_type', 'afm', 'doy', 
+                                         'address', 'postal_code', 'town', 
+                                         'telephone', 'email', 'webpage', 'fax_number',
+                                         'notes', 'status', 'created_at', 'updated_at', 
+                                         'created_by', 'modified_by', 'primary_contact_id'].includes(key)) {
+                                      return null;
+                                    }
+                                    
+                                    // Include fields that might be related to history (containing 'date', 'time', etc.)
+                                    if (key.includes('date') || key.includes('time') || key.includes('by') || 
+                                        key.includes('history') || key.includes('log')) {
+                                      // Skip object values and null/undefined values
+                                      if (typeof value === 'object' || value === null || value === undefined) {
+                                        return null;
+                                      }
+                                      
+                                      return (
+                                        <div key={key}>
+                                          <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                            {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}
+                                          </div>
+                                          <div className="text-sm font-normal">
+                                            {key.includes('date') || key.includes('time') 
+                                              ? formatDateTime(value.toString()) 
+                                              : value.toString() || "—"}
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    
+                                    return null;
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </AppTabsContent>
+                  </AppTabs>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>

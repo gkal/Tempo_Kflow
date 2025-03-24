@@ -1,5 +1,6 @@
-import React from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useState, useEffect } from 'react';
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 import OfferHistory from './OfferHistory';
 
 interface OfferHistoryTabProps {
@@ -15,19 +16,19 @@ export default function OfferHistoryTab({ offerId, isEditing }: OfferHistoryTabP
 
   return (
     <div className="mt-4 border border-[#52796f] rounded-md overflow-hidden">
-      <Tabs defaultValue="history" className="w-full">
-        <TabsList className="w-full bg-[#354f52] border-b border-[#52796f]">
-          <TabsTrigger 
+      <AppTabs defaultValue="history" className="w-full">
+        <AppTabsList className="w-full bg-[#354f52] border-b border-[#52796f]">
+          <AppTabsTrigger 
             value="history" 
             className="flex-1 data-[state=active]:bg-[#2f3e46] data-[state=active]:text-[#cad2c5]"
           >
             Ιστορικό Προσφοράς
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="history" className="p-0 bg-[#2f3e46]">
+          </AppTabsTrigger>
+        </AppTabsList>
+        <AppTabsContent value="history" className="p-0 bg-[#2f3e46]">
           <OfferHistory offerId={offerId} />
-        </TabsContent>
-      </Tabs>
+        </AppTabsContent>
+      </AppTabs>
     </div>
   );
 } 

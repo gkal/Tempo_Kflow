@@ -1,28 +1,45 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
+import LoadingSpinner from './ui/LoadingSpinner';
 
-export default function ProtectedRoute({
-  children,
-}: {
+interface ProtectedRouteProps {
   children: React.ReactNode;
-}) {
-  const { user, loading } = useAuth();
+  requireAdmin?: boolean;
+  requireSuperUser?: boolean;
+}
 
+/**
+ * Route component that protects routes requiring authentication
+ * Can optionally require specific role levels (admin, super user)
+ */
+export default function ProtectedRoute({ 
+  children, 
+  requireAdmin = false,
+  requireSuperUser = false
+}: ProtectedRouteProps) {
+  const { user, loading, isAdmin, isSuperUser } = useAuth();
+  const location = useLocation();
+
+  // Show loader while auth status is being verified
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#2f3e46]">
-        <div className="flex items-center justify-center space-x-2">
-          <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce" />
-          <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.2s]" />
-          <div className="h-2 w-2 bg-[#cad2c5] rounded-full animate-bounce [animation-delay:0.4s]" />
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Authenticating user" />;
   }
 
+  // Redirect unauthenticated users to login page
   if (!user) {
-    return <Navigate to="/login" replace />;
+    // Save current location to redirect back after login
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Check role requirements
+  if (requireAdmin && !isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (requireSuperUser && !(isAdmin || isSuperUser)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Render protected content for authenticated users with appropriate roles
   return <>{children}</>;
 }

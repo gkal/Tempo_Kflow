@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
 import { OffersTable } from "./OffersTable";
 import { StatusFilter } from "./StatusFilter";

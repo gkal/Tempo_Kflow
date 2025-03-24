@@ -10,22 +10,7 @@
  * Changing these values will affect ALL instances of DataTableBase in the application.
  * Any modifications should be thoroughly tested across all table instances.
  */
-
-/**
- * Deep freeze an object to make it and its nested properties immutable
- */
-function deepFreeze<T extends object>(obj: T): Readonly<T> {
-  Object.keys(obj).forEach((prop) => {
-    if (
-      typeof (obj as any)[prop] === "object" &&
-      (obj as any)[prop] !== null &&
-      !Object.isFrozen((obj as any)[prop])
-    ) {
-      deepFreeze((obj as any)[prop]);
-    }
-  });
-  return Object.freeze(obj);
-}
+import { deepFreeze } from './utils';
 
 /**
  * DataTable styles configuration
@@ -102,15 +87,19 @@ export type DataTableStyles = typeof dataTableStyles;
  * Helper function to get a specific style value
  * This ensures type safety when accessing style values
  */
-export const getDataTableStyle = <
+export function getDataTableStyle<K extends keyof DataTableStyles>(
+  key: K
+): DataTableStyles[K];
+export function getDataTableStyle<
   K extends keyof DataTableStyles,
-  SK extends keyof DataTableStyles[K],
->(
-  key: K,
-  subKey?: SK,
-): SK extends undefined ? DataTableStyles[K] : DataTableStyles[K][SK] => {
-  if (subKey) {
-    return dataTableStyles[key][subKey as any] as any;
+  SK extends keyof DataTableStyles[K]
+>(key: K, subKey: SK): DataTableStyles[K][SK];
+export function getDataTableStyle<
+  K extends keyof DataTableStyles,
+  SK extends keyof DataTableStyles[K]
+>(key: K, subKey?: SK): any {
+  if (subKey !== undefined) {
+    return dataTableStyles[key][subKey];
   }
-  return dataTableStyles[key] as any;
-};
+  return dataTableStyles[key];
+}

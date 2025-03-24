@@ -1,15 +1,71 @@
-// Version history with structured format
+/**
+ * Application version management system
+ * Provides structured version history and current version information
+ */
+
+/**
+ * Version entry interface with semantic versioning support
+ */
 export interface VersionEntry {
-  version: string;
-  date: string;
-  description: string;
-  changes: string[];
+  version: string;      // Semantic version (x.y.z)
+  date: string;         // Release date in DD-MM-YYYY format
+  description: string;  // Short description of the version
+  changes: string[];    // List of changes in this version
+  isPreRelease?: boolean; // Whether this is a pre-release version
+  buildNumber?: number;   // Optional build number for CI/CD
 }
 
+/**
+ * Semantic version components
+ */
+export interface SemanticVersion {
+  major: number;
+  minor: number;
+  patch: number;
+  preRelease?: string;
+  buildMetadata?: string;
+}
+
+/**
+ * Parse a semantic version string into its components
+ * @param version Semantic version string (e.g., "1.2.3-beta.1+build.123")
+ * @returns Parsed semantic version object
+ */
+export function parseVersion(version: string): SemanticVersion {
+  // Match semantic versioning pattern major.minor.patch[-prerelease][+buildmetadata]
+  const regex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+  const match = version.match(regex);
+  
+  if (!match) {
+    throw new Error(`Invalid semantic version: ${version}`);
+  }
+  
+  return {
+    major: parseInt(match[1], 10),
+    minor: parseInt(match[2], 10),
+    patch: parseInt(match[3], 10),
+    preRelease: match[4],
+    buildMetadata: match[5]
+  };
+}
+
+/**
+ * Format a Date object to DD-MM-YYYY format
+ * @param date Date to format
+ * @returns Formatted date string
+ */
+export function formatReleaseDate(date: Date): string {
+  return date.toLocaleDateString('en-GB').split('/').join('-');
+}
+
+/**
+ * Version history with structured format
+ * Most recent versions should be at the beginning of the array
+ */
 export const VERSION_HISTORY: VersionEntry[] = [
   {
     version: "1.5.3",
-    date: new Date().toLocaleDateString('en-GB').split('/').join('-'),
+    date: formatReleaseDate(new Date()),
     description: "Φίλτρο Τύπων Πελατών",
     changes: [
       "Προσθήκη φίλτρου για την εμφάνιση πελατών με βάση τον τύπο τους",
@@ -19,7 +75,7 @@ export const VERSION_HISTORY: VersionEntry[] = [
   },
   {
     version: "1.5.2",
-    date: new Date().toLocaleDateString('en-GB').split('/').join('-'),
+    date: formatReleaseDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)), // 1 week ago
     description: "Επέκταση Τύπων Πελατών",
     changes: [
       "Προσθήκη νέων τύπων πελατών: Εκτακτος πελάτης και Εκτακτη εταιρία",
@@ -115,5 +171,28 @@ export const VERSION_HISTORY: VersionEntry[] = [
   }
 ];
 
-// Current version is the first entry in the version history
-export const VERSION = VERSION_HISTORY[0].version;
+// Current version is the first (most recent) entry in the version history
+export const CURRENT_VERSION = VERSION_HISTORY[0];
+
+// Export just the version string for simple imports
+export const VERSION = CURRENT_VERSION.version;
+
+/**
+ * Gets a specific version entry by version string
+ * @param version Version string to find
+ * @returns Version entry or undefined if not found
+ */
+export function getVersionEntry(version: string): VersionEntry | undefined {
+  return VERSION_HISTORY.find(entry => entry.version === version);
+}
+
+/**
+ * Gets all versions released after a specific version
+ * @param version Base version to compare against
+ * @returns Array of newer version entries
+ */
+export function getNewerVersions(version: string): VersionEntry[] {
+  const versionIndex = VERSION_HISTORY.findIndex(entry => entry.version === version);
+  if (versionIndex === -1) return VERSION_HISTORY;
+  return VERSION_HISTORY.slice(0, versionIndex);
+}

@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { TaskDialog } from "./TaskDialog";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "@/components/ui/search-bar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 import { openEditOfferDialog } from "@/components/customers/OfferDialogManager";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Define interfaces
 interface Task {
@@ -708,132 +709,168 @@ export default function TasksPage() {
     }
   }, []);
 
+  // Function to render task filters
+  const renderTaskFilters = () => {
+    return (
+      <div className="flex flex-col sm:flex-row gap-1 mb-2 mt-1">
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
+          {/* Status filters */}
+          <div 
+            onClick={() => setStatusFilter("all")}
+            className="relative inline-block min-w-[70px]"
+          >
+            <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+              ${statusFilter === "all" 
+                ? "bg-white/20 text-white font-medium shadow-[0_0_8px_2px_rgba(255,255,255,0.15)] ring-white/30" 
+                : "bg-white/10 text-white hover:bg-white/20 ring-transparent"}`}
+            >
+              Όλες
+            </span>
+          </div>
+          
+          <div 
+            onClick={() => setStatusFilter("pending")}
+            className="relative inline-block min-w-[70px]"
+          >
+            <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+              ${statusFilter === "pending" 
+                ? "bg-amber-500/20 text-amber-400 font-medium shadow-[0_0_8px_2px_rgba(245,158,11,0.15)] ring-amber-400/30" 
+                : "bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 ring-transparent"}`}
+            >
+              Εκκρεμεί
+            </span>
+          </div>
+          
+          <div 
+            onClick={() => setStatusFilter("in_progress")}
+            className="relative inline-block min-w-[70px]"
+          >
+            <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+              ${statusFilter === "in_progress" 
+                ? "bg-blue-500/20 text-blue-400 font-medium shadow-[0_0_8px_2px_rgba(59,130,246,0.15)] ring-blue-400/30" 
+                : "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 ring-transparent"}`}
+            >
+              Σε εξέλιξη
+            </span>
+          </div>
+          
+          <div 
+            onClick={() => setStatusFilter("completed")}
+            className="relative inline-block min-w-[70px]"
+          >
+            <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+              ${statusFilter === "completed" 
+                ? "bg-green-500/20 text-green-400 font-medium shadow-[0_0_8px_2px_rgba(34,197,94,0.15)] ring-green-400/30" 
+                : "bg-green-500/10 text-green-400 hover:bg-green-500/20 ring-transparent"}`}
+            >
+              Ολοκληρώθηκε
+            </span>
+          </div>
+          
+          <div 
+            onClick={() => setStatusFilter("cancelled")}
+            className="relative inline-block min-w-[70px]"
+          >
+            <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+              ${statusFilter === "cancelled" 
+                ? "bg-gray-500/20 text-gray-400 font-medium shadow-[0_0_8px_2px_rgba(156,163,175,0.15)] ring-gray-400/30" 
+                : "bg-gray-500/10 text-gray-400 hover:bg-gray-500/20 ring-transparent"}`}
+            >
+              Ακυρώθηκε
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Function to render general tasks table
+  const renderGeneralTasks = () => {
+    return (
+      <>
+        <div>
+          <SearchBar 
+            placeholder="Αναζήτηση εργασιών..."
+            value={searchTerm}
+            onChange={setSearchTerm}
+            options={[
+              { label: "Τίτλος", value: "title" },
+              { label: "Περιγραφή", value: "description" }
+            ]}
+            selectedColumn={searchColumn}
+            onColumnChange={setSearchColumn}
+            className="w-96"
+          />
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
+          </div>
+        ) : filteredTasks.length === 0 ? (
+          <div className="text-center py-8 text-[#84a98c]">
+            Δεν βρέθηκαν γενικές εργασίες
+          </div>
+        ) : (
+          <DataTableBase
+            columns={generalTasksColumns}
+            data={filteredTasks}
+            defaultSortColumn="created_at"
+            defaultSortDirection="desc"
+            searchTerm={searchTerm}
+            searchColumn={searchColumn}
+            onRowClick={handleRowClick}
+            containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
+            rowClassName="hover:bg-[#354f52]/50 cursor-pointer group border-t border-[#52796f]/30"
+            emptyStateMessage="Δεν βρέθηκαν γενικές εργασίες"
+            loadingStateMessage="Φόρτωση εργασιών..."
+          />
+        )}
+      </>
+    );
+  };
+
   return (
-    <div className="container mx-auto py-1 space-y-1">
-      <div className="bg-[#2f3e46] rounded-lg p-2">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="flex w-full bg-[#2f3e46] p-0 h-auto justify-start border-0">
-            <TabsTrigger 
-              value="offer-tasks" 
-              className="px-4 py-2 text-[#cad2c5] font-normal data-[state=active]:bg-transparent data-[state=active]:border-b data-[state=active]:border-b-[#84a98c] data-[state=active]:font-normal hover:bg-[#52796f] hover:text-[#cad2c5]"
-            >
-              Εργασίες Προσφορών
-            </TabsTrigger>
-            <TabsTrigger 
-              value="general-tasks" 
-              className="px-4 py-2 text-[#cad2c5] font-normal data-[state=active]:bg-transparent data-[state=active]:border-b data-[state=active]:border-b-[#84a98c] data-[state=active]:font-normal hover:bg-[#52796f] hover:text-[#cad2c5]"
-            >
-              Γενικές Εργασίες
-            </TabsTrigger>
-          </TabsList>
+    <div className="container mx-auto py-4">
+      <div className="flex flex-col space-y-4">
+        <div className="flex items-center justify-between pb-4">
+          <h1 className="text-2xl font-bold text-[#cad2c5]">Εργασίες</h1>
+          <Button onClick={() => setIsDialogOpen(true)} className="bg-[#52796f] hover:bg-[#354f52]">
+            Νέα Εργασία
+          </Button>
+        </div>
+        
+        <AppTabs value={activeTab} onValueChange={setActiveTab}>
+          <AppTabsList>
+            <AppTabsTrigger value="offer-tasks">
+              Προσφορές ({processedOfferTasks.length})
+            </AppTabsTrigger>
+            <AppTabsTrigger value="general-tasks">
+              Γενικές Εργασίες ({filteredTasks.length})
+            </AppTabsTrigger>
+          </AppTabsList>
           
-          {/* Place the button below tabs, on the left side */}
-          <div className="h-[30px]">
-            {activeTab === "general-tasks" && (
-              <div className="flex justify-start pt-1">
-                <Button 
-                  className="bg-transparent hover:bg-[#52796f] text-[#84a98c] hover:text-[#cad2c5] flex items-center gap-2 transition-colors font-normal"
-                  onClick={() => {
-                    setCurrentTaskId(null);
-                    setIsDialogOpen(true);
-                  }}
-                >
-                  <Plus className="h-5 w-5 text-white" /> Νέα Εργασία
-                </Button>
+          <AppTabsContent value="offer-tasks" className="mt-0">
+            <div className="mt-4 space-y-4">
+              {renderTaskFilters()}
+              <div>
+                <SearchBar 
+                  placeholder="Αναζήτηση εργασιών..."
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  options={activeTab === "offer-tasks" ? [
+                    { label: "Πελάτης", value: "company_name" },
+                    { label: "Περιγραφή", value: "requirements" }
+                  ] : [
+                    { label: "Τίτλος", value: "title" },
+                    { label: "Περιγραφή", value: "description" }
+                  ]}
+                  selectedColumn={searchColumn}
+                  onColumnChange={setSearchColumn}
+                  className="w-96"
+                />
               </div>
-            )}
-          </div>
 
-          <div className="mb-2">
-            <SearchBar 
-              placeholder="Αναζήτηση εργασιών..."
-              value={searchTerm}
-              onChange={setSearchTerm}
-              options={activeTab === "offer-tasks" ? [
-                { label: "Πελάτης", value: "company_name" },
-                { label: "Περιγραφή", value: "requirements" }
-              ] : [
-                { label: "Τίτλος", value: "title" },
-                { label: "Περιγραφή", value: "description" }
-              ]}
-              selectedColumn={searchColumn}
-              onColumnChange={setSearchColumn}
-              className="w-96"
-            />
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-1 mb-2 mt-1">
-            <div className="flex flex-wrap items-center gap-2 ml-auto">
-              {/* Status filters */}
-              <div 
-                onClick={() => setStatusFilter("all")}
-                className="relative inline-block min-w-[70px]"
-              >
-                <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
-                  ${statusFilter === "all" 
-                    ? "bg-white/20 text-white font-medium shadow-[0_0_8px_2px_rgba(255,255,255,0.15)] ring-white/30" 
-                    : "bg-white/10 text-white hover:bg-white/20 ring-transparent"}`}
-                >
-                  Όλες
-                </span>
-              </div>
-              
-              <div 
-                onClick={() => setStatusFilter("pending")}
-                className="relative inline-block min-w-[70px]"
-              >
-                <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
-                  ${statusFilter === "pending" 
-                    ? "bg-amber-500/20 text-amber-400 font-medium shadow-[0_0_8px_2px_rgba(245,158,11,0.15)] ring-amber-400/30" 
-                    : "bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 ring-transparent"}`}
-                >
-                  Εκκρεμεί
-                </span>
-              </div>
-              
-              <div 
-                onClick={() => setStatusFilter("in_progress")}
-                className="relative inline-block min-w-[70px]"
-              >
-                <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
-                  ${statusFilter === "in_progress" 
-                    ? "bg-blue-500/20 text-blue-400 font-medium shadow-[0_0_8px_2px_rgba(59,130,246,0.15)] ring-blue-400/30" 
-                    : "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 ring-transparent"}`}
-                >
-                  Σε εξέλιξη
-                </span>
-              </div>
-              
-              <div 
-                onClick={() => setStatusFilter("completed")}
-                className="relative inline-block min-w-[70px]"
-              >
-                <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
-                  ${statusFilter === "completed" 
-                    ? "bg-green-500/20 text-green-400 font-medium shadow-[0_0_8px_2px_rgba(34,197,94,0.15)] ring-green-400/30" 
-                    : "bg-green-500/10 text-green-400 hover:bg-green-500/20 ring-transparent"}`}
-                >
-                  Ολοκληρώθηκε
-                </span>
-              </div>
-              
-              <div 
-                onClick={() => setStatusFilter("cancelled")}
-                className="relative inline-block min-w-[70px]"
-              >
-                <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
-                  ${statusFilter === "cancelled" 
-                    ? "bg-gray-500/20 text-gray-400 font-medium shadow-[0_0_8px_2px_rgba(156,163,175,0.15)] ring-gray-400/30" 
-                    : "bg-gray-500/10 text-gray-400 hover:bg-gray-500/20 ring-transparent"}`}
-                >
-                  Ακυρώθηκε
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <TabsContent value="offer-tasks" className="mt-0">
               {loading ? (
                 <div className="flex justify-center items-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
@@ -858,31 +895,16 @@ export default function TasksPage() {
                   loadingStateMessage="Φόρτωση εργασιών..."
                 />
               )}
-            </TabsContent>
-
-            <TabsContent value="general-tasks" className="mt-0">
-              {loading ? (
-                <div className="flex justify-center items-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
-                </div>
-              ) : (
-                <DataTableBase
-                  columns={generalTasksColumns}
-                  data={filteredTasks}
-                  defaultSortColumn="created_at"
-                  defaultSortDirection="desc"
-                  searchTerm={searchTerm}
-                  searchColumn={searchColumn}
-                  onRowClick={handleRowClick}
-                  containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
-                  rowClassName="hover:bg-[#354f52]/50 cursor-pointer group border-t border-[#52796f]/30"
-                  emptyStateMessage="Δεν βρέθηκαν γενικές εργασίες"
-                  loadingStateMessage="Φόρτωση εργασιών..."
-                />
-              )}
-            </TabsContent>
-          </div>
-        </Tabs>
+            </div>
+          </AppTabsContent>
+          
+          <AppTabsContent value="general-tasks" className="mt-0">
+            <div className="mt-4 space-y-4">
+              {renderTaskFilters()}
+              {renderGeneralTasks()}
+            </div>
+          </AppTabsContent>
+        </AppTabs>
       </div>
 
       {/* Task Dialog */}

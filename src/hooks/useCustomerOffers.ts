@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabaseClient';
 import { useState, useEffect } from 'react';
 
 export function useCustomerOffers(customerId: string) {

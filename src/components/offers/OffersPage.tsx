@@ -3,9 +3,9 @@ import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, Edit, Trash2, Filter, ChevronRight, ChevronDown } from "lucide-react";
 import { DataTableBase } from "@/components/ui/data-table-base";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/utils/formatUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +25,10 @@ import {
 } from "@/components/ui/tooltip";
 import React from "react";
 import { openNewOfferDialog, openEditOfferDialog } from '../customers/OfferDialogManager';
-import { TruncatedText } from "@/components/ui/truncated-text";
+import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
+import { logDebug, logError, createPrefixedLogger } from "@/utils/loggingUtils";
+import { handleSupabaseError, getUserErrorMessage } from "@/utils/errorUtils";
+import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 
 // Offer interface
 interface Offer {
@@ -71,6 +74,9 @@ export default function OffersPage() {
   // Add state variables for loading and success
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteSuccessful, setIsDeleteSuccessful] = useState(false);
+
+  // Create a logger for this component
+  const logger = createPrefixedLogger('OffersPage');
 
   // Format status for display
   const formatStatus = (status: string) => {
@@ -135,7 +141,7 @@ export default function OffersPage() {
   const fetchOffers = async () => {
     try {
       setLoading(true);
-      console.log(`fetchOffers called with statusFilter=${statusFilter}, resultFilter=${resultFilter}`);
+      logger.debug(`fetchOffers called with statusFilter=${statusFilter}, resultFilter=${resultFilter}`);
       
       // Build the query
       let query = supabase
@@ -148,38 +154,38 @@ export default function OffersPage() {
         `)
         .is("deleted_at", null); // Filter out soft-deleted records
       
-      console.log("Base query created with deleted_at filter");
+      logger.debug("Base query created with deleted_at filter");
       
       // Apply status filter if not "all"
       if (statusFilter !== "all") {
         query = query.eq("offer_result", statusFilter);
-        console.log(`Added status filter: offer_result=${statusFilter}`);
+        logger.debug(`Added status filter: offer_result=${statusFilter}`);
       }
       
       // Apply result filter if not "all"
       if (resultFilter !== "all") {
         query = query.eq("result", resultFilter);
-        console.log(`Added result filter: result=${resultFilter}`);
+        logger.debug(`Added result filter: result=${resultFilter}`);
       }
       
       // Apply search filter if provided
       if (searchTerm) {
         query = query.ilike(`${searchColumn}`, `%${searchTerm}%`);
-        console.log(`Added search filter: ${searchColumn} ILIKE %${searchTerm}%`);
+        logger.debug(`Added search filter: ${searchColumn} ILIKE %${searchTerm}%`);
       }
       
       // Execute the query
-      console.log("Executing query...");
+      logger.debug("Executing query...");
       const { data, error } = await query.order("created_at", { ascending: false });
       
       if (error) {
-        console.error("Query error:", error);
+        logger.error("Query error:", error);
         throw error;
       }
       
-      console.log(`Query returned ${data?.length || 0} offers`);
+      logger.debug(`Query returned ${data?.length || 0} offers`);
       if (data && data.length > 0) {
-        console.log("First result:", {
+        logger.debug("First result:", {
           id: data[0].id,
           result: data[0].result,
           offer_result: data[0].offer_result
@@ -199,8 +205,9 @@ export default function OffersPage() {
       setFilteredOffers(offersWithData);
       
     } catch (error) {
-      console.error("Error fetching offers:", error);
-      showError("Σφάλμα", "Δεν ήταν δυνατή η φόρτωση των προσφορών");
+      const handledError = handleSupabaseError(error, 'fetching offers');
+      const { title, message } = getUserErrorMessage(handledError, 'Data Load Error');
+      showError(title, message);
     } finally {
       setLoading(false);
     }
@@ -301,6 +308,7 @@ export default function OffersPage() {
         error = response.error;
       } catch (softDeleteError) {
         // If soft delete is not available, fallback to regular delete
+        logger.debug("Soft delete not available, falling back to regular delete");
         const response = await supabase
           .from("offers")
           .delete()
@@ -315,8 +323,9 @@ export default function OffersPage() {
       
       // Removed immediate state updates to avoid refreshing the UI before the user sees the success message
     } catch (error) {
-      console.error("Error deleting offer:", error);
-      showError("Σφάλμα", "Δεν ήταν δυνατή η διαγραφή της προσφοράς");
+      const handledError = handleSupabaseError(error, 'deleting offer');
+      const { title, message } = getUserErrorMessage(handledError, 'Delete Error');
+      showError(title, message);
       setShowDeleteDialog(false);
       setOfferToDelete(null);
     } finally {
@@ -409,13 +418,13 @@ export default function OffersPage() {
         
         // Truncate long text
         return value.length > 50 
-          ? <TruncatedText 
+          ? <TruncateWithTooltip 
               text={value} 
               maxLength={50} 
-              tooltipMaxWidth={800}
-              multiLine={value.length > 100}
+              maxWidth={800}
+              multiLine={false}
               maxLines={2}
-            />
+            /> 
           : value;
       },
     },

@@ -1,77 +1,147 @@
-import { supabase } from "./lib/supabase";
+import { supabase } from "./lib/supabaseClient";
+import logger from "./utils/loggingUtils";
+
+interface Customer {
+  id: string;
+  company_name: string;
+}
+
+interface Offer {
+  id: string;
+  created_at: string;
+}
 
 /**
  * This script verifies that the database indexes and functions were created correctly.
  * Run it with: node --loader ts-node/esm src/verify-db-setup.ts
  */
-async function verifyDatabaseSetup() {
-  console.log("Verifying database setup...");
 
+/**
+ * Verifies that required database functions exist and work properly
+ */
+async function verifyFunctions(): Promise<boolean> {
+  logger.info("Checking if count_pending_offers_by_customer function exists...");
   try {
-    // Check if the function exists
-    console.log("Checking if count_pending_offers_by_customer function exists...");
-    const { data: functionData, error: functionError } = await supabase.rpc('count_pending_offers_by_customer');
+    // @ts-ignore - Ignoring type errors since we're testing if the function exists
+    const { data, error } = await supabase.rpc('count_pending_offers_by_customer');
     
-    if (functionError) {
-      console.error("Error calling function:", functionError.message);
-      console.error("The function may not exist or there might be an issue with it.");
-    } else {
-      console.log("✅ Function count_pending_offers_by_customer exists and is working!");
-      console.log("Function returned:", functionData);
+    if (error) {
+      logger.error("❌ Error calling function:", error.message);
+      logger.error("The function may not exist or there might be an issue with it.");
+      return false;
     }
-
-    // Check indexes by running a query that would use them
-    console.log("\nChecking if indexes are working by running optimized queries...");
     
-    // Query that would use customer status index
-    console.log("Testing customers status index...");
-    const { data: customersData, error: customersError } = await supabase
+    logger.info("✅ Function count_pending_offers_by_customer exists and is working!");
+    logger.info("Function returned:", data);
+    return true;
+  } catch (error) {
+    logger.error("❌ Unexpected error checking function:", error);
+    return false;
+  }
+}
+
+/**
+ * Verifies that the customer status index is working correctly
+ */
+async function verifyCustomerStatusIndex(): Promise<Customer[]> {
+  logger.info("Testing customers status index...");
+  try {
+    // @ts-ignore - Ignoring type errors since we're testing if the table exists
+    const { data, error } = await supabase
       .from('customers')
       .select('id, company_name')
       .eq('status', 'active')
       .limit(5);
     
-    if (customersError) {
-      console.error("Error querying customers:", customersError.message);
-    } else {
-      console.log("✅ Query using customers status index worked!");
-      console.log(`Found ${customersData.length} active customers`);
+    if (error) {
+      logger.error("❌ Error querying customers:", error.message);
+      return [];
     }
     
-    // Query that would use offers customer_id and result indexes
-    console.log("\nTesting offers customer_id and result indexes...");
-    if (customersData && customersData.length > 0) {
-      const customerId = customersData[0].id;
-      const { data: offersData, error: offersError } = await supabase
-        .from('offers')
-        .select('id, created_at')
-        .eq('customer_id', customerId)
-        .is('result', null)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      if (offersError) {
-        console.error("Error querying offers:", offersError.message);
-      } else {
-        console.log("✅ Query using offers customer_id and result indexes worked!");
-        console.log(`Found ${offersData.length} pending offers for customer ${customersData[0].company_name}`);
-      }
-    } else {
-      console.log("Skipping offers index test as no customers were found");
-    }
-    
-    console.log("\nVerification complete!");
-    console.log("If no errors were shown above, your database setup is correct.");
-    console.log("Note: This script can only verify that the function and queries work, not that the indexes specifically exist.");
-    console.log("However, if the queries run quickly with large datasets, the indexes are likely working correctly.");
-    
+    logger.info("✅ Query using customers status index worked!");
+    logger.info(`Found ${data?.length || 0} active customers`);
+    // Ensure data matches our Customer interface
+    return (data || []) as Customer[];
   } catch (error) {
-    console.error("Unexpected error during verification:", error);
+    logger.error("❌ Unexpected error checking customer index:", error);
+    return [];
   }
 }
 
-// Run the verification
-verifyDatabaseSetup();
+/**
+ * Verifies that the offers indexes are working correctly
+ */
+async function verifyOfferIndexes(customer: Customer): Promise<boolean> {
+  try {
+    logger.info(`Testing offers indexes for customer: ${customer.company_name}...`);
+    // @ts-ignore - Ignoring type errors since we're testing if the table exists
+    const { data, error } = await supabase
+      .from('offers')
+      .select('id, created_at')
+      .eq('customer_id', customer.id)
+      .is('result', null)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    
+    if (error) {
+      logger.error("❌ Error querying offers:", error.message);
+      return false;
+    }
+    
+    logger.info("✅ Query using offers customer_id and result indexes worked!");
+    logger.info(`Found ${data?.length || 0} pending offers for customer ${customer.company_name}`);
+    return true;
+  } catch (error) {
+    logger.error("❌ Unexpected error checking offer indexes:", error);
+    return false;
+  }
+}
 
-// Export for ES modules compatibility
-export {}; 
+/**
+ * Main verification function that orchestrates all checks
+ */
+async function verifyDatabaseSetup(): Promise<void> {
+  logger.info("🔍 Verifying database setup...");
+  logger.info("==============================");
+
+  try {
+    // Verify functions
+    const functionsOk = await verifyFunctions();
+    
+    // Verify customer indexes
+    logger.info("\n📋 Checking indexes by running optimized queries...");
+    const customers = await verifyCustomerStatusIndex();
+    
+    // Verify offer indexes if we have customers
+    let offersOk = false;
+    if (customers.length > 0) {
+      offersOk = await verifyOfferIndexes(customers[0]);
+    } else {
+      logger.info("ℹ️ Skipping offers index test as no customers were found");
+    }
+    
+    // Summary
+    logger.info("\n✨ Verification complete!");
+    logger.info("==============================");
+    
+    if (functionsOk && (customers.length > 0) && offersOk) {
+      logger.info("✅ All checks passed! Your database setup appears to be correct.");
+    } else {
+      logger.warning("⚠️ Some checks failed or were skipped. Review the logs above for details.");
+    }
+    
+    logger.info("\nNote: This script verifies that the queries work efficiently, which");
+    logger.info("suggests that the indexes exist. For a definitive check, inspect the");
+    logger.info("database schema directly or use EXPLAIN ANALYZE on your queries.");
+  } catch (error) {
+    logger.error("❌ Unexpected error during verification:", error);
+  }
+}
+
+// Run the verification only if directly executed (not imported)
+if (require.main === module) {
+  verifyDatabaseSetup();
+}
+
+// Export for ES modules compatibility and for potential import in other modules
+export { verifyDatabaseSetup, verifyFunctions, verifyCustomerStatusIndex, verifyOfferIndexes }; 

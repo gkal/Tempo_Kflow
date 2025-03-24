@@ -3,12 +3,13 @@ import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, EyeOff } from "lucide-react";
 import { DataTableBase } from "@/components/ui/data-table-base";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
 import { checkPermission } from "@/lib/permissions";
 import SimpleUserDialog from "./SimpleUserDialog";
 import './settings-cursor-fix.css'; // Import the CSS fix
 import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
+import { toast } from "@/components/ui/use-toast";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -183,7 +184,11 @@ export default function SettingsPage() {
       setUsers(transformedData);
     } catch (error) {
       console.error("Error fetching users:", error);
-      // TODO: Add proper error handling/notification here
+      toast({
+        title: "Error loading users",
+        description: "There was a problem fetching the user data. Please try again later.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

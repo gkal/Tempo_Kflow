@@ -13,9 +13,9 @@ import {
 import { Button } from "../ui/button";
 import { SearchBar } from "../ui/search-bar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabaseClient";
 import { DataTableBase } from "@/components/ui/data-table-base";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/utils/formatUtils";
 import { CloseButton } from "@/components/ui/close-button";
 import { createPortal } from "react-dom";
 

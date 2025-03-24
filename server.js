@@ -2,6 +2,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from './src/utils/loggingUtils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,7 +20,7 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-  console.log(`For network access, use: http://${STATIC_IP}:${PORT}`);
-  console.log(`Application is now available in PRODUCTION mode`);
+  logger.info(`Server running at http://localhost:${PORT}`);
+  logger.info(`For network access, use: http://${STATIC_IP}:${PORT}`);
+  logger.info(`Application is now available in PRODUCTION mode`);
 }); 

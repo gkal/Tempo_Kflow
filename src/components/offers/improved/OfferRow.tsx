@@ -1,5 +1,5 @@
 import React from "react";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/utils/formatUtils";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Edit, Trash2 } from "lucide-react";
 import {

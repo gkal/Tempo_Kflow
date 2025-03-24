@@ -1,25 +1,41 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+
+// Components
 import App from "./App.tsx";
+
+// Context providers
+import { AuthProvider } from "./lib/AuthContext";
+
+// Styles
 import "./index.css";
 import "./styles/tooltip.css";
-import "./suppressLogs";
-import { BrowserRouter } from "react-router-dom";
-import { AuthProvider } from "./lib/AuthContext";
-import { disableAutocomplete } from "./lib/disableAutocomplete";
 
+// Utilities
+import { setupUtilities } from "./utils";
+import { disableAutocomplete } from "./lib/disableAutocomplete";
 import { TempoDevtools } from "tempo-devtools";
+
+// Initialize development tools
 TempoDevtools.init();
+
+// Initialize all utilities (logging, warning suppression, etc.)
+setupUtilities();
 
 // Disable browser autocomplete functionality
 disableAutocomplete();
 
-const basename = import.meta.env.BASE_URL;
+// Root element
+const rootElement = document.getElementById("root") as HTMLElement;
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <BrowserRouter>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  </BrowserRouter>
-);
+// Render the application
+ReactDOM.createRoot(rootElement).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </BrowserRouter>
+  </React.StrictMode>
+); 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,10 +29,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDateTime } from "@/lib/utils";
+import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
+import { formatDateTime } from "@/utils/formatUtils";
 import ReactDOM from "react-dom";
-import { TruncatedText } from "@/components/ui/truncated-text";
+import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 
 // Extend Window interface to include our custom property
 declare global {
@@ -247,40 +247,31 @@ export default function ServiceTypesPage() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <Tabs defaultValue="categories" className="w-full">
-        <TabsList className="flex w-full bg-[#2f3e46] p-0 h-auto justify-start border-0">
-          <TabsTrigger 
-            value="categories" 
-            className="px-4 py-2 text-[#cad2c5] font-normal data-[state=active]:bg-transparent data-[state=active]:border-b data-[state=active]:border-b-[#84a98c] data-[state=active]:font-normal hover:bg-[#52796f] hover:text-[#cad2c5]"
-          >
+      <AppTabs defaultValue="categories">
+        <AppTabsList>
+          <AppTabsTrigger value="categories">
             Εργασίες σε προσφορές
-          </TabsTrigger>
-          <TabsTrigger 
-            value="units" 
-            className="px-4 py-2 text-[#cad2c5] font-normal data-[state=active]:bg-transparent data-[state=active]:border-b data-[state=active]:border-b-[#84a98c] data-[state=active]:font-normal hover:bg-[#52796f] hover:text-[#cad2c5]"
-          >
+          </AppTabsTrigger>
+          <AppTabsTrigger value="units">
             Μονάδες Μέτρησης
-          </TabsTrigger>
-          <TabsTrigger 
-            value="departments" 
-            className="px-4 py-2 text-[#cad2c5] font-normal data-[state=active]:bg-transparent data-[state=active]:border-b data-[state=active]:border-b-[#84a98c] data-[state=active]:font-normal hover:bg-[#52796f] hover:text-[#cad2c5]"
-          >
+          </AppTabsTrigger>
+          <AppTabsTrigger value="departments">
             Τμήματα
-          </TabsTrigger>
-        </TabsList>
+          </AppTabsTrigger>
+        </AppTabsList>
         
-        <TabsContent value="categories" className="mt-0 border-t-0">
+        <AppTabsContent value="categories">
           <CategoriesTab />
-        </TabsContent>
+        </AppTabsContent>
         
-        <TabsContent value="units" className="mt-0 border-t-0">
+        <AppTabsContent value="units">
           <UnitsTab />
-        </TabsContent>
+        </AppTabsContent>
         
-        <TabsContent value="departments" className="mt-0 border-t-0">
+        <AppTabsContent value="departments">
           <DepartmentsTab />
-        </TabsContent>
-      </Tabs>
+        </AppTabsContent>
+      </AppTabs>
     </div>
   );
 }
@@ -661,7 +652,7 @@ function CategoriesTab() {
           return (
             <div className="pl-6 flex items-center text-[#84a98c] font-semibold">
               <span className="mr-2 text-[#52796f] flex-shrink-0">└─</span>
-              <TruncatedText text={value} maxLength={40} />
+              <TruncateWithTooltip text={value} maxLength={40} />
             </div>
           );
         }
@@ -673,7 +664,7 @@ function CategoriesTab() {
             onCreateSubcategory={handleCreateSubcategory}
           >
             <div className="text-[#cad2c5] text-base">
-              <TruncatedText text={value} maxLength={40} />
+              <TruncateWithTooltip text={value} maxLength={40} />
             </div>
           </CategoryContextMenu>
         );
@@ -817,7 +808,7 @@ function CategoriesTab() {
               <DialogTitle className="text-[#84a98c] text-xl font-medium">
                 {currentParentCategory?.category_name 
                   ? (currentParentCategory.category_name.length > 40 
-                      ? <TruncatedText text={currentParentCategory.category_name} maxLength={40} tooltipPosition="top" />
+                      ? <TruncateWithTooltip text={currentParentCategory.category_name} maxLength={40} tooltipPosition="top" />
                       : currentParentCategory.category_name)
                   : "Προσθήκη Περιγραφής"
                 }

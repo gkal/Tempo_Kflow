@@ -10,9 +10,10 @@ import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { CheckCircle, AlertCircle, Clock, ArrowUpRight, Trash2, Link, Link2Off, ExternalLink } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { openEditOfferDialog } from "@/components/customers/OfferDialogManager";
-import { truncate } from "@/lib/utils";
+import { truncate } from "@/utils/textUtils";
+import { DialogClose } from "@/components/ui/dialog";
+import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 
 interface TaskDialogProps {
   isOpen: boolean;
@@ -449,24 +450,18 @@ export function TaskDialog({ isOpen, onClose, taskId, offerId: propOfferId, onTa
             </div>
           ) : (
             <>
-              <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="bg-[#2f3e46] w-full grid grid-cols-2 mb-4">
-                  <TabsTrigger
-                    value="details"
-                    className="data-[state=active]:bg-[#52796f] data-[state=active]:text-white data-[state=active]:shadow-sm"
-                  >
+              <AppTabs defaultValue={activeTab} onValueChange={setActiveTab}>
+                <AppTabsList>
+                  <AppTabsTrigger value="details">
                     Λεπτομέρειες
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="related"
-                    className="data-[state=active]:bg-[#52796f] data-[state=active]:text-white data-[state=active]:shadow-sm"
-                  >
+                  </AppTabsTrigger>
+                  <AppTabsTrigger value="related">
                     Συσχετισμοί
-                  </TabsTrigger>
-                </TabsList>
+                  </AppTabsTrigger>
+                </AppTabsList>
 
                 <form onSubmit={handleSubmit}>
-                  <TabsContent value="details" className="space-y-4 mt-0">
+                  <AppTabsContent value="details" className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="title">Τίτλος</Label>
                       <Input
@@ -545,9 +540,9 @@ export function TaskDialog({ isOpen, onClose, taskId, offerId: propOfferId, onTa
                         </div>
                       </div>
                     )}
-                  </TabsContent>
+                  </AppTabsContent>
 
-                  <TabsContent value="related" className="space-y-4 mt-0">
+                  <AppTabsContent value="related" className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="offerId">Προσφορά</Label>
@@ -618,7 +613,7 @@ export function TaskDialog({ isOpen, onClose, taskId, offerId: propOfferId, onTa
                         )}
                       </div>
                     )}
-                  </TabsContent>
+                  </AppTabsContent>
 
                   {error && (
                     <div className="text-red-400 text-sm mt-4">{error}</div>
@@ -653,7 +648,7 @@ export function TaskDialog({ isOpen, onClose, taskId, offerId: propOfferId, onTa
                     )}
                   </div>
                 </form>
-              </Tabs>
+              </AppTabs>
             </>
           )}
         </DialogContent>

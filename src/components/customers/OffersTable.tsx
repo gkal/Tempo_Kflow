@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/utils/formatUtils";
 import { Button } from "@/components/ui/button";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { SearchBar } from "@/components/ui/search-bar";
@@ -26,7 +26,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
-import { TruncatedText } from "@/components/ui/truncated-text";
+import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 
 // Add a ref type for the component
 export interface OffersTableRef {
@@ -311,15 +311,18 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
 
   // Function to truncate text with ellipsis and add indicator
   const truncateText = (text: string, maxLength: number) => {
-    if (!text) return "-";
-    if (text.length <= maxLength) return text;
+    if (!text) return '-';
+    
+    if (text.length <= maxLength) {
+      return text;
+    }
     
     return (
-      <TruncatedText 
+      <TruncateWithTooltip 
         text={text} 
         maxLength={maxLength} 
-        tooltipMaxWidth={800}
-        multiLine={text.length > 100} // Use multi-line for very long text
+        maxWidth={800}
+        multiLine={false}
         maxLines={2}
       />
     );

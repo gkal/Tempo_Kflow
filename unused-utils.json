@@ -1,0 +1,590 @@
+{
+  "summary": {
+    "totalExports": 142,
+    "potentiallyUnused": 142,
+    "byConfidence": {
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 142,
+      "5": 0
+    },
+    "scanDate": "2025-03-23T17:19:13.600Z"
+  },
+  "unusedExportsByConfidence": {
+    "1": [],
+    "2": [],
+    "3": [],
+    "4": [
+      {
+        "name": "ApiResponse",
+        "filepath": "src\\utils\\apiUtils.ts"
+      },
+      {
+        "name": "ApiError",
+        "filepath": "src\\utils\\apiUtils.ts"
+      },
+      {
+        "name": "ApiOptions",
+        "filepath": "src\\utils\\apiUtils.ts"
+      },
+      {
+        "name": "formatApiError",
+        "filepath": "src\\utils\\apiUtils.ts"
+      },
+      {
+        "name": "createSuccessResponse",
+        "filepath": "src\\utils\\apiUtils.ts"
+      },
+      {
+        "name": "createErrorResponse",
+        "filepath": "src\\utils\\apiUtils.ts"
+      },
+      {
+        "name": "isSuccessResponse",
+        "filepath": "src\\utils\\apiUtils.ts"
+      },
+      {
+        "name": "parseApiData",
+        "filepath": "src\\utils\\apiUtils.ts"
+      },
+      {
+        "name": "createTimeoutController",
+        "filepath": "src\\utils\\apiUtils.ts"
+      },
+      {
+        "name": "formatQueryParams",
+        "filepath": "src\\utils\\apiUtils.ts"
+      },
+      {
+        "name": "disableAutocomplete",
+        "filepath": "src\\utils\\browserUtils.ts"
+      },
+      {
+        "name": "detectBrowserFeature",
+        "filepath": "src\\utils\\browserUtils.ts"
+      },
+      {
+        "name": "browserUtils",
+        "filepath": "src\\utils\\browserUtils.ts"
+      },
+      {
+        "name": "logDeprecationWarning",
+        "filepath": "src\\utils\\componentUtils.ts"
+      },
+      {
+        "name": "withDeprecationWarning",
+        "filepath": "src\\utils\\componentUtils.ts"
+      },
+      {
+        "name": "loggingConsole",
+        "filepath": "src\\utils\\consoleReplacer.ts"
+      },
+      {
+        "name": "findConsoleStatements",
+        "filepath": "src\\utils\\consoleReplacer.ts"
+      },
+      {
+        "name": "replaceConsoleStatements",
+        "filepath": "src\\utils\\consoleReplacer.ts"
+      },
+      {
+        "name": "hasLoggingImport",
+        "filepath": "src\\utils\\consoleReplacer.ts"
+      },
+      {
+        "name": "addLoggingImport",
+        "filepath": "src\\utils\\consoleReplacer.ts"
+      },
+      {
+        "name": "ErrorType",
+        "filepath": "src\\utils\\errorUtils.ts"
+      },
+      {
+        "name": "ErrorResponse",
+        "filepath": "src\\utils\\errorUtils.ts"
+      },
+      {
+        "name": "createError",
+        "filepath": "src\\utils\\errorUtils.ts"
+      },
+      {
+        "name": "handleSupabaseError",
+        "filepath": "src\\utils\\errorUtils.ts"
+      },
+      {
+        "name": "handleFormError",
+        "filepath": "src\\utils\\errorUtils.ts"
+      },
+      {
+        "name": "getUserErrorMessage",
+        "filepath": "src\\utils\\errorUtils.ts"
+      },
+      {
+        "name": "isNetworkError",
+        "filepath": "src\\utils\\errorUtils.ts"
+      },
+      {
+        "name": "getFieldErrors",
+        "filepath": "src\\utils\\errorUtils.ts"
+      },
+      {
+        "name": "AppEventType",
+        "filepath": "src\\utils\\eventUtils.ts"
+      },
+      {
+        "name": "BaseEventData",
+        "filepath": "src\\utils\\eventUtils.ts"
+      },
+      {
+        "name": "EntityEventData",
+        "filepath": "src\\utils\\eventUtils.ts"
+      },
+      {
+        "name": "AppEventMap",
+        "filepath": "src\\utils\\eventUtils.ts"
+      },
+      {
+        "name": "addEventListener",
+        "filepath": "src\\utils\\eventUtils.ts"
+      },
+      {
+        "name": "removeEventListener",
+        "filepath": "src\\utils\\eventUtils.ts"
+      },
+      {
+        "name": "dispatchEvent",
+        "filepath": "src\\utils\\eventUtils.ts"
+      },
+      {
+        "name": "createEventHandlers",
+        "filepath": "src\\utils\\eventUtils.ts"
+      },
+      {
+        "name": "createCustomEvent",
+        "filepath": "src\\utils\\eventUtils.ts"
+      },
+      {
+        "name": "onceEvent",
+        "filepath": "src\\utils\\eventUtils.ts"
+      },
+      {
+        "name": "formatDate",
+        "filepath": "src\\utils\\formatUtils.ts"
+      },
+      {
+        "name": "formatDateTime",
+        "filepath": "src\\utils\\formatUtils.ts"
+      },
+      {
+        "name": "safeFormatDateTime",
+        "filepath": "src\\utils\\formatUtils.ts"
+      },
+      {
+        "name": "formatDateISO",
+        "filepath": "src\\utils\\formatUtils.ts"
+      },
+      {
+        "name": "formatCurrency",
+        "filepath": "src\\utils\\formatUtils.ts"
+      },
+      {
+        "name": "formatPhoneNumber",
+        "filepath": "src\\utils\\formatUtils.ts"
+      },
+      {
+        "name": "DateParts",
+        "filepath": "src\\utils\\formatUtils.ts"
+      },
+      {
+        "name": "extractDateParts",
+        "filepath": "src\\utils\\formatUtils.ts"
+      },
+      {
+        "name": "useFormWatch",
+        "filepath": "src\\utils\\formHelpers.ts"
+      },
+      {
+        "name": "setMultipleFields",
+        "filepath": "src\\utils\\formHelpers.ts"
+      },
+      {
+        "name": "resetFormWithValues",
+        "filepath": "src\\utils\\formHelpers.ts"
+      },
+      {
+        "name": "formHelpers",
+        "filepath": "src\\utils\\formHelpers.ts"
+      },
+      {
+        "name": "ValidationMessages",
+        "filepath": "src\\utils\\formValidation.ts"
+      },
+      {
+        "name": "ValidationPatterns",
+        "filepath": "src\\utils\\formValidation.ts"
+      },
+      {
+        "name": "setupCustomValidationMessages",
+        "filepath": "src\\utils\\formValidation.ts"
+      },
+      {
+        "name": "ValidationRule",
+        "filepath": "src\\utils\\formValidation.ts"
+      },
+      {
+        "name": "ValidationStatus",
+        "filepath": "src\\utils\\formValidation.ts"
+      },
+      {
+        "name": "FormValidationState",
+        "filepath": "src\\utils\\formValidation.ts"
+      },
+      {
+        "name": "useFormValidation",
+        "filepath": "src\\utils\\formValidation.ts"
+      },
+      {
+        "name": "setCustomValidationMessage",
+        "filepath": "src\\utils\\formValidation.ts"
+      },
+      {
+        "name": "checkRequiredFields",
+        "filepath": "src\\utils\\formValidation.ts"
+      },
+      {
+        "name": "setupUtilities",
+        "filepath": "src\\utils\\index.ts"
+      },
+      {
+        "name": "utils",
+        "filepath": "src\\utils\\index.ts"
+      },
+      {
+        "name": "truncateWithNullHandling",
+        "filepath": "src\\utils\\index.ts"
+      },
+      {
+        "name": "capitalize",
+        "filepath": "src\\utils\\index.ts"
+      },
+      {
+        "name": "slugify",
+        "filepath": "src\\utils\\index.ts"
+      },
+      {
+        "name": "textTruncate",
+        "filepath": "src\\utils\\index.ts"
+      },
+      {
+        "name": "LogLevel",
+        "filepath": "src\\utils\\loggingUtils.ts"
+      },
+      {
+        "name": "logDebug",
+        "filepath": "src\\utils\\loggingUtils.ts"
+      },
+      {
+        "name": "logInfo",
+        "filepath": "src\\utils\\loggingUtils.ts"
+      },
+      {
+        "name": "logWarning",
+        "filepath": "src\\utils\\loggingUtils.ts"
+      },
+      {
+        "name": "logError",
+        "filepath": "src\\utils\\loggingUtils.ts"
+      },
+      {
+        "name": "configureLogging",
+        "filepath": "src\\utils\\loggingUtils.ts"
+      },
+      {
+        "name": "createPrefixedLogger",
+        "filepath": "src\\utils\\loggingUtils.ts"
+      },
+      {
+        "name": "truncateText",
+        "filepath": "src\\utils\\stringUtils.ts"
+      },
+      {
+        "name": "truncate",
+        "filepath": "src\\utils\\stringUtils.ts"
+      },
+      {
+        "name": "generateSlug",
+        "filepath": "src\\utils\\stringUtils.ts"
+      },
+      {
+        "name": "capitalizeWords",
+        "filepath": "src\\utils\\stringUtils.ts"
+      },
+      {
+        "name": "normalizeText",
+        "filepath": "src\\utils\\stringUtils.ts"
+      },
+      {
+        "name": "getInitials",
+        "filepath": "src\\utils\\stringUtils.ts"
+      },
+      {
+        "name": "cn",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "classNames",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "deepFreeze",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "getStyleValue",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "StatusType",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "ResultType",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "formatStatus",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "formatResult",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "getStatusClass",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "getResultClass",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "ButtonSize",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "TooltipPosition",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "getCloseButtonClasses",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "getTooltipPositionClass",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "getSkeletonClasses",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "getInputClasses",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "styles",
+        "filepath": "src\\utils\\styleUtils.ts"
+      },
+      {
+        "name": "setupWarningSuppressions",
+        "filepath": "src\\utils\\suppressWarnings.ts"
+      },
+      {
+        "name": "addWarningSuppressionPattern",
+        "filepath": "src\\utils\\suppressWarnings.ts"
+      },
+      {
+        "name": "setupLogSuppressions",
+        "filepath": "src\\utils\\suppressWarnings.ts"
+      },
+      {
+        "name": "disableCustomLoggingFunctions",
+        "filepath": "src\\utils\\suppressWarnings.ts"
+      },
+      {
+        "name": "truncateWithNullHandling",
+        "filepath": "src\\utils\\textUtils.ts"
+      },
+      {
+        "name": "truncate",
+        "filepath": "src\\utils\\textUtils.ts"
+      },
+      {
+        "name": "capitalize",
+        "filepath": "src\\utils\\textUtils.ts"
+      },
+      {
+        "name": "slugify",
+        "filepath": "src\\utils\\textUtils.ts"
+      },
+      {
+        "name": "ValidationPatterns",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "ValidationMessages",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "ValidationMessagesEN",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "ValidationResult",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "ValidationFunction",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "validResult",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "invalidResult",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "validateRequired",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "validatePattern",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "validateLength",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "validateEmail",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "validatePhone",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "validateAfm",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "validateUrl",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "validateMultiple",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "ValidationRule",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "ValidationStatus",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "FormValidationState",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "useFormValidation",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "setupCustomValidationMessages",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "setCustomValidationMessage",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "checkRequiredFields",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "validation",
+        "filepath": "src\\utils\\validationModule.ts"
+      },
+      {
+        "name": "ValidationResult",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validResult",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "invalidResult",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validateEmail",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validateUrl",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validateAfm",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validateVat",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validatePhone",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validateDate",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validateRange",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validatePositiveNumber",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validatePercentage",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validateAlphanumeric",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validateMultiple",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validateRequired",
+        "filepath": "src\\utils\\validationUtils.ts"
+      },
+      {
+        "name": "validateLength",
+        "filepath": "src\\utils\\validationUtils.ts"
+      }
+    ],
+    "5": []
+  }
+}

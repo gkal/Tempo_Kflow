@@ -60,7 +60,7 @@ const StatusSection = () => {
 
   // Styles for consistent alignment
   const assignedToStyle = {
-    width: 'calc(42% - 12px)',
+    width: 'calc(100% - 12px)',
     marginLeft: '0'
   };
   
@@ -94,29 +94,33 @@ const StatusSection = () => {
         </h2>
       </div>
       <div className="p-2 space-y-2">
-        {/* First line - Ανάθεση σε */}
-        <div className="flex items-center">
-          <div className="w-24 text-[#a8c5b5] text-sm pr-1 flex justify-start">
-            Ανάθεση σε
-          </div>
-          <div className="flex-1">
-            <div style={assignedToStyle}>
-              <GlobalDropdown
-                options={userOptions}
-                value={getUserNameById(assignedTo)}
-                onSelect={(value) => {
-                  const userId = getUserIdByName(value);
-                  setValue("assigned_to", userId);
-                }}
-                placeholder="Επιλέξτε χρήστη"
-                className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-sm truncate hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] transition-all duration-200 h-8"
-              />
+        {/* All dropdowns in a single grid for consistent widths */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Ανάθεση σε */}
+          <div className="flex items-center">
+            <div className="w-24 text-[#a8c5b5] text-sm pr-1 flex justify-start">
+              Ανάθεση σε
+            </div>
+            <div className="flex-1">
+              <div style={assignedToStyle}>
+                <GlobalDropdown
+                  options={userOptions}
+                  value={getUserNameById(assignedTo)}
+                  onSelect={(value) => {
+                    const userId = getUserIdByName(value);
+                    setValue("assigned_to", userId);
+                  }}
+                  placeholder="Επιλέξτε χρήστη"
+                  className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-sm truncate hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] transition-all duration-200 h-8"
+                />
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Second line - Κατάσταση and Αποτέλεσμα */}
-        <div className="grid grid-cols-2 gap-2">
+          
+          {/* Empty cell for alignment */}
+          <div className="flex items-center"></div>
+          
+          {/* Κατάσταση */}
           <div className="flex items-center">
             <div className="w-24 text-[#a8c5b5] text-sm pr-1 flex justify-start">
               Κατάσταση
@@ -134,8 +138,9 @@ const StatusSection = () => {
             </div>
           </div>
 
+          {/* Αποτέλεσμα */}
           <div className="flex items-center">
-            <div className="w-20 text-[#a8c5b5] text-sm pr-0 flex justify-start">
+            <div className="w-24 text-[#a8c5b5] text-sm pr-0 flex justify-start">
               Αποτέλεσμα
             </div>
             <div className="flex-1">

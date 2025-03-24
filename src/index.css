@@ -534,3 +534,142 @@ span[title] {
 .text-blue-400 {
   color: #60a5fa;
 }
+
+/* 
+ * Consolidated styles from src/styles/globals.css 
+ * These styles were previously in a separate file but have been consolidated here
+ * to reduce the number of file dependencies.
+ */
+
+/* Offer Dialog Styles */
+.offer-dialog-container {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.offer-dialog-content {
+  background-color: #2f3e46;
+  border: 1px solid #52796f;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  max-width: 64rem;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.offer-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #52796f;
+  background-color: #3a5258;
+}
+
+.offer-dialog-body {
+  padding: 1rem;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.offer-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid #52796f;
+  background-color: #3a5258;
+}
+
+/* Search highlighting */
+.search-highlight, .forced-highlight {
+  background-color: #52796f !important;
+  color: #ffffff !important;
+  border-radius: 2px !important;
+  display: inline !important;
+  padding: 0 2px !important;
+  margin: 0 !important;
+  line-height: inherit !important;
+  font-size: inherit !important;
+  font-family: inherit !important;
+  font-weight: bold !important;
+  text-decoration: none !important;
+  white-space: normal !important;
+  box-shadow: 0 0 0 1px #ffffff !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
+  pointer-events: none !important;
+}
+
+/* Debug class to add to the table cells that should have highlighting */
+.has-highlight-debug {
+  outline: 2px solid red;
+}
+
+/* Custom text selection colors */
+.offer-dialog-content *::selection {
+  background-color: #52796f !important;
+  color: #cad2c5 !important;
+}
+
+.offer-dialog-content *::-moz-selection {
+  background-color: #52796f !important;
+  color: #cad2c5 !important;
+}
+
+/* Target specific elements */
+.offer-dialog-content textarea::selection,
+.offer-dialog-content input::selection,
+.offer-dialog-content div::selection {
+  background-color: #52796f !important;
+  color: #cad2c5 !important;
+}
+
+.offer-dialog-content textarea::-moz-selection,
+.offer-dialog-content input::-moz-selection,
+.offer-dialog-content div::-moz-selection {
+  background-color: #52796f !important;
+  color: #cad2c5 !important;
+}
+
+/* Specifically target date/time input */
+.offer-dialog-content input[type="datetime-local"]::selection,
+.offer-dialog-content input[type="datetime-local"]::-moz-selection {
+  background-color: #52796f !important;
+  color: #cad2c5 !important;
+}
+
+/* Target all input types to be safe */
+.offer-dialog-content input[type]::selection,
+.offer-dialog-content input[type]::-moz-selection {
+  background-color: #52796f !important;
+  color: #cad2c5 !important;
+}
+
+/* Add custom scrollbar styles */
+.scrollbar-visible::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-track {
+  background: #2f3e46;
+  border-radius: 4px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background: #52796f;
+  border-radius: 4px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: #84a98c;
+}

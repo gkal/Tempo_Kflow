@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
-import { supabase } from "@/lib/supabase";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { supabase } from '@/lib/supabaseClient';
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { X, Star, Check, Plus, Edit } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
 import { PositionDialog } from "./PositionDialog";
 import { useFormRegistration } from '@/lib/FormContext';
 import { usePhoneFormat } from "@/hooks/usePhoneFormat";
+import { logDebug } from "../../utils/loggingUtils";
 
 interface ContactDialogProps {
   open: boolean;
@@ -278,7 +279,7 @@ export function ContactDialog({
     e.preventDefault();
     e.stopPropagation();
     if (formData.position && formData.position !== "add_new_position") {
-      console.log("Right-clicked position:", formData.position);
+      logDebug("Right-clicked position:", formData.position);
       setSelectedPosition(formData.position);
       setPositionDialogOpen(true);
     }

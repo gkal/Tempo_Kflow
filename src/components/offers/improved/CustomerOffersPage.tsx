@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronRight, ChevronDown, Edit, Trash2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/utils/formatUtils";
 import { SearchBar } from "@/components/ui/search-bar";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { ErrorDialog } from "@/components/ui/error-dialog";
@@ -24,7 +24,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { openNewOfferDialog, openEditOfferDialog } from '../../customers/OfferDialogManager';
-import { TruncatedText } from "@/components/ui/truncated-text";
+import { Badge } from "@/components/ui/badge";
+import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 
 // Customer interface
 interface Customer {
@@ -758,22 +759,24 @@ export default function CustomerOffersPage() {
                 <td key={`date-${offer.id}`} className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
                 <td key={`request-${offer.id}`} className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
                   {offer.requirements 
-                    ? <TruncatedText 
+                    ? <TruncateWithTooltip 
                         text={offer.requirements} 
                         maxLength={50} 
-                        tooltipMaxWidth={800}
-                        multiLine={offer.requirements.length > 100}
+                        maxWidth={800}
+                        multiLine={false}
                         maxLines={2}
-                      />
+                      /> 
                     : "-"}
                 </td>
                 <td key={`amount-${offer.id}`} className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
                   {offer.amount 
-                    ? <TruncatedText 
+                    ? <TruncateWithTooltip 
                         text={offer.amount} 
                         maxLength={50} 
-                        tooltipMaxWidth={800}
-                      />
+                        maxWidth={800}
+                        multiLine={false}
+                        maxLines={2}
+                      /> 
                     : "-"}
                 </td>
                 <td key={`status-${offer.id}`} className="px-3 py-2 text-xs w-[140px]">

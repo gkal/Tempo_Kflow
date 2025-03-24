@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { OfferDialogContext, OfferDialogContextType } from '../OffersDialog';
-import { useFormWatch } from "@/lib/form-helpers";
+import { useFormWatch } from "@/utils/formHelpers";
 
 const ResultSection = () => {
   const context = useContext<OfferDialogContextType | null>(OfferDialogContext);

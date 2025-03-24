@@ -6,30 +6,51 @@ import {
   createFirstAdmin,
   loginUser,
   getRememberedUser,
+  AuthError
 } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import type { User } from "@/types/auth";
+import type { Database } from "@/types/supabase";
+
+// Type for the login form data
+interface LoginFormData {
+  username: string;
+  password: string;
+  rememberMe: boolean;
+  fullname: string;
+  email: string;
+  phone: string;
+  department: string;
+  role: Database["public"]["Enums"]["user_role"];
+  status: "active" | "inactive";
+}
+
+// Initial form data values
+const initialFormData: LoginFormData = {
+  username: "",
+  password: "",
+  rememberMe: false,
+  fullname: "",
+  email: "",
+  phone: "",
+  department: "Administration",
+  role: "Admin",
+  status: "active",
+};
 
 export default function LoginForm() {
   const navigate = useNavigate();
-  const { checkAuth } = useAuth();
+  const { checkAuth, error: authError } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isFirstUser, setIsFirstUser] = useState(false);
-  const [formData, setFormData] = useState({
-    username: "",
-    password: "",
-    rememberMe: false,
-    fullname: "",
-    email: "",
-    phone: "",
-    department: "Administration",
-    role: "Admin" as const,
-    status: "active" as const,
-  });
+  const [formData, setFormData] = useState<LoginFormData>(initialFormData);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
+  // Load remembered user and check if first user on mount
   useEffect(() => {
     const remembered = getRememberedUser();
     if (remembered) {
@@ -46,14 +67,23 @@ export default function LoginForm() {
         const isFirst = await checkIfFirstUser();
         setIsFirstUser(isFirst);
       } catch (error) {
-        console.error("Error checking first user:", error);
+        const errorMessage = error instanceof AuthError 
+          ? error.message 
+          : "Error checking first user";
+        console.error(errorMessage, error);
+        setError(errorMessage);
       }
     };
+    
     checkFirst();
   }, []);
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  // Update error from auth context
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   const handleLogin = async (
     username: string,
@@ -71,8 +101,11 @@ export default function LoginForm() {
       if (userData) {
         navigate("/dashboard");
       }
-    } catch (error: any) {
-      setError(error.message || "Λάθος στοιχεία σύνδεσης");
+    } catch (error) {
+      const errorMessage = error instanceof AuthError
+        ? error.message
+        : (error instanceof Error ? error.message : "Λάθος στοιχεία σύνδεσης");
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -98,6 +131,7 @@ export default function LoginForm() {
       if (isFirstUser) {
         if (!formData.fullname || !formData.email || !formData.phone) {
           setError("Παρακαλώ συμπληρώστε όλα τα πεδία");
+          setIsLoading(false);
           return;
         }
         await createFirstAdmin(formData);
@@ -113,11 +147,25 @@ export default function LoginForm() {
           formData.rememberMe,
         );
       }
-    } catch (error: any) {
-      setError(error.message || "Λάθος στοιχεία σύνδεσης");
+    } catch (error) {
+      const errorMessage = error instanceof AuthError
+        ? error.message
+        : (error instanceof Error ? error.message : "Λάθος στοιχεία σύνδεσης");
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Field change handler with type safety
+  const handleFieldChange = <K extends keyof LoginFormData>(
+    field: K, 
+    value: LoginFormData[K]
+  ) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   return (
@@ -156,12 +204,11 @@ export default function LoginForm() {
               type="text"
               placeholder="Όνομα χρήστη"
               value={formData.username}
-              onChange={(e) =>
-                setFormData({ ...formData, username: e.target.value })
-              }
+              onChange={(e) => handleFieldChange("username", e.target.value)}
               className="login-input"
               required
               autoComplete="off"
+              aria-label="Username field"
             />
           </div>
           {isFirstUser && (
@@ -171,12 +218,11 @@ export default function LoginForm() {
                   type="text"
                   placeholder="Ονοματεπώνυμο"
                   value={formData.fullname}
-                  onChange={(e) =>
-                    setFormData({ ...formData, fullname: e.target.value })
-                  }
+                  onChange={(e) => handleFieldChange("fullname", e.target.value)}
                   className="login-input"
                   required
                   autoComplete="off"
+                  aria-label="Full name field"
                 />
               </div>
               <div className="space-y-2">
@@ -184,12 +230,11 @@ export default function LoginForm() {
                   type="email"
                   placeholder="Email"
                   value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
+                  onChange={(e) => handleFieldChange("email", e.target.value)}
                   className="login-input"
                   required
                   autoComplete="off"
+                  aria-label="Email field"
                 />
               </div>
               <div className="space-y-2">
@@ -197,11 +242,10 @@ export default function LoginForm() {
                   type="tel"
                   placeholder="Τηλέφωνο"
                   value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
+                  onChange={(e) => handleFieldChange("phone", e.target.value)}
                   className="login-input"
                   autoComplete="off"
+                  aria-label="Phone field"
                 />
               </div>
             </>
@@ -211,12 +255,11 @@ export default function LoginForm() {
               type="password"
               placeholder="Κωδικός"
               value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
+              onChange={(e) => handleFieldChange("password", e.target.value)}
               className="login-input"
               required
               autoComplete="new-password"
+              aria-label="Password field"
             />
           </div>
 
@@ -225,11 +268,12 @@ export default function LoginForm() {
               <Checkbox
                 id="rememberMe"
                 checked={formData.rememberMe}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, rememberMe: checked as boolean })
+                onCheckedChange={(checked) => 
+                  handleFieldChange("rememberMe", checked as boolean)
                 }
                 className="h-full w-full bg-[#354f52] border-0 rounded-none text-[#cad2c5] data-[state=checked]:bg-[#52796f]"
                 style={{ backgroundColor: '#354f52' }}
+                aria-label="Remember me checkbox"
               />
             </div>
             <label
@@ -243,10 +287,11 @@ export default function LoginForm() {
           {(error || success) && (
             <div
               className={`flex items-center space-x-2 ${success ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"} text-sm p-3 rounded-md`}
+              role={success ? "status" : "alert"}
             >
               {success ? (
                 <>
-                  <CheckCircle className="h-4 w-4" />
+                  <CheckCircle className="h-4 w-4" aria-hidden="true" />
                   <p>
                     Επιτυχής{" "}
                     {isFirstUser ? "δημιουργία λογαριασμού" : "σύνδεση"}!
@@ -254,7 +299,7 @@ export default function LoginForm() {
                 </>
               ) : (
                 <>
-                  <AlertCircle className="h-4 w-4" />
+                  <AlertCircle className="h-4 w-4" aria-hidden="true" />
                   <p>{error}</p>
                 </>
               )}
@@ -265,12 +310,12 @@ export default function LoginForm() {
             type="submit"
             className="w-full bg-[#52796f] hover:bg-[#84a98c] text-[#cad2c5] transition-all duration-300"
             disabled={isLoading}
+            aria-busy={isLoading}
           >
             {isLoading ? (
               <div className="flex items-center justify-center space-x-2">
-                <div className="h-2 w-2 bg-[#cad2c5] rounded-full" />
-                <div className="h-2 w-2 bg-[#cad2c5] rounded-full" />
-                <div className="h-2 w-2 bg-[#cad2c5] rounded-full" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                <span className="sr-only">Loading...</span>
               </div>
             ) : isFirstUser ? (
               "Δημιουργία Διαχειριστή"

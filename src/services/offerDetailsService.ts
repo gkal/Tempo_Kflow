@@ -1,61 +1,85 @@
-import { supabase } from "@/lib/supabase";
 import { OfferDetail, OfferDetailFormData } from "@/types/offer-details";
+import { 
+  fetchRecords, 
+  createRecord, 
+  updateRecord, 
+  softDeleteRecord, 
+  deleteRecord, 
+  fetchRecordById 
+} from "@/services/api/supabaseService";
+import { logError, logInfo, logDebug } from "@/utils";
 
-// Fetch all offer details for a specific offer
+/**
+ * Fetch all offer details for a specific offer
+ * 
+ * @param offerId - The ID of the offer to fetch details for
+ * @returns Promise with array of offer details
+ * @usedIn src/components/offers/OfferDetailsTab.tsx, src/components/offers/OfferEditForm.tsx
+ */
 export const fetchOfferDetails = async (offerId: string): Promise<OfferDetail[]> => {
   if (!offerId) {
     return [];
   }
   
   try {
-    const { data, error } = await supabase
-      .from("offer_details")
-      .select(`
+    const { data, error } = await fetchRecords<OfferDetail>("offer_details", {
+      select: `
         *,
         category:service_categories(*),
         subcategory:service_subcategories(*),
         unit:units(*)
-      `)
-      .eq("offer_id", offerId)
-      .order("date_created", { ascending: true });
+      `,
+      filters: { offer_id: offerId },
+      order: { column: "date_created", ascending: true }
+    });
 
     if (error) {
       throw error;
     }
 
-    return data || [];
+    // Handle both array and single item responses
+    if (Array.isArray(data)) {
+      return data;
+    } else if (data) {
+      return [data]; // Convert single item to array
+    }
+    return [];
   } catch (error) {
-    console.error("Exception in fetchOfferDetails:", error);
+    logError("Exception in fetchOfferDetails:", error, "OfferDetailsService");
     throw error;
   }
 };
 
-// Add a new offer detail
+/**
+ * Add a new offer detail
+ * 
+ * @param offerId - The ID of the offer to add a detail to
+ * @param detailData - The offer detail data
+ * @param userId - The ID of the user creating the detail
+ * @returns Promise with the created offer detail
+ * @usedIn src/components/offers/OfferDetailForm.tsx
+ */
 export const addOfferDetail = async (
   offerId: string,
   detailData: OfferDetailFormData,
   userId: string
 ): Promise<OfferDetail | null> => {
   if (!offerId) {
-    console.error("No offerId provided to addOfferDetail");
+    logError("No offerId provided to addOfferDetail", null, "OfferDetailsService");
     throw new Error("Offer ID is required");
   }
   
   try {
     // First check if the offer exists
-    const { data: offerExists, error: offerCheckError } = await supabase
-      .from("offers")
-      .select("id")
-      .eq("id", offerId)
-      .single();
+    const { data: offerExists, error: offerCheckError } = await fetchRecordById("offers", offerId);
       
     if (offerCheckError) {
-      console.error("Error checking if offer exists:", offerCheckError);
+      logError("Error checking if offer exists:", offerCheckError, "OfferDetailsService");
       throw new Error("Failed to verify offer existence");
     }
     
     if (!offerExists) {
-      console.error("Offer does not exist:", offerId);
+      logError("Offer does not exist:", offerId, "OfferDetailsService");
       throw new Error("Offer does not exist");
     }
     
@@ -72,146 +96,188 @@ export const addOfferDetail = async (
     };
     
     // Add the detail with a fixed quantity of 1
-    const { data, error } = await supabase
-      .from("offer_details")
-      .insert(detailToInsert)
-      .select(`
-        *,
-        category:service_categories(*),
-        subcategory:service_subcategories(*),
-        unit:units(*)
-      `)
-      .single();
+    const { data, error } = await createRecord<OfferDetail>("offer_details", detailToInsert);
 
     if (error) {
-      console.error("Error adding offer detail:", error);
+      logError("Error adding offer detail:", error, "OfferDetailsService");
       throw error;
+    }
+
+    // If we need the relations, fetch the complete record
+    if (data) {
+      const { data: detailWithRelations, error: fetchError } = await fetchRecordById<OfferDetail>(
+        "offer_details", 
+        data.id,
+        `
+          *,
+          category:service_categories(*),
+          subcategory:service_subcategories(*),
+          unit:units(*)
+        `
+      );
+      
+      if (fetchError) {
+        logError("Error fetching complete offer detail:", fetchError, "OfferDetailsService");
+      }
+      
+      return detailWithRelations || data;
     }
 
     return data;
   } catch (error) {
-    console.error("Error in addOfferDetail:", error);
+    logError("Error in addOfferDetail:", error, "OfferDetailsService");
     throw error;
   }
 };
 
-// Update an existing offer detail
+/**
+ * Update an existing offer detail
+ * 
+ * @param detailId - The ID of the detail to update
+ * @param detailData - The partial offer detail data
+ * @param userId - The ID of the user updating the detail
+ * @returns Promise with the updated offer detail
+ * @usedIn src/components/offers/OfferDetailForm.tsx
+ */
 export const updateOfferDetail = async (
   detailId: string,
   detailData: Partial<OfferDetailFormData>,
   userId: string
 ): Promise<OfferDetail> => {
-  const { data, error } = await supabase
-    .from("offer_details")
-    .update({
+  try {
+    const updateData = {
       ...detailData,
       date_updated: new Date().toISOString(),
       user_updated: userId,
-    })
-    .eq("id", detailId)
-    .select()
-    .single();
+    };
 
-  if (error) {
-    console.error("Error updating offer detail:", error);
+    const { data, error } = await updateRecord<OfferDetail>(
+      "offer_details",
+      detailId,
+      updateData
+    );
+
+    if (error) {
+      logError("Error updating offer detail:", error, "OfferDetailsService");
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    logError("Error in updateOfferDetail:", error, "OfferDetailsService");
     throw error;
   }
-
-  return data;
 };
 
-// Delete an offer detail
+/**
+ * Delete an offer detail
+ * 
+ * @param detailId - The ID of the detail to delete
+ * @returns Promise that resolves when the detail is deleted
+ * @usedIn src/components/offers/OfferDetailsTab.tsx
+ */
 export const deleteOfferDetail = async (detailId: string): Promise<void> => {
-  console.log("deleteOfferDetail called with ID:", detailId);
+  logDebug(`[OfferDetailsService] deleteOfferDetail called with ID: ${detailId}`);
   
   if (!detailId) {
-    console.error("No detailId provided to deleteOfferDetail");
+    logError("No detailId provided to deleteOfferDetail", null, "OfferDetailsService");
     throw new Error("Detail ID is required");
   }
   
   try {
-    console.log("Attempting soft delete for detail ID:", detailId);
+    logDebug(`[OfferDetailsService] Attempting soft delete for detail ID: ${detailId}`);
     // Try soft delete first
-    let error = null;
-    try {
-      const response = await supabase.rpc('soft_delete_record', {
-        table_name: 'offer_details',
-        record_id: detailId
-      });
-      error = response.error;
+    const { error: softDeleteError } = await softDeleteRecord("offer_details", detailId);
+    
+    if (softDeleteError) {
+      logDebug(`[OfferDetailsService] Soft delete failed, falling back to regular delete: ${JSON.stringify(softDeleteError)}`);
+      
+      // If soft delete is not available or fails, fallback to regular delete
+      const { error } = await deleteRecord("offer_details", detailId);
       
       if (error) {
-        console.log("Soft delete failed with error:", error);
-        throw error; // Throw to trigger the fallback
+        logError("Error deleting offer detail:", error, "OfferDetailsService");
+        throw error;
       }
-      console.log("Soft delete successful for detail ID:", detailId);
-    } catch (softDeleteError) {
-      // If soft delete is not available or fails, fallback to regular delete
-      console.log("Soft delete not available or failed, falling back to regular delete");
-      console.log("Executing Supabase delete query for detail ID:", detailId);
-      const response = await supabase
-        .from("offer_details")
-        .delete()
-        .eq("id", detailId);
-      
-      error = response.error;
-      console.log("Regular delete completed, result:", response);
     }
     
+    logInfo(`[OfferDetailsService] Successfully deleted offer detail with ID: ${detailId}`);
+  } catch (error) {
+    logError("Exception in deleteOfferDetail:", error, "OfferDetailsService");
+    throw error;
+  }
+};
+
+/**
+ * Fetch all service categories
+ * 
+ * @returns Promise with array of service categories
+ * @usedIn src/components/offers/OfferDetailForm.tsx, src/components/admin/ServiceTypeManager.tsx
+ */
+export const fetchServiceCategories = async () => {
+  try {
+    const { data, error } = await fetchRecords("service_categories", {
+      order: { column: "category_name", ascending: true }
+    });
+
     if (error) {
-      console.error("Error deleting offer detail:", error);
+      logError("Error fetching service categories:", error, "OfferDetailsService");
       throw error;
     }
-    
-    console.log("Successfully deleted offer detail with ID:", detailId);
+
+    return data || [];
   } catch (error) {
-    console.error("Exception in deleteOfferDetail:", error);
+    logError("Exception in fetchServiceCategories:", error, "OfferDetailsService");
     throw error;
   }
 };
 
-// Fetch all service categories
-export const fetchServiceCategories = async () => {
-  const { data, error } = await supabase
-    .from("service_categories")
-    .select("*")
-    .order("category_name", { ascending: true });
-
-  if (error) {
-    console.error("Error fetching service categories:", error);
-    throw error;
-  }
-
-  return data || [];
-};
-
-// Fetch subcategories for a specific category
+/**
+ * Fetch subcategories for a specific category
+ * 
+ * @param categoryId - The ID of the category to fetch subcategories for
+ * @returns Promise with array of subcategories
+ * @usedIn src/components/offers/OfferDetailForm.tsx, src/components/admin/ServiceTypeManager.tsx
+ */
 export const fetchSubcategories = async (categoryId: string) => {
-  const { data, error } = await supabase
-    .from("service_subcategories")
-    .select("*")
-    .eq("category_id", categoryId)
-    .order("subcategory_name", { ascending: true });
+  try {
+    const { data, error } = await fetchRecords("service_subcategories", {
+      filters: { category_id: categoryId },
+      order: { column: "subcategory_name", ascending: true }
+    });
 
-  if (error) {
-    console.error("Error fetching subcategories:", error);
+    if (error) {
+      logError("Error fetching subcategories:", error, "OfferDetailsService");
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    logError("Exception in fetchSubcategories:", error, "OfferDetailsService");
     throw error;
   }
-
-  return data || [];
 };
 
-// Fetch all measurement units
+/**
+ * Fetch all measurement units
+ * 
+ * @returns Promise with array of measurement units
+ * @usedIn src/components/offers/OfferDetailForm.tsx
+ */
 export const fetchMeasurementUnits = async () => {
-  const { data, error } = await supabase
-    .from("units")
-    .select("*")
-    .order("name", { ascending: true });
+  try {
+    const { data, error } = await fetchRecords("units", {
+      order: { column: "name", ascending: true }
+    });
 
-  if (error) {
-    console.error("Error fetching measurement units:", error);
+    if (error) {
+      logError("Error fetching measurement units:", error, "OfferDetailsService");
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    logError("Exception in fetchMeasurementUnits:", error, "OfferDetailsService");
     throw error;
   }
-
-  return data || [];
 }; 

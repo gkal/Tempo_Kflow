@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Plus, Eye, Pencil, Trash2, ArrowLeft, Edit, Filter, EyeOff, ChevronRight, ChevronDown, Check } from "lucide-react";
 import { CloseButton } from "@/components/ui/close-button";
 import { DataTableBase } from "@/components/ui/data-table-base";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/utils/formatUtils";
 import CustomerForm from "./CustomerForm";
 import {
   AlertDialog,
@@ -38,7 +38,7 @@ import { CustomerContextMenu } from "./CustomerContextMenu";
 import React from "react";
 import { CustomerDialog } from "./CustomerDialog";
 import { openNewOfferDialog, openEditOfferDialog } from './OfferDialogManager';
-import { TruncatedText } from "@/components/ui/truncated-text";
+import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +48,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 
 // Customer type filter component
 interface CustomerTypeFilterProps {
@@ -298,7 +300,7 @@ const CustomerRow = React.memo(({
         <div className="pl-[70px]">
           {isLoading ? (
             <div className="flex justify-center items-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
+              <LoadingSpinner fullScreen={false} />
             </div>
           ) : offers.length === 0 ? (
             <div className="py-4 text-[#84a98c] flex flex-col items-center justify-center gap-3">
@@ -308,18 +310,8 @@ const CustomerRow = React.memo(({
             </div>
           ) : (
             <div>
-              <div className="flex justify-between items-center mb-2 pr-4">
-                <h3 className="text-sm font-medium text-[#84a98c]">Προσφορές</h3>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCreateOffer(row.id, "Email");
-                  }}
-                  className="px-2 py-1 bg-[#52796f] hover:bg-[#3a5a44] text-white rounded-md flex items-center gap-1 text-xs transition-colors"
-                >
-                  <Plus className="h-3 w-3" />
-                  Νέα Προσφορά
-                </button>
+              <div className="mb-2 pr-4">
+                {/* Removed the title "Προσφορές" and the "Νέα Προσφορά" button */}
               </div>
               <table className="w-full border-collapse">
                 <thead>
@@ -345,22 +337,24 @@ const CustomerRow = React.memo(({
                       <td className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
                       <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
                         {offer.requirements 
-                          ? <TruncatedText 
+                          ? <TruncateWithTooltip 
                               text={offer.requirements} 
                               maxLength={50} 
-                              tooltipMaxWidth={800}
-                              multiLine={offer.requirements.length > 100}
+                              maxWidth={800}
+                              multiLine={false}
                               maxLines={2}
-                            />
+                            /> 
                           : "-"}
                       </td>
                       <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
                         {offer.amount 
-                          ? <TruncatedText 
+                          ? <TruncateWithTooltip 
                               text={offer.amount} 
                               maxLength={50} 
-                              tooltipMaxWidth={800}
-                            />
+                              maxWidth={800}
+                              multiLine={false}
+                              maxLines={2}
+                            /> 
                           : "-"}
                       </td>
                       <td className="px-3 py-2 text-xs w-[140px]">
@@ -808,7 +802,10 @@ export default function CustomersPage() {
         return;
       }
 
-      setLoadingOffers(prev => ({ ...prev, [customerId]: true }));
+      // Set loading state with a small delay to prevent flickering for fast loads
+      const loadingTimerId = setTimeout(() => {
+        setLoadingOffers(prev => ({ ...prev, [customerId]: true }));
+      }, 150); // Only show loading indicator if it takes more than 150ms
       
       const { data, error } = await supabase
         .from('offers')
@@ -827,6 +824,9 @@ export default function CustomersPage() {
         .is("deleted_at", null)
         .or('result.is.null,result.eq.pending,result.eq.,result.eq.none')
         .order("created_at", { ascending: false });
+      
+      // Clear the timeout to prevent the loading indicator if the request was fast
+      clearTimeout(loadingTimerId);
       
       if (error) throw error;
       
@@ -871,7 +871,7 @@ export default function CustomersPage() {
   
   // Update fetchCustomers to be more efficient and prevent double rendering
   const fetchCustomers = useCallback(async () => {
-    // Set loading state
+    // Set loading state immediately
     setLoading(true);
 
     // Set throttle timeout to prevent rapid successive calls
@@ -960,6 +960,11 @@ export default function CustomersPage() {
       
       // Set a minimal query time for UI feedback
       setQueryTime("0.00");
+      
+      // Use a small delay before removing loading state to ensure consistent UX
+      setTimeout(() => {
+        setLoading(false);
+      }, 500);
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast({
@@ -967,9 +972,10 @@ export default function CustomersPage() {
         description: "Δεν ήταν δυνατή η φόρτωση των πελατών.",
         variant: "destructive",
       });
-    } finally {
-      // Always set loading to false
-      setLoading(false);
+      // Still ensure loading state is removed after a delay
+      setTimeout(() => {
+        setLoading(false);
+      }, 500);
     }
   }, [supabase, selectedCustomerTypes, statusFilter, availableCustomerTypes.length, searchTerm, searchColumn]);
 
@@ -984,11 +990,7 @@ export default function CustomersPage() {
     
     const isCurrentlyExpanded = expandedCustomers[customerId] || false;
     
-    // If we're expanding and don't have offers yet, fetch them
-    if (!isCurrentlyExpanded && !customerOffers[customerId]) {
-      await fetchCustomerOffers(customerId);
-    }
-    
+    // Immediately update UI state for better responsiveness
     setExpandedCustomers(prev => ({
       ...prev,
       [customerId]: !isCurrentlyExpanded
@@ -1009,6 +1011,11 @@ export default function CustomersPage() {
           : customer
       )
     );
+    
+    // Then fetch data if needed (asynchrously, after UI is updated)
+    if (!isCurrentlyExpanded && !customerOffers[customerId]) {
+      fetchCustomerOffers(customerId);
+    }
   };
 
   // Format status for display
@@ -1931,8 +1938,32 @@ export default function CustomersPage() {
       highlightedRowId={lastUpdatedCustomerId}
       renderRow={renderCustomRow}
       showOfferMessage={true}
+      emptyStateMessage="Δεν βρέθηκαν πελάτες που να αντιστοιχούν στα κριτήρια αναζήτησης"
+      loadingStateMessage="Φόρτωση πελατών..."
     />
   ), [columns, filteredCustomers, loading, statusFilter, searchTerm, searchColumn, navigate, lastUpdatedCustomerId, renderCustomRow]);
+
+  // Move the useEffect from the JSX to the proper place in the component body
+
+  // Add prefetching for customers with offers
+  useEffect(() => {
+    if (customers.length > 0) {
+      // Find the 5 first customers with offers to prefetch data
+      const customersWithOffers = customers
+        .filter(customer => (customer.offersCount || 0) > 0)
+        .slice(0, 5);
+      
+      // Stagger the prefetches to avoid overwhelming the network
+      customersWithOffers.forEach((customer, index) => {
+        setTimeout(() => {
+          // Only fetch if not already loaded
+          if (!customerOffers[customer.id]) {
+            fetchCustomerOffers(customer.id);
+          }
+        }, index * 300); // Stagger each request by 300ms
+      });
+    }
+  }, [customers, customerOffers, fetchCustomerOffers]);
 
   // If showing the form, render it instead of the customer list
   return (

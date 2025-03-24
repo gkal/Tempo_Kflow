@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Check, Clock, AlertCircle, User, Edit, Trash2 } from 'lucide-react';
 import { TaskDialog } from './TaskDialog';
+import { formatDateTime } from "@/utils/formatUtils";
 
 interface Task {
   id: string;
@@ -59,12 +60,6 @@ export function TaskItem({ task, onStatusChange, onDelete }: TaskItemProps) {
     setIsUpdating(false);
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'No due date';
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
-
   const getStatusIcon = () => {
     switch (task.status) {
       case 'completed':
@@ -113,7 +108,7 @@ export function TaskItem({ task, onStatusChange, onDelete }: TaskItemProps) {
               </div>
               
               <div className="text-xs text-[#84a98c]">
-                Due: {formatDate(task.due_date)}
+                Due: {task.due_date ? formatDateTime(task.due_date) : 'No due date'}
                 {isOverdue && <span className="ml-2 text-red-400">Overdue</span>}
               </div>
             </div>

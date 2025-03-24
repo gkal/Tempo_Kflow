@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { formatDateTime } from "@/lib/utils";
+import { supabase } from '@/lib/supabaseClient';
+import { formatDateTime } from "@/utils/formatUtils";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight, User, Clock, FileText, DollarSign, CheckCircle, AlertCircle } from "lucide-react";
 

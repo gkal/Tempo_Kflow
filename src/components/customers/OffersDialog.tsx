@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, createContext } from "react";
 import { useForm, UseFormRegister, UseFormWatch, UseFormSetValue, UseFormReset, FormState, UseFormHandleSubmit, FieldValues, Control } from "react-hook-form";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/AuthContext";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime } from "@/utils/formatUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +30,8 @@ import { useFormRegistration } from '@/lib/FormContext';
 import { createTask } from '@/components/tasks/createTask';
 import { OffersTableRef } from './OffersTable';
 import { useRealtimeSubscription } from '@/lib/useRealtimeSubscription';
+import { validate as uuidValidate } from 'uuid';
+import { validateRequired, validateAlphanumeric } from '../../utils/validationUtils';
 
 // Import our new components
 import DialogHeaderSection from "./offer-dialog/DialogHeaderSection";
@@ -38,12 +40,12 @@ import RequirementsSection from "./offer-dialog/RequirementsSection";
 import StatusSection from "./offer-dialog/StatusSection";
 import CommentsSection from "./offer-dialog/CommentsSection";
 import DialogFooterSection from "./offer-dialog/DialogFooterSection";
-import TabsContainer from "./offer-dialog/TabsContainer";
 import DetailsTab from "./offer-dialog/DetailsTab";
 import SourceSection from "./offer-dialog/SourceSection";
 import AssignmentSection from "./offer-dialog/AssignmentSection";
 import ResultSection from "./offer-dialog/ResultSection";
 import CertificateSection from "./offer-dialog/CertificateSection";
+import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 
 // Export the props interface so it can be imported by other files
 export interface OffersDialogProps {
@@ -103,6 +105,7 @@ export interface OfferDialogContextType {
   registerSaveDetailsToDatabase?: (saveFn: ((realOfferId: string) => Promise<boolean>) | null) => void;
   registerTabReset?: (tabId: string, resetFn: () => void) => void;
   unregisterTabReset?: (tabId: string) => void;
+  registerDeletedDetails?: (detailIds: string | string[] | number | number[]) => void;
 }
 
 export const OfferDialogContext = createContext<OfferDialogContextType | null>(null);
@@ -163,6 +166,35 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteOldOffer, setDeleteOldOffer] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Track deleted detail IDs for batch deletion
+  const [deletedDetailIds, setDeletedDetailIds] = useState<(string | number)[]>([]);
+  
+  // Add a ref to store deleted detail IDs - using the correct type for both string and number IDs
+  const deletedDetailsRef = React.useRef<(string | number)[]>([]);
+  
+  // Function to register details for deletion
+  const registerDeletedDetails = useCallback((detailId: string | string[] | number | number[]) => {
+    // Update the ref for immediate access
+    if (Array.isArray(detailId)) {
+      // Convert all IDs to strings for consistency
+      const stringIds = detailId.map(id => id.toString());
+      deletedDetailsRef.current = [...deletedDetailsRef.current, ...stringIds];
+    } else {
+      // Convert ID to string for consistency
+      deletedDetailsRef.current = [...deletedDetailsRef.current, detailId.toString()];
+    }
+    
+    // Also update the state for component re-renders and persistence
+    if (Array.isArray(detailId)) {
+      // Convert all IDs to strings for consistency
+      const stringIds = detailId.map(id => id.toString());
+      setDeletedDetailIds(prev => [...prev, ...stringIds]);
+    } else {
+      // Convert ID to string for consistency
+      setDeletedDetailIds(prev => [...prev, detailId.toString()]);
+    }
+  }, []);
   
   // Register this form when it's open
   useFormRegistration(
@@ -377,8 +409,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     const fetchCustomerData = async () => {
       try {
         // Validate customerId format (should be a UUID)
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(customerId)) {
+        if (!uuidValidate(customerId)) {
           return;
         }
         
@@ -570,7 +601,8 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     const formData = watch();
     
     // Check if source is selected
-    if (!formData.source) {
+    const sourceResult = validateRequired(formData.source);
+    if (!sourceResult.isValid) {
       setError("Παρακαλώ επιλέξτε πηγή.");
       return false;
     }
@@ -605,7 +637,6 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       } else {
         // If no offer ID exists or it's a temporary ID, return null
         // This prevents any database interactions until the form is explicitly saved
-        console.log("No real offer ID exists, returning null to prevent database interaction");
         return null;
       }
     } catch (error) {
@@ -648,7 +679,8 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     getUserIdByName,
     registerSaveDetailsToDatabase,
     registerTabReset,
-    unregisterTabReset
+    unregisterTabReset,
+    registerDeletedDetails
   }), [
     offerId, 
     customerId, 
@@ -674,7 +706,8 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     getUserIdByName,
     registerSaveDetailsToDatabase,
     registerTabReset,
-    unregisterTabReset
+    unregisterTabReset,
+    registerDeletedDetails
   ]);
 
   // Find where contactOptions are created or where the dropdown is rendered
@@ -720,211 +753,140 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
     [offerId, isSubmitting]
   );
 
-  // Handle form submission
+  // Enhanced onSubmit function with better handling of details saving
   const onSubmit = async (data) => {
     try {
-      setIsSubmitting(true);
+      // Show the loading state
+      setLoading(true);
       
-      // Validate required fields
-      if (!isFormValid()) {
+      // Clear any previous errors
+      setError(null);
+      
+      // STEP 1: Create/Update the offer
+      let savedOfferId = null;
+      try {
+        savedOfferId = await saveOfferAndGetId();
+        if (!savedOfferId) {
+          throw new Error("Failed to save offer - no ID returned");
+        }
+      } catch (error) {
+        console.error("Error saving offer:", error);
+        setError("Σφάλμα κατά την αποθήκευση προσφοράς.");
+        setLoading(false);
         return;
       }
       
-      // Convert 'none' result to null
-      const resultValue = data.result === "none" ? null : data.result;
-      
-      // Validate assigned_to is a valid UUID
-      if (data.assigned_to && typeof data.assigned_to === 'string') {
-        // UUID validation regex
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(data.assigned_to)) {
-          console.error("Invalid assigned_to value:", data.assigned_to);
-          setError("Μη έγκυρη τιμή για το πεδίο 'Ανάθεση σε'.");
-          return;
+      // STEP 2: Now that we have a valid offer ID, save the details
+      if (savedOfferId && saveDetailsToDatabaseRef.current) {
+        try {
+          await saveDetailsToDatabaseRef.current(savedOfferId);
+        } catch (detailsError) {
+          console.error("Error saving details:", detailsError);
+          // We don't fail the whole save if details fail
         }
       }
       
-      // Process date values, ensuring both fields are set
-      const createdAt = data.created_at || new Date().toISOString();
-      
-      const offerData = {
-        customer_id: customerId,
-        source: data.source,
-        amount: data.amount,
-        requirements: data.requirements,
-        customer_comments: data.customer_comments,
-        our_comments: data.our_comments,
-        offer_result: data.offer_result,
-        result: resultValue, // Use the converted value
-        assigned_to: data.assigned_to,
-        contact_id: selectedContactId,
-        hma: data.hma,
-        certificate: data.certificate,
-        address: data.address,
-        tk: data.postal_code,
-        town: data.town,
-        // Only include created_at field which exists in the database
-        created_at: createdAt
-      };
-      
-      // Variables to store data during the save process
-      let savedOfferId = null;
-      let assignedUserChanged = false;
-      let currentOfferData = null;
-      
-      // STEP 1: Save or update the offer in the database
-      try {
-        if (isEditing && offerId && !offerId.startsWith('temp-')) {
-          // Update existing offer
-          
-          // First, get the current offer data to check for changes
-          const { data: currentOffer, error: fetchError } = await supabase
-            .from("offers")
-            .select("*, users!offers_assigned_to_fkey(fullname), customers(company_name)")
-            .eq("id", offerId)
-            .single();
-            
-          if (fetchError) throw fetchError;
-          
-          // Store current offer data for later use
-          currentOfferData = currentOffer;
-          
-          // Check if assigned user has changed
-          assignedUserChanged = currentOffer && currentOffer.assigned_to !== offerData.assigned_to;
-          
-          // Update the offer
-          const { data: updatedOffer, error: updateError } = await supabase
-            .from("offers")
-            .update(offerData)
-            .eq("id", offerId)
-            .select()
-            .single();
-            
-          if (updateError) {
-            console.error("Error updating offer:", updateError);
-            throw updateError;
-          }
-          
-          savedOfferId = updatedOffer.id;
-          
-          // Use the tableRef for optimistic updates if available
-          if (tableRef?.current && updatedOffer) {
-            tableRef.current.updateOfferInList(updatedOffer);
-          }
-        } else {
-          // Create new offer
-          const { data: newOffer, error } = await supabase
-            .from("offers")
-            .insert({
-              ...offerData,
-              created_by: user?.id,
-            })
-            .select()
-            .single();
-
-          if (error) {
-            console.error("Error creating offer:", error);
-            throw error;
-          }
-
-          // Update the offer ID with the real one from the database
-          savedOfferId = newOffer.id;
-          setOfferId(newOffer.id);
-
-          // Use the tableRef for optimistic updates if available
-          if (tableRef?.current && newOffer) {
-            tableRef.current.addOfferToList(newOffer);
-          }
-        }
-        
-        // STEP 2: Now that we have a valid offer ID, save the details
-        if (savedOfferId && saveDetailsToDatabaseRef.current) {
-          try {
-            const detailsSaveResult = await saveDetailsToDatabaseRef.current(savedOfferId);
-            
-            if (!detailsSaveResult) {
-              // We don't throw an error here because we want to continue even if details save fails
-              // The offer has been saved successfully
-            }
-          } catch (error) {
-            console.error("Error calling saveDetailsToDatabase:", error);
-          }
-        } else {
-          // We don't need to do anything here - no details to save
-        }
-        
-        // STEP 3: Show success message and close dialog
-        setSuccess(true);
-        
-        // Call onSave callback
-        if (onSave) {
-          onSave();
-        }
-        
-        // Close dialog after successful save - reduced delay
-        setTimeout(() => {
-          onOpenChange(false);
-        }, 500);
-        
-        // Create tasks and notifications asynchronously after closing the dialog
-        setTimeout(() => {
-          try {
-            // If assigned user has changed, create a task for the new assignee
-            if (assignedUserChanged && offerData.assigned_to && currentOfferData) {
-              const companyName = currentOfferData.customers?.company_name || "Unknown Company";
-              const newAssigneeName = userMap[offerData.assigned_to] || 'Unknown User';
-              const oldAssigneeName = userMap[currentOfferData.assigned_to] || 'Unknown User';
+      // STEP 3: Process any deleted details
+      if (savedOfferId && deletedDetailIds.length > 0) {
+        try {
+          // Process each ID individually to avoid batch issues
+          for (const id of deletedDetailIds) {
+            try {
+              // Ensure ID is a string for consistency
+              const stringId = id.toString();
               
-              // Create a task for the new assignee using the createTask helper function
-              createTask({
-                title: `Offer assigned for ${companyName}`,
-                description: `You have been assigned an offer for ${companyName}. Please review and take appropriate action.`,
-                assignedTo: offerData.assigned_to,
-                createdBy: user.id,
-                offerId: savedOfferId,
-                dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Due in 7 days
-              }).catch(taskError => {
-                console.error("Error creating task for new assignee:", taskError);
-              });
+              // Try to delete the detail. Some might fail if they are temporary IDs 
+              // that weren't actually saved to the database, and that's OK.
+              const { error: deleteError } = await supabase
+                .from("offer_details")
+                .delete()
+                .eq("id", stringId);
+                
+              if (deleteError) {
+                console.error(`Error deleting offer detail ID ${stringId}:`, deleteError);
+              }
+            } catch (err) {
+              console.error(`Error processing deletion for ID ${id}:`, err);
             }
-            
-            // Create a task for the updated offer if status changed to "ready"
-            if (data.offer_result === "ready") {
-              createTask({
-                title: `Follow up on completed offer for ${customerName}`,
-                description: `The offer has been marked as ready. Follow up with the customer.`,
-                assignedTo: data.assigned_to,
-                createdBy: user?.id,
-                offerId: savedOfferId
-              }).catch(taskError => {
-                console.error("Error creating task for offer:", taskError);
-              });
-            }
-            
-            // For new offers, create a review task
-            if (!isEditing || (offerId && offerId.startsWith('temp-'))) {
-              createTask({
-                title: `Review offer for ${customerName}`,
-                description: `Review the offer details and follow up with the customer.`,
-                assignedTo: data.assigned_to,
-                createdBy: user?.id,
-                offerId: savedOfferId
-              }).catch(taskError => {
-                console.error("Error creating task for new offer:", taskError);
-              });
-            }
-          } catch (error) {
-            console.error("Error creating tasks:", error);
           }
-        }, 100);
-      } catch (error) {
-        console.error("Error saving offer or details:", error);
-        setError("Σφάλμα κατά την αποθήκευση της προσφοράς. Παρακαλώ δοκιμάστε ξανά.");
+          
+          // Clear the deleted details after processing
+          setDeletedDetailIds([]);
+          deletedDetailsRef.current = [];
+        } catch (error) {
+          console.error("Error processing deleted details:", error);
+        }
       }
+      
+      // STEP 4: Show success message and close dialog
+      setSuccess(true);
+      
+      // Call onSave callback
+      if (onSave) {
+        onSave();
+      }
+      
+      // Close dialog after successful save - reduced delay
+      setTimeout(() => {
+        onOpenChange(false);
+      }, 500);
+      
+      // Create tasks and notifications asynchronously after closing the dialog
+      setTimeout(() => {
+        try {
+          // If assigned user has changed, create a task for the new assignee
+          if (data.assigned_to && userMap[data.assigned_to]) {
+            const companyName = userMap[data.assigned_to] || "Unknown Company";
+            const newAssigneeName = userMap[data.assigned_to] || 'Unknown User';
+            const oldAssigneeName = userMap[data.assigned_to] || 'Unknown User';
+            
+            // Create a task for the new assignee using the createTask helper function
+            createTask({
+              title: `Offer assigned for ${companyName}`,
+              description: `You have been assigned an offer for ${companyName}. Please review and take appropriate action.`,
+              assignedTo: data.assigned_to,
+              createdBy: user.id,
+              offerId: savedOfferId,
+              dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Due in 7 days
+            }).catch(taskError => {
+              console.error("Error creating task for new assignee:", taskError);
+            });
+          }
+          
+          // Create a task for the updated offer if status changed to "ready"
+          if (data.offer_result === "ready") {
+            createTask({
+              title: `Follow up on completed offer for ${customerName}`,
+              description: `The offer has been marked as ready. Follow up with the customer.`,
+              assignedTo: data.assigned_to,
+              createdBy: user.id,
+              offerId: savedOfferId
+            }).catch(taskError => {
+              console.error("Error creating task for offer:", taskError);
+            });
+          }
+          
+          // For new offers, create a review task
+          if (!isEditing || (offerId && offerId.startsWith('temp-'))) {
+            createTask({
+              title: `Review offer for ${customerName}`,
+              description: `Review the offer details and follow up with the customer.`,
+              assignedTo: data.assigned_to,
+              createdBy: user.id,
+              offerId: savedOfferId
+            }).catch(taskError => {
+              console.error("Error creating task for new offer:", taskError);
+            });
+          }
+        } catch (error) {
+          console.error("Error creating tasks:", error);
+        }
+      }, 100);
     } catch (error) {
       console.error("Error in form submission:", error);
       setError("Σφάλμα κατά την υποβολή της φόρμας. Παρακαλώ δοκιμάστε ξανά.");
     } finally {
+      setLoading(false);
       setIsSubmitting(false);
     }
   };
@@ -982,91 +944,159 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       }}>
         <DialogContent
           className="max-w-4xl bg-[#2f3e46] border-[#52796f] text-[#cad2c5] p-3"
-          style={{ height: 'auto', maxHeight: '90vh', overflow: 'hidden' }}
+          style={{ 
+            height: '85vh', 
+            maxHeight: '950px', 
+            minHeight: '750px',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'visible' 
+          }}
           aria-labelledby="offer-dialog-title"
           aria-describedby="offer-dialog-description"
         >
           <style>
             {`
-              textarea {
-                min-height: 2.5rem !important;
-                resize: none !important;
-              }
-              
-              /* Remove background and border from dialog header */
-              .dialog-header-section,
-              .p-5.border-b.border-\\[\\#52796f\\].bg-\\[\\#3a5258\\] {
-                background: transparent !important;
-                border-bottom: none !important;
-              }
-              
-              /* Custom text selection colors with !important to override */
-              .max-w-4xl *::selection {
-                background-color: #52796f !important;
-                color: #cad2c5 !important;
-              }
-              
-              .max-w-4xl *::-moz-selection {
-                background-color: #52796f !important;
-                color: #cad2c5 !important;
-              }
-              
-              /* Target specific elements */
-              .max-w-4xl textarea::selection,
-              .max-w-4xl input::selection,
-              .max-w-4xl div::selection {
-                background-color: #52796f !important;
-                color: #cad2c5 !important;
-              }
-              
-              .max-w-4xl textarea::-moz-selection,
-              .max-w-4xl input::-moz-selection,
-              .max-w-4xl div::-moz-selection {
-                background-color: #52796f !important;
-                color: #cad2c5 !important;
-              }
-              
-              /* Specifically target date/time input */
-              input[type="datetime-local"]::selection,
-              input[type="datetime-local"]::-moz-selection {
-                background-color: #52796f !important;
-                color: #cad2c5 !important;
-              }
-              
-              /* Target all input types to be safe */
-              input[type]::selection,
-              input[type]::-moz-selection {
-                background-color: #52796f !important;
-                color: #cad2c5 !important;
-              }
-              
-              /* Override datetime-local display format */
-              input[type="datetime-local"] {
-                position: relative;
-              }
-              
-              input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-                background: transparent;
-                bottom: 0;
-                color: transparent;
-                cursor: pointer;
-                height: auto;
-                left: 0;
-                position: absolute;
-                right: 0;
-                top: 0;
-                width: auto;
-                z-index: 1;
-              }
-              
-              input[type="datetime-local"]::before {
-                color: #cad2c5;
-                content: attr(data-date);
-              }
-              
-              input[type="datetime-local"]:focus::before {
-                display: none;
-              }
+            /* DialogContent wrapper for consistent display and scrolling */
+            .dialog-content {
+              display: flex;
+              flex-direction: column;
+              height: 100%;
+              width: 100%;
+              position: relative;
+              z-index: 1;
+            }
+            
+            /* Make form fill available space */
+            .dialog-content form {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              overflow: hidden;
+              border-bottom: none;
+              position: relative;
+              z-index: 2;
+            }
+
+            /* Additional style to ensure form inputs are interactive */
+            .dialog-content form input,
+            .dialog-content form textarea,
+            .dialog-content form select,
+            .dialog-content form button {
+              position: relative;
+              z-index: 10;
+              pointer-events: auto;
+            }
+            
+            /* Tab specific styling */
+            .app-tabs-container {
+              height: 100%;
+              display: flex;
+              flex-direction: column;
+              position: relative;
+              z-index: 3;
+            }
+            
+            /* Ensure tab triggers are properly positioned */
+            [role="tablist"] {
+              position: sticky !important;
+              top: 0;
+              z-index: 50;
+              background-color: #2f3e46;
+            }
+            
+            /* Make sure tab content fills the available space */
+            [data-radix-tabs-content] {
+              height: 100%;
+              padding-bottom: 70px; /* Add space for footer */
+              background-color: #2a3b42; /* Darker background color for tab content */
+              position: relative; /* Add position relative */
+              z-index: 4; /* Lower z-index than tab triggers but higher than other elements */
+            }
+
+            /* Section styling */
+            [data-radix-tabs-content] > div > div {
+              margin-bottom: 1rem;
+              border: 1px solid #52796f;
+              background-color: #2a3b42; /* Add darker background to sections */
+              padding: 1rem;
+              border-radius: 0.375rem;
+              position: relative; /* Add position relative */
+              z-index: 5; /* Make sure sections appear above the tab content background */
+            }
+            
+            /* Ensure footer buttons are always visible and fixed at bottom */
+            .dialog-footer {
+              position: fixed;
+              bottom: 10px;
+              right: 24px;
+              z-index: 60; /* Higher than tab triggers */
+              padding: 10px 0;
+              background-color: transparent;
+              border: none;
+              border-radius: 0;
+              min-height: 60px;
+              display: flex;
+              align-items: center;
+              justify-content: flex-end;
+              box-shadow: none;
+            }
+            
+            /* Delete button styling */
+            .delete-btn {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 24px;
+              height: 24px;
+              border-radius: 4px;
+              color: #84a98c;
+              background-color: transparent;
+              border: none;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            }
+            
+            .delete-btn:hover {
+              background-color: rgba(53, 79, 82, 0.7);
+            }
+            
+            .delete-btn:focus {
+              outline: none;
+            }
+            
+            /* Ensure cursor is visible on hover */
+            .delete-btn:hover svg {
+              color: #cad2c5;
+            }
+            
+            /* Add visual feedback on active state */
+            .delete-btn:active {
+              transform: scale(0.95);
+            }
+            
+            textarea {
+              min-height: 4rem !important;
+              resize: none !important;
+            }
+            
+            /* Custom text selection colors with !important to override */
+            .max-w-4xl *::selection {
+              background-color: #52796f !important;
+              color: #cad2c5 !important;
+            }
+            
+            .max-w-4xl *::-moz-selection {
+              background-color: #52796f !important;
+              color: #cad2c5 !important;
+            }
+
+            /* Style for rows being deleted */
+            .deleting-row {
+              background-color: rgba(255, 0, 0, 0.05) !important;
+              transition: all 0.3s ease;
+              pointer-events: none;
+            }
             `}
           </style>
           
@@ -1089,131 +1119,142 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
               getSourceLabel={getSourceLabel}
               getSourceValue={getSourceValue}
             />
-
-            <form onSubmit={handleSubmit(onSubmit)} className="p-2 flex flex-col" style={{ height: 'auto', minHeight: 'auto', display: 'flex', flexDirection: 'column' }}>
-              <TabsContainer>
-                {/* Tab 1: Basic Information */}
-                <div className="space-y-3">
-                  <BasicInfoSection />
-                  <RequirementsSection />
-                  <StatusSection />
-                  <CommentsSection />
-                </div>
+           
+            <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden relative p-2">
+              <AppTabs defaultValue="basic" className="app-tabs-container">
+                <AppTabsList>
+                  <AppTabsTrigger value="basic">Βασικά Στοιχεία</AppTabsTrigger>
+                  <AppTabsTrigger value="details">Λεπτομέρειες</AppTabsTrigger>
+                </AppTabsList>
                 
-                {/* Tab 2: Details */}
-                <DetailsTab />
-              </TabsContainer>
-
-              <DialogFooterSection 
-                error={error}
-                success={success}
-                loading={loading}
-                isEditing={isEditing}
-                isFormValid={isFormValid}
-                watchOfferResult={watchOfferResult}
-                watchResult={watchResult}
-                onOpenChange={onOpenChange}
-              />
-            </form>
-
-            {/* Contact Dialog */}
-            <ContactDialog
-              open={showContactDialog}
-              onOpenChange={(open) => {
-                setShowContactDialog(open);
-                if (!open) {
-                  setSelectedContact(null);
-                  // Refresh contacts when dialog closes
-                  const fetchContacts = async () => {
-                    if (!customerId) return;
-                    
-                    try {
-                      const { data, error } = await supabase
-                        .from("contacts")
-                        .select("id, full_name, position, created_at")
-                        .eq("customer_id", customerId)
-                        .eq("status", "active")
-                        .is("deleted_at", null);
-
-                      if (error) throw error;
-                      
-                      // Create a map of contact IDs to names and display names
-                      const contactIdToName: Record<string, string> = {};
-                      const contactIdToDisplayName: Record<string, string> = {};
-                      const contactNameOptions: string[] = [];
-                      
-                      data?.forEach(contact => {
-                        // Store both full name and display name with position
-                        contactIdToName[contact.id] = contact.full_name;
-                        
-                        const displayName = contact.position 
-                          ? `${contact.full_name} (${contact.position})` 
-                          : contact.full_name;
-                        
-                        contactIdToDisplayName[contact.id] = displayName;
-                        contactNameOptions.push(displayName);
-                      });
-                      
-                      setContactMap(contactIdToName);
-                      setContactDisplayMap(contactIdToDisplayName);
-                      setContactOptions(contactNameOptions);
-                      setContacts(data || []);
-                      
-                      // If we have contacts and no contact is selected, select the first one
-                      if (data && data.length > 0 && !selectedContactId) {
-                        setSelectedContactId(data[0].id);
-                      }
-                    } catch (error) {
-                      console.error("Error fetching contacts:", error);
-                    }
-                  };
+                <div className="flex-1 relative" style={{ minHeight: '600px' }}>
+                  {/* Tab 1: Basic Information */}
+                  <AppTabsContent value="basic" className="absolute inset-0 pt-4 overflow-auto pointer-events-auto">
+                    <BasicInfoSection />
+                    <RequirementsSection />
+                    <StatusSection />
+                    <CommentsSection />
+                  </AppTabsContent>
                   
-                  fetchContacts();
-                }
-              }}
-              contactId={selectedContact?.id}
-              customerId={customerId}
-              refreshData={async () => {
-                // If you need to refresh contacts, define the function here
-                // or call an existing function that fetches contacts
-                // For example:
-                // await loadContacts();
-                // or just return a resolved promise if no action is needed
-                return Promise.resolve();
-              }}
-            />
-
-            {/* Delete Offer Dialog */}
-            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-              <AlertDialogContent aria-describedby="delete-offer-description">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Offer</AlertDialogTitle>
-                  <AlertDialogDescription id="delete-offer-description">
-                    Are you sure you want to delete this offer? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="flex justify-end space-x-2 mt-4">
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      // Handle delete logic here
-                      setShowDeleteDialog(false);
-                    }}
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    Delete
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowDeleteDialog(false)}
-                    className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
-                  >
-                    Cancel
-                  </Button>
+                  {/* Tab 2: Details */}
+                  <AppTabsContent value="details" className="absolute inset-0 pt-2 overflow-auto pointer-events-auto">
+                    <DetailsTab />
+                  </AppTabsContent>
                 </div>
-              </AlertDialogContent>
-            </AlertDialog>
+              </AppTabs>
+             
+              <div className="dialog-footer">
+                <DialogFooterSection 
+                  error={error}
+                  success={success}
+                  loading={loading}
+                  isEditing={isEditing}
+                  isFormValid={isFormValid}
+                  watchOfferResult={watchOfferResult}
+                  watchResult={watchResult}
+                  onOpenChange={onOpenChange}
+                />
+             </div>
+           </form>
+
+           {/* Contact Dialog */}
+           <ContactDialog
+             open={showContactDialog}
+             onOpenChange={(open) => {
+               setShowContactDialog(open);
+               if (!open) {
+                 setSelectedContact(null);
+                 // Refresh contacts when dialog closes
+                 const fetchContacts = async () => {
+                   if (!customerId) return;
+                   
+                   try {
+                     const { data, error } = await supabase
+                       .from("contacts")
+                       .select("id, full_name, position, created_at")
+                       .eq("customer_id", customerId)
+                       .eq("status", "active")
+                       .is("deleted_at", null);
+
+                     if (error) throw error;
+                     
+                     // Create a map of contact IDs to names and display names
+                     const contactIdToName: Record<string, string> = {};
+                     const contactIdToDisplayName: Record<string, string> = {};
+                     const contactNameOptions: string[] = [];
+                     
+                     data?.forEach(contact => {
+                       // Store both full name and display name with position
+                       contactIdToName[contact.id] = contact.full_name;
+                       
+                       const displayName = contact.position 
+                         ? `${contact.full_name} (${contact.position})` 
+                         : contact.full_name;
+                       
+                       contactIdToDisplayName[contact.id] = displayName;
+                       contactNameOptions.push(displayName);
+                     });
+                     
+                     setContactMap(contactIdToName);
+                     setContactDisplayMap(contactIdToDisplayName);
+                     setContactOptions(contactNameOptions);
+                     setContacts(data || []);
+                     
+                     // If we have contacts and no contact is selected, select the first one
+                     if (data && data.length > 0 && !selectedContactId) {
+                       setSelectedContactId(data[0].id);
+                     }
+                   } catch (error) {
+                     console.error("Error fetching contacts:", error);
+                   }
+                 };
+                 
+                 fetchContacts();
+               }
+             }}
+             contactId={selectedContact?.id}
+             customerId={customerId}
+             refreshData={async () => {
+               // If you need to refresh contacts, define the function here
+               // or call an existing function that fetches contacts
+               // For example:
+               // await loadContacts();
+               // or just return a resolved promise if no action is needed
+               return Promise.resolve();
+             }}
+           />
+
+           {/* Delete Offer Dialog */}
+           <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+             <AlertDialogContent aria-describedby="delete-offer-description">
+               <AlertDialogHeader>
+                 <AlertDialogTitle>Delete Offer</AlertDialogTitle>
+                 <AlertDialogDescription id="delete-offer-description">
+                   Are you sure you want to delete this offer? This action cannot be undone.
+                 </AlertDialogDescription>
+               </AlertDialogHeader>
+               <div className="flex justify-end space-x-2 mt-4">
+                 <Button
+                   type="button"
+                   onClick={() => {
+                     // Handle delete logic here
+                     setShowDeleteDialog(false);
+                   }}
+                   className="bg-red-600 hover:bg-red-700 text-white"
+                 >
+                   Delete
+                 </Button>
+                 <Button
+                   type="button"
+                   variant="outline"
+                   onClick={() => setShowDeleteDialog(false)}
+                   className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
+                 >
+                   Cancel
+                 </Button>
+               </div>
+             </AlertDialogContent>
+           </AlertDialog>
           </div>
         </DialogContent>
       </Dialog>

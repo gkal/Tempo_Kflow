@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -47,7 +48,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import './OffersDialog.css';
-import { TruncatedText } from "@/components/ui/truncated-text";
 
 /**
  * DetailsTab Component
@@ -106,6 +106,15 @@ const DetailsTab = React.memo(() => {
   const [isDeleteLoading, setIsDeleteLoading] = useState(false);
   const [isDeleteSuccessful, setIsDeleteSuccessful] = useState(false);
 
+  // Add state to track deleted IDs separately
+  const [manuallyDeletedIds, setManuallyDeletedIds] = useState<string[]>([]);
+
+  // Near the top of the component where other state is defined
+  const [formValidationError, setFormValidationError] = useState("");
+
+  // Define tabId constant
+  const tabId = 'details';
+
   // Reset function to clear all temporary state
   const resetState = useCallback(() => {
     setSelectedItems([]);
@@ -116,48 +125,10 @@ const DetailsTab = React.memo(() => {
     setError(null);
     setConfirmingSelection(false);
     setSelectedDetails([]);
+    setManuallyDeletedIds([]);
     
     // Also clear from localStorage
     localStorage.removeItem('offerDetailsSelectedItems');
-  }, []);
-
-  // Register the reset function with the context only once
-  useEffect(() => {
-    // Only register if context exists and has the registerTabReset function
-    if (context?.registerTabReset) {
-      // Register the reset function
-      context.registerTabReset("details", resetState);
-      
-      // Cleanup function to unregister when component unmounts
-      return () => {
-        if (context.unregisterTabReset) {
-          context.unregisterTabReset("details");
-        }
-      };
-    }
-  }, [context, resetState]);
-
-  // Clear selected items from localStorage on component mount
-  useEffect(() => {
-    // Clear any stored selected items on mount
-    localStorage.removeItem('offerDetailsSelectedItems');
-    
-    // Set up event listener for beforeunload to save selected items
-    const handleBeforeUnload = () => {
-      // Clear selected items from localStorage
-      localStorage.removeItem('offerDetailsSelectedItems');
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Clear selected items from localStorage on unmount
-      localStorage.removeItem('offerDetailsSelectedItems');
-      // Reset all state on unmount
-      setSelectedItems([]);
-      setCurrentCategoryId(null);
-    };
   }, []);
 
   // Function to fetch offer details
@@ -175,6 +146,219 @@ const DetailsTab = React.memo(() => {
       setLoading(false);
     }
   }, [offerId]);
+
+  // Function to save selected details to the database
+  const saveDetailsToDatabase = useCallback(async (realOfferId: string) => {
+    try {
+      // Validate we have an offer ID and user
+      if (!realOfferId) {
+        console.error("Cannot save details: No offer ID provided");
+        return false;
+      }
+      
+      if (!user) {
+        console.error("Cannot save details: No authenticated user");
+        return false;
+      }
+      
+      // Get the current selectedDetails from state
+      const detailsToSave = selectedDetails;
+      
+      // Check if we have any details to save
+      if (detailsToSave.length === 0) {
+        return true; // Return true as this is not an error condition
+      }
+      
+      // Process each detail individually to ensure proper error handling
+      const saveResults = await Promise.all(
+        detailsToSave.map(async (detail) => {
+          try {
+            // Check if this is a new detail or an existing one
+            // Consider any ID with 'ui-' or 'temp-' prefix as new
+            const isTemporaryId = !detail.id || 
+                                detail.id.startsWith('temp-') || 
+                                detail.id.startsWith('ui-') ||
+                                !detail.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+            
+            // All temporary IDs should be treated as new entries
+            if (isTemporaryId) {
+              // Create a new detail object with proper fields for the API
+              const newDetail = {
+                offer_id: realOfferId,
+                category_id: detail.category_id,
+                subcategory_id: detail.subcategory_id,
+                unit_id: detail.unit_id,
+                quantity: 1, // Always use 1 as the quantity
+                price: detail.price,
+                notes: detail.notes || ""
+              };
+              
+              const result = await addOfferDetail(realOfferId, newDetail, user.id);
+              return { success: !!result, id: result?.id, action: 'added' };
+            } else {
+              // This is a real existing database entry with a valid UUID
+              const updatedDetail = {
+                unit_id: detail.unit_id,
+                price: detail.price,
+                notes: detail.notes || ""
+              };
+              
+              const result = await updateOfferDetail(detail.id, updatedDetail, user.id);
+              return { success: true, id: detail.id, action: 'updated' };
+            }
+          } catch (error) {
+            console.error(`Error saving detail ${detail.id || 'new'}:`, error);
+            return { success: false, id: detail.id, error, action: 'failed' };
+          }
+        })
+      );
+      
+      // Check if all saves were successful
+      const allSuccessful = saveResults.every(result => result.success);
+      
+      // If everything was successful, refetch the details to make sure UI is up to date
+      if (allSuccessful) {
+        await fetchDetails();
+        
+        // Clear the selected details after they've been successfully saved
+        // IMPORTANT: This ensures we don't try to save the same UI details twice
+        setSelectedDetails([]);
+      }
+      
+      return allSuccessful;
+    } catch (error) {
+      console.error("Error in saveDetailsToDatabase:", error);
+      return false;
+    }
+  }, [selectedDetails, user, fetchDetails]);
+
+  // Create a unique instance ID for this component
+  const instanceIdRef = React.useRef(`details-tab-${Math.random().toString(36).substring(2, 9)}`);
+
+  // Create a single ref to track if component is mounted
+  const isMountedRef = React.useRef(false);
+  const hasRegisteredRef = React.useRef(false);
+
+  // Function to reset tab state
+  const resetTab = useCallback(() => {
+    // Reset the form state when tab is reset
+    // DO NOT reset selectedDetails here - we need to preserve them for saving!
+    setCurrentCategoryId(null);
+    setSubcategories([]);
+    // We still track deleted IDs
+  }, []);
+
+  // First useEffect to set mounted state - runs only once
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      // On unmount, ensure we clean up properly
+      isMountedRef.current = false;
+      hasRegisteredRef.current = false;
+      
+      // Use direct DOM approach to delay cleanup until after the component is truly gone
+      setTimeout(() => {
+        if (context?.registerSaveDetailsToDatabase) {
+          context.registerSaveDetailsToDatabase(null);
+        }
+        
+        if (context?.unregisterTabReset) {
+          context.unregisterTabReset('details');
+        }
+      }, 50); // Small delay to ensure proper sequence
+    };
+  }, []); // Empty dependency array ensures this only runs on mount/unmount
+
+  // Create a form submit handler that will be passed to the dialog context
+  const handleFormSubmit = React.useCallback(async (realOfferId: string) => {
+    if (!isMountedRef.current) {
+      return true;
+    }
+    
+    // Validation: If no details are selected, show validation error
+    if (selectedDetails.length === 0) {
+      setFormValidationError("Παρακαλώ επιλέξτε τουλάχιστον ένα είδος για την προσφορά");
+      return false;
+    }
+
+    try {
+      // Reset any previous validation errors
+      setFormValidationError("");
+      
+      // Save details to database when form is submitted
+      const saveResult = await saveDetailsToDatabase(realOfferId);
+      
+      // Return result to inform the dialog if submission was successful
+      return saveResult;
+    } catch (error) {
+      console.error("Error in form submit:", error);
+      setFormValidationError("Παρουσιάστηκε σφάλμα κατά την αποθήκευση. Παρακαλώ δοκιμάστε ξανά.");
+      return false;
+    }
+  }, [selectedDetails, saveDetailsToDatabase]);
+
+  // Effect to register/update the form submit handler when selectedDetails change
+  React.useEffect(() => {
+    // Only update if we're mounted and have already registered once
+    if (isMountedRef.current && hasRegisteredRef.current && context?.registerSaveDetailsToDatabase) {
+      context.registerSaveDetailsToDatabase(handleFormSubmit);
+    }
+  }, [context, handleFormSubmit, selectedDetails]);
+
+  // Register form submit handler with the dialog context on mount
+  React.useEffect(() => {
+    // Set mounted flag
+    isMountedRef.current = true;
+    
+    // Return cleanup function
+    return () => {
+      isMountedRef.current = false;
+      hasRegisteredRef.current = false;
+      
+      // Use setTimeout to ensure cleanup happens after component is fully unmounted
+      setTimeout(() => {
+        if (context?.registerSaveDetailsToDatabase) {
+          context.registerSaveDetailsToDatabase(null);
+        }
+        
+        if (context?.unregisterTabReset) {
+          context.unregisterTabReset('details');
+        }
+      }, 50);
+    };
+  }, [context]);
+
+  // Register handlers with context only once on initial mount
+  React.useEffect(() => {
+    // Only register if component is mounted, hasn't registered yet, and context is available
+    if (
+      isMountedRef.current && 
+      !hasRegisteredRef.current && 
+      context?.registerSaveDetailsToDatabase && 
+      context?.registerTabReset
+    ) {
+      // Register form submit handler
+      context.registerSaveDetailsToDatabase(handleFormSubmit);
+      
+      // Register reset function
+      context.registerTabReset('details', () => {
+        // Don't reset selectedDetails as these should persist until saved
+        // Just reset the selection dialog state
+        setCurrentCategoryId(null);
+        setSelectedItems([]);
+        setShowSelectionDialog(false);
+        setDialogLoading(false);
+        setFormValidationError("");
+        
+        // Return true to indicate successful reset
+        return true;
+      });
+      
+      // Mark as registered
+      hasRegisteredRef.current = true;
+    }
+  }, [context, handleFormSubmit, selectedDetails.length]);
 
   // Fetch offer details when the component mounts or offerId changes
   useEffect(() => {
@@ -201,11 +385,12 @@ const DetailsTab = React.memo(() => {
           fetchMeasurementUnits()
         ]);
         
-        setCategories(categoriesData);
-        setUnits(unitsData);
+        // Add type assertions to fix the "unknown" type errors
+        setCategories(categoriesData as ServiceCategory[]);
+        setUnits(unitsData as MeasurementUnit[]);
         
         // Preload subcategories for the first few categories to improve initial load time
-        if (categoriesData.length > 0) {
+        if (categoriesData && Array.isArray(categoriesData) && categoriesData.length > 0) {
           const categoriesToPreload = categoriesData.slice(0, 3); // Preload first 3 categories
           
           // Fetch subcategories in parallel
@@ -261,8 +446,8 @@ const DetailsTab = React.memo(() => {
           fetchMeasurementUnits()
         ]);
         
-        setCategories(categoriesData);
-        setUnits(unitsData);
+        setCategories(categoriesData as ServiceCategory[]);
+        setUnits(unitsData as MeasurementUnit[]);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -292,7 +477,13 @@ const DetailsTab = React.memo(() => {
         const subcategoriesData = await fetchSubcategories(categoryId);
         
         // Merge with existing subcategories
-        setSubcategories(prev => [...prev, ...subcategoriesData]);
+        setSubcategories(prev => {
+          // Type guard to ensure subcategoriesData is an array
+          if (subcategoriesData && Array.isArray(subcategoriesData)) {
+            return [...prev, ...subcategoriesData as ServiceSubcategory[]];
+          }
+          return prev; // Return previous state if data is not valid
+        });
         
         setDialogLoading(false);
       }
@@ -460,14 +651,15 @@ const DetailsTab = React.memo(() => {
         return;
       }
       
-      // Create detail objects for UI display only
-      const newSelectedDetails = itemsToAdd.map(item => {
+      // Create detail objects for UI display only - maintain original order from selectedItems
+      // We need to process items in reverse order to maintain the selection order
+      const newSelectedDetails = [...itemsToAdd].reverse().map(item => {
         // Find the category and subcategory objects
         const category = categories.find(c => c.id === item.categoryId);
         const subcategory = subcategories.find(s => s.id === item.subcategoryId);
         const unit = units.find(u => u.id === item.unitId);
         
-        // Generate a UI-only ID
+        // Generate a UI-only ID with timestamp to prevent collisions
         const uiId = `ui-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
         // Create a detail object for UI only
@@ -488,18 +680,21 @@ const DetailsTab = React.memo(() => {
         } as OfferDetail;
       });
       
-      // Add to selected details for UI display
-      setSelectedDetails(prev => [...prev, ...newSelectedDetails]);
+      // Add new items to the beginning of the list
+      setSelectedDetails(prev => [...newSelectedDetails, ...prev]);
       
-      // Clear selected items
+      // Reset selection state
       setSelectedItems([]);
       setCurrentCategoryId(null);
       localStorage.removeItem('offerDetailsSelectedItems');
       
+      // Wait a short time before closing the dialog to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Close the dialog window
       setShowSelectionDialog(false);
     } catch (error) {
-      console.error("Error loading subcategory data:", error);
+      console.error("Error handling selection:", error);
       setError("Σφάλμα κατά την φόρτωση δεδομένων. Παρακαλώ δοκιμάστε ξανά.");
       // Reset the flag in case of error
       setConfirmingSelection(false);
@@ -509,53 +704,71 @@ const DetailsTab = React.memo(() => {
     }
   };
 
-  // Handle delete button click
-  const handleDeleteClick = (detail: OfferDetail) => {
-    // Check if this is a database item or a UI-only item
-    if (detail.id.startsWith('ui-')) {
-      // This is a UI-only item, remove it from selectedDetails
-      setSelectedDetails(prev => prev.filter(item => item.id !== detail.id));
-    } else {
-      // This is a database item
-      setDetailToDelete(detail);
-      // Show dialog immediately
-      setShowDeleteDialog(true);
-      // Reset success state
-      setIsDeleteSuccessful(false);
-    }
+  // Handle delete UI item separately with useCallback
+  const handleDeleteUIItem = useCallback((itemId: string) => {
+    // First mark the ID for deletion to avoid race conditions
+    const idToDelete = itemId;
+    
+    // Use RAF (requestAnimationFrame) to ensure UI updates first
+    requestAnimationFrame(() => {
+      setSelectedDetails(prevDetails => {
+        // Filter out by ID
+        return prevDetails.filter(item => item.id !== idToDelete);
+      });
+    });
+  }, []);
+
+  // Handle delete click
+  const handleDeleteClick = (e: React.MouseEvent<HTMLElement>, item: OfferDetail, index: number) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // Set the detail to delete and show confirmation dialog
+    setDetailToDelete(item);
+    setShowDeleteDialog(true);
   };
 
   // Handle delete confirmation
   const handleDeleteConfirm = () => {
-    if (!detailToDelete) {
-      return;
-    }
+    if (!detailToDelete) return;
     
-    // Set loading state
-    setIsDeleteLoading(true);
-    
-    // Store the ID before deleting
-    const idToDelete = detailToDelete.id;
-    
-    // Use a direct promise chain instead of an async function
-    deleteOfferDetail(idToDelete)
-      .then(() => {
-        // Show success state instead of closing immediately
-        setIsDeleteSuccessful(true);
+    try {
+      // Check if this is a real database item with a UUID
+      const isRealDatabaseItem = detailToDelete.id && 
+        !detailToDelete.id.startsWith('ui-') && 
+        !detailToDelete.id.startsWith('temp-');
+      
+      // If this is a real database item, we need to mark it for deletion
+      if (isRealDatabaseItem) {
+        // Add to manually deleted IDs list
+        setManuallyDeletedIds(prev => [...prev, detailToDelete.id]);
         
-        // Don't update state immediately to prevent UI refresh
-        // Will update when dialog is closed
-      })
-      .catch(error => {
-        console.error("Error deleting offer detail:", error);
-        setError("Σφάλμα κατά τη διαγραφή λεπτομέρειας προσφοράς.");
-        // Close dialog on error
-        setShowDeleteDialog(false);
-        setDetailToDelete(null);
-      })
-      .finally(() => {
-        setIsDeleteLoading(false);
-      });
+        // Find DOM element and mark as deleted if it exists
+        const row = document.querySelector(`tr[data-id="${detailToDelete.id}"]`);
+        if (row) {
+          row.setAttribute('data-deleted', 'true');
+          row.setAttribute('data-deleted-id', detailToDelete.id);
+          row.classList.add('deleting-row');
+        }
+        
+        // Register for deletion with context
+        if (context?.registerDeletedDetails) {
+          context.registerDeletedDetails(detailToDelete.id);
+        }
+      }
+      
+      // Remove from UI immediately
+      setSelectedDetails(prev => prev.filter(d => d.id !== detailToDelete.id));
+      
+      // Close the dialog
+      setShowDeleteDialog(false);
+      
+      // Reset detail to delete
+      setDetailToDelete(null);
+    } catch (error) {
+      console.error("Error deleting detail:", error);
+      setError("Σφάλμα κατά την διαγραφή. Παρακαλώ δοκιμάστε ξανά.");
+    }
   };
   
   // Handle dialog close
@@ -574,7 +787,7 @@ const DetailsTab = React.memo(() => {
   };
 
   // Truncate text and add ellipsis if needed
-  const truncateText = (text: string, maxLength: number = 20) => {
+  const truncateText = (text: string, maxLength: number = 30) => {
     if (!text) return "";
     if (text.length <= maxLength) return text;
     
@@ -618,505 +831,56 @@ const DetailsTab = React.memo(() => {
     return unit ? unit.name : id;
   };
 
-  // Function to save selected details to the database
-  const saveDetailsToDatabase = useCallback(async (realOfferId: string) => {
-    if (!realOfferId || !user?.id) {
-      return false;
-    }
-    
-    if (selectedDetails.length === 0) {
-      return true; // Return true as there's nothing to save
-    }
-    
-    try {
-      setLoading(true);
-      
-      // Prepare all details for batch processing
-      const detailsToAdd = selectedDetails.map(detail => ({
-        offer_id: realOfferId,
-        category_id: detail.category_id,
-        subcategory_id: detail.subcategory_id,
-        unit_id: detail.unit_id,
-        quantity: detail.quantity,
-        price: detail.price,
-        notes: detail.notes || ""
-      }));
-      
-      // Use Promise.all to process all details in parallel
-      const results = await Promise.all(
-        detailsToAdd.map(detailData => 
-          addOfferDetail(realOfferId, detailData, user.id)
-        )
-      );
-      
-      // Count successes
-      const successCount = results.filter(Boolean).length;
-      
-      // Clear selected details after saving
-      setSelectedDetails([]);
-      
-      // Refresh the list to show the newly saved details
-      await fetchDetails();
-      
-      return successCount > 0; // Return true if at least one detail was saved successfully
-    } catch (error) {
-      console.error("Error saving details:", error);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedDetails, user, fetchDetails]);
-  
-  // Expose the save function to the parent component through context
-  useEffect(() => {
-    if (context && context.registerSaveDetailsToDatabase) {
-      // Register the saveDetailsToDatabase function
-      context.registerSaveDetailsToDatabase(saveDetailsToDatabase);
-      
-      // Cleanup function
-      return () => {
-        if (context.registerSaveDetailsToDatabase) {
-          context.registerSaveDetailsToDatabase(null);
-        }
-      };
-    }
-  }, [context, saveDetailsToDatabase]);
-
-  // Memoized UnitDropdown component to prevent unnecessary re-renders
-  const UnitDropdown = React.memo(({ 
-    detailId, 
-    unitId, 
-    unitName, 
-    isUIOnly, 
-    onUnitChange 
-  }: { 
-    detailId: string; 
-    unitId: string; 
-    unitName: string; 
-    isUIOnly: boolean; 
-    onUnitChange: (detailId: string, unitId: string, isUIOnly: boolean) => void;
-  }) => {
-    return (
-      <div style={{ width: '180px' }}>
-        <GlobalDropdown
-          options={units.map(unit => unit.name)}
-          value={unitName || ""}
-          onSelect={(value) => {
-            const selectedUnit = units.find(u => u.name === value);
-            if (selectedUnit) {
-              onUnitChange(detailId, selectedUnit.id, isUIOnly);
-            }
-          }}
-          placeholder="Επιλέξτε μονάδα"
-          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-xs truncate hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] transition-all duration-200 h-8"
-        />
-      </div>
-    );
-  });
-
-  // Memoized PriceInput component to prevent unnecessary re-renders
-  const PriceInput = React.memo(({ 
-    detailId, 
-    price, 
-    isUIOnly, 
-    onPriceChange 
-  }: { 
-    detailId: string; 
-    price: number; 
-    isUIOnly: boolean; 
-    onPriceChange: (detailId: string, price: number, isUIOnly: boolean) => void;
-  }) => {
-    // Use local state to prevent re-renders of the parent component
-    const [localPrice, setLocalPrice] = React.useState(price.toString());
-    
-    // Update local price when prop changes
-    React.useEffect(() => {
-      setLocalPrice(price.toString());
-    }, [price]);
-    
-    // Handle input change
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // Allow only numbers and decimal point
-      const value = e.target.value.replace(/[^0-9.]/g, '');
-      setLocalPrice(value);
-    };
-    
-    // Handle blur to update parent only when user finishes typing
-    const handleBlur = () => {
-      const newPrice = parseFloat(localPrice) || 0;
-      onPriceChange(detailId, newPrice, isUIOnly);
-    };
-    
-    return (
-      <div className="relative" style={{ width: '80px' }}>
-        <Input
-          type="text"
-          value={localPrice}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          className="h-8 w-full bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-xs text-right pr-6"
-        />
-        <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[#cad2c5] text-xs">€</span>
-      </div>
-    );
-  });
-  
-  // Memoized SelectionItem component for the selection dialog
-  const SelectionItem = React.memo(({ 
-    item, 
-    index, 
-    units, 
-    setSelectedItems 
-  }: { 
-    item: {
-      categoryId: string;
-      subcategoryId: string;
-      subcategoryName: string;
-      unitId: string;
-      price: number;
-    }; 
-    index: number; 
-    units: MeasurementUnit[];
-    setSelectedItems: React.Dispatch<React.SetStateAction<{
-      categoryId: string;
-      subcategoryId: string;
-      subcategoryName: string;
-      unitId: string;
-      price: number;
-    }[]>>;
-  }) => {
-    return (
-      <div className="flex items-center space-x-2 p-1 border-b border-[#52796f]/30">
-        <div className="flex-1 truncate text-xs">
-          {item.subcategoryName.length > 30 ? (
-            <GlobalTooltip content={item.subcategoryName} position="top">
-              <span>
-                {item.subcategoryName.substring(0, 30)}
-                <span className="ml-1 ellipsis-blue">...</span>
-              </span>
-            </GlobalTooltip>
-          ) : (
-            item.subcategoryName
-          )}
-        </div>
-        <div className="w-24">
-          <div style={{ width: '180px' }}>
-            <GlobalDropdown
-              options={units.map(unit => unit.name)}
-              value={units.find(u => u.id === item.unitId)?.name || ""}
-              onSelect={(value) => {
-                const selectedUnit = units.find(u => u.name === value);
-                if (selectedUnit) {
-                  setSelectedItems(prev => 
-                    prev.map((i, idx) => idx === index ? { ...i, unitId: selectedUnit.id } : i)
-                  );
-                }
-              }}
-              placeholder="Μονάδα"
-              className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-xs truncate hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] transition-all duration-200 h-8"
-            />
-          </div>
-        </div>
-        <div className="w-20">
-          <div className="relative" style={{ width: '80px' }}>
-            <Input
-              type="text"
-              value={item.price.toString()}
-              onChange={(e) => {
-                // Allow only numbers and decimal point
-                const value = e.target.value.replace(/[^0-9.]/g, '');
-                const newPrice = parseFloat(value) || 0;
-                setSelectedItems(prev => 
-                  prev.map((i, idx) => idx === index ? { ...i, price: newPrice } : i)
-                );
-              }}
-              className="h-8 bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-xs text-right pr-6"
-              placeholder="Τιμή"
-            />
-            <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[#cad2c5] text-xs">€</span>
-          </div>
-        </div>
-      </div>
-    );
-  });
-
   return (
-    <div id="details-tab" className="space-y-4">
-      {/* 
-        Let the tab container control the height.
-        This component will adapt to its parent's height.
-      */}
-      <div className="p-4 bg-[#354f52] rounded-md border border-[#52796f]">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="text-[#a8c5b5] text-sm font-medium">Λεπτομέρειες Προσφοράς</h3>
-          
-          {isEditing && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleAddClick}
-              className="h-8 px-2 bg-transparent hover:bg-[#52796f] border-none flex items-center gap-1 group"
-            >
-              <Plus className="h-4 w-4 text-white" />
-              <span className="text-xs text-[#84a98c] group-hover:text-white">Προσθήκη</span>
-            </Button>
-          )}
-        </div>
-        
-        {loading ? (
-          <div className="flex items-center justify-center py-2">
-            <svg className="animate-spin h-5 w-5 text-[#52796f]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          </div>
-        ) : error ? (
-          <div className="p-2 bg-red-900/30 text-red-300 border border-red-800 rounded-md text-xs">
-            {error}
-          </div>
-        ) : details.length === 0 && selectedDetails.length === 0 ? (
-        <p className="text-[#cad2c5] text-xs">
-            Δεν υπάρχουν λεπτομέρειες προσφοράς. {isEditing && "Πατήστε το κουμπί Προσθήκη για να προσθέσετε."}
-          </p>
-        ) : (
-          <>
-            {/* Existing details from database and selected details for UI */}
-            {(details.length > 0 || selectedDetails.length > 0) && (
-              <>
-                <div className={`overflow-y-auto border border-[#52796f] rounded-md ${
-                  details.length + selectedDetails.length > 6 ? 'max-h-[350px]' : 'h-auto'
-                } mb-4`}>
-                  <table className="w-full text-xs text-[#cad2c5]">
-                    <thead className="details-table-header">
-                      <tr className="border-b border-[#52796f]">
-                        <th className="text-left py-2 px-3 font-medium text-[#84a98c]" colSpan={2}>Κατηγορία / Περιγραφή</th>
-                        <th className="text-center py-2 px-3 font-medium text-[#84a98c]">Μονάδα</th>
-                        <th className="text-center py-2 px-3 font-medium text-[#84a98c]">Τιμή</th>
-                        {isEditing && <th className="w-10 py-2 px-3"></th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* Combine database and selected details */}
-                      {Array.from(new Set([
-                        ...details.map(detail => detail.category_id),
-                        ...selectedDetails.map(detail => detail.category_id)
-                      ])).map(categoryId => {
-                        // Get all details for this category
-                        const categoryDetails = [
-                          ...details.filter(detail => detail.category_id === categoryId),
-                          ...selectedDetails.filter(detail => detail.category_id === categoryId)
-                        ];
-                        
-                        // Get the category object from the first detail
-                        const category = categoryDetails[0]?.category;
-                        const categoryName = category?.category_name || "-";
-                        
-                        return (
-                          <React.Fragment key={categoryId}>
-                            {/* Category row */}
-                            <tr className="bg-[#354f52]/70 category-row">
-                              <td colSpan={isEditing ? 5 : 4} className="py-2 px-3 font-medium">
-                                {categoryName.length > 40 ? (
-                                  <GlobalTooltip content={categoryName} position="top">
-                                    <span>
-                                      {categoryName.substring(0, 40)}
-                                      <span className="ml-1 ellipsis-blue">...</span>
-                                    </span>
-                                  </GlobalTooltip>
-                                ) : (
-                                  categoryName
-                                )}
-                              </td>
-                            </tr>
-                            
-                            {/* Subcategory rows */}
-                            {categoryDetails.map((detail) => {
-                              const isUIOnly = detail.id.startsWith('ui-');
-                              
-                              return (
-                                <tr key={detail.id} className={`hover:bg-[#2f3e46] ${isUIOnly ? 'bg-[#354f52]/30' : ''}`}>
-                                  <td className="w-4 py-2">
-                                    {isUIOnly && (
-                                      <span className="inline-block w-3 h-3 rounded-full bg-[#84a98c] ml-1" title="Προσωρινό - Δεν έχει αποθηκευτεί"></span>
-                                    )}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <span className="text-[#84a98c]">
-                                      {detail.subcategory?.subcategory_name && detail.subcategory.subcategory_name.length > 30 ? (
-                                        <GlobalTooltip content={detail.subcategory.subcategory_name} position="top">
-                                          <span>
-                                            {detail.subcategory.subcategory_name.substring(0, 30)}
-                                            <span className="ml-1 ellipsis-blue">...</span>
-                                          </span>
-                                        </GlobalTooltip>
-                                      ) : (
-                                        detail.subcategory?.subcategory_name || '-'
-                                      )}
-                                    </span>
-                                  </td>
-                                  <td className="py-2 px-3 text-center">
-                                    {isEditing ? (
-                                      <UnitDropdown
-                                        detailId={detail.id}
-                                        unitId={detail.unit_id}
-                                        unitName={detail.unit?.name || ""}
-                                        isUIOnly={isUIOnly}
-                                        onUnitChange={handleUnitChange}
-                                      />
-                                    ) : (
-                                      detail.unit?.name && detail.unit.name.length > 10 ? (
-                                        <GlobalTooltip content={detail.unit.name} position="top">
-                                          <span>
-                                            {detail.unit.name.substring(0, 10)}
-                                            <span className="ml-1 ellipsis-blue">...</span>
-                                          </span>
-                                        </GlobalTooltip>
-                                      ) : (
-                                        detail.unit?.name || '-'
-                                      )
-                                    )}
-                                  </td>
-                                  <td className="py-2 px-3 text-center">
-                                    {isEditing ? (
-                                      <PriceInput
-                                        detailId={detail.id}
-                                        price={detail.price}
-                                        isUIOnly={isUIOnly}
-                                        onPriceChange={handlePriceChange}
-                                      />
-                                    ) : (
-                                      <span>{detail.price.toFixed(2)} €</span>
-                                    )}
-                                  </td>
-                                  {isEditing && (
-                                    <td className="py-2 px-3 text-center">
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          handleDeleteClick(detail);
-                                        }}
-                                        className="h-6 w-6 p-0 text-[#84a98c] hover:text-red-400 hover:bg-[#52796f]"
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </td>
-                                  )}
-                                </tr>
-                              );
-                            })}
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog 
-        open={showDeleteDialog} 
-        onOpenChange={(open) => {
-          // Prevent closing while deleting
-          if (!isDeleteLoading) {
-            handleDeleteDialogClose(open);
-          }
-        }}
-      >
-        <DialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f]">
-          <DialogHeader>
-            <DialogTitle className="text-[#84a98c]">
-              {isDeleteSuccessful 
-                ? "Επιτυχής Διαγραφή" 
-                : "Διαγραφή Λεπτομέρειας"
-              }
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            {isDeleteLoading ? (
-              <div className="flex flex-col items-center justify-center space-y-3 py-3">
-                <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#52796f] border-t-transparent"></div>
-                <p className="text-[#cad2c5]">Η διαγραφή βρίσκεται σε εξέλιξη. Παρακαλώ περιμένετε...</p>
-                <p className="text-sm text-[#84a98c]">Αυτή η διαδικασία μπορεί να διαρκέσει μερικά δευτερόλεπτα.</p>
-              </div>
-            ) : isDeleteSuccessful ? (
-              <div className="flex flex-col items-center justify-center space-y-3 py-3">
-                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <p className="text-center text-green-500 font-medium">
-                  Η λεπτομέρεια προσφοράς διαγράφηκε με επιτυχία!
-                </p>
-              </div>
-            ) : (
-              <p className="text-[#cad2c5] text-sm">
-                Είστε βέβαιοι ότι θέλετε να διαγράψετε αυτή τη λεπτομέρεια προσφοράς;
-                <br />
-                Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            {isDeleteSuccessful ? (
+    <div className="h-full flex flex-col">
+      {showDeleteDialog && (
+        <AlertDialog open={showDeleteDialog} onOpenChange={handleDeleteDialogClose}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Διαγραφή</AlertDialogTitle>
+              <AlertDialogDescription>
+                Είστε σίγουροι ότι θέλετε να διαγράψετε αυτό το στοιχείο;
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex justify-end space-x-2 mt-4">
               <Button
                 type="button"
-                onClick={() => handleDeleteDialogClose(false)}
-                className="bg-[#52796f] hover:bg-[#52796f]/90 text-white"
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
-                OK
+                Διαγραφή
               </Button>
-            ) : (
-              <>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    handleDeleteDialogClose(false);
-                  }}
-                  className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
-                  disabled={isDeleteLoading}
+                onClick={() => setShowDeleteDialog(false)}
+                className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
                 >
                   Ακύρωση
                 </Button>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      <div className="flex-1 flex flex-col pb-4">
+        {/* Details header and buttons */}
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-base font-medium text-[#a8c5b5]">Λεπτομέρειες Προσφοράς</h3>
                 <Button
                   type="button"
-                  variant="destructive"
-                  onClick={() => {
-                    handleDeleteConfirm();
-                  }}
-                  className="bg-red-600 text-white hover:bg-red-700"
-                  disabled={isDeleteLoading}
-                >
-                  {isDeleteLoading ? (
-                    <div className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Διαγραφή...
-                    </div>
-                  ) : "Διαγραφή"}
+            onClick={handleAddClick}
+            className="bg-[#52796f] hover:bg-[#354f52] text-[#cad2c5]"
+            disabled={dialogLoading}
+          >
+            Προσθήκη <Plus className="ml-1 h-4 w-4" />
                 </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Selection Dialog */}
-      <Dialog 
-        open={showSelectionDialog} 
-        onOpenChange={(open) => {
+        </div>
+
+        {/* Category selection dialog */}
+        {showSelectionDialog && (
+          <Dialog open={showSelectionDialog} onOpenChange={(open) => {
           if (open) {
             // If dialog is opening, just update the state
             setShowSelectionDialog(true);
@@ -1136,8 +900,7 @@ const DetailsTab = React.memo(() => {
             }
             setShowSelectionDialog(false);
           }
-        }}
-      >
+          }}>
         <DialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] max-w-4xl w-[800px] h-[550px] flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-[#a8c5b5]">Επιλογή Λεπτομερειών</DialogTitle>
@@ -1148,7 +911,7 @@ const DetailsTab = React.memo(() => {
               {/* Categories List */}
               <div className="w-1/3 border border-[#52796f] rounded-md overflow-hidden flex-shrink-0">
                 <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
-                  <h3 className="text-[#a8c5b5] text-sm font-medium">Κατηγορίες</h3>
+                  <h3 className="text-[#a8c5b5] text-base font-medium">Κατηγορίες</h3>
                 </div>
                 <div className="overflow-y-auto h-[calc(100%-36px)]">
                   {categories.length > 0 ? (
@@ -1182,7 +945,7 @@ const DetailsTab = React.memo(() => {
               {/* Subcategories List */}
               <div className="w-2/3 border border-[#52796f] rounded-md overflow-hidden flex-shrink-0">
                 <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
-                  <h3 className="text-[#a8c5b5] text-sm font-medium">
+                  <h3 className="text-[#a8c5b5] text-base font-medium">
                     {currentCategoryId 
                       ? `Περιγραφές: ${truncateText(categories.find(c => c.id === currentCategoryId)?.category_name || "", 20)}`
                       : "Περιγραφές"
@@ -1217,10 +980,10 @@ const DetailsTab = React.memo(() => {
                                     {isSelected && <span className="text-white text-xs">✓</span>}
                                   </div>
                                   <span className="text-xs">
-                                    {subcategory.subcategory_name.length > 40 ? (
+                                    {subcategory.subcategory_name.length > 60 ? (
                                       <GlobalTooltip content={subcategory.subcategory_name} position="top">
                                         <span>
-                                          {subcategory.subcategory_name.substring(0, 40)}
+                                          {subcategory.subcategory_name.substring(0, 60)}
                                           <span className="ml-1 ellipsis-blue">...</span>
                                         </span>
                                       </GlobalTooltip>
@@ -1228,7 +991,6 @@ const DetailsTab = React.memo(() => {
                                       subcategory.subcategory_name
                                     )}
                                   </span>
-                                  {isSelected && <span className="ml-1 text-xs text-[#cad2c5]/70">(επιλεγμένο)</span>}
                                 </div>
                               </div>
                             );
@@ -1247,72 +1009,6 @@ const DetailsTab = React.memo(() => {
                 </div>
               </div>
             </div>
-            
-            {/* Selected Items */}
-            {selectedItems.length > 0 && (
-              <div className="border border-[#52796f] rounded-md overflow-hidden flex-shrink-0">
-                <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
-                  <h3 className="text-[#a8c5b5] text-sm font-medium">Επιλεγμένα Στοιχεία</h3>
-                </div>
-                <div className="overflow-y-auto max-h-[250px]">
-                  <div className="divide-y divide-[#52796f]/30">
-                    {selectedItems.map((item, index) => (
-                      <div key={index} className="flex items-center space-x-2 p-1 border-b border-[#52796f]/30">
-                        <div className="flex-1 truncate text-xs">
-                          {item.subcategoryName.length > 30 ? (
-                            <GlobalTooltip content={item.subcategoryName} position="top">
-                              <span>
-                                {item.subcategoryName.substring(0, 30)}
-                                <span className="ml-1 ellipsis-blue">...</span>
-                              </span>
-                            </GlobalTooltip>
-                          ) : (
-                            item.subcategoryName
-                          )}
-                        </div>
-                        <div className="w-24">
-                          <div style={{ width: '180px' }}>
-                            <GlobalDropdown
-                              options={units.map(unit => unit.name)}
-                              value={units.find(u => u.id === item.unitId)?.name || ""}
-                              onSelect={(value) => {
-                                const selectedUnit = units.find(u => u.name === value);
-                                if (selectedUnit) {
-                                  setSelectedItems(prev => 
-                                    prev.map((i, idx) => idx === index ? { ...i, unitId: selectedUnit.id } : i)
-                                  );
-                                }
-                              }}
-                              placeholder="Μονάδα"
-                              className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-xs truncate hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] transition-all duration-200 h-8"
-                            />
-                          </div>
-                        </div>
-                        <div className="w-20">
-                          <div className="relative" style={{ width: '80px' }}>
-                            <Input
-                              type="text"
-                              value={item.price.toString()}
-                              onChange={(e) => {
-                                // Allow only numbers and decimal point
-                                const value = e.target.value.replace(/[^0-9.]/g, '');
-                                const newPrice = parseFloat(value) || 0;
-                                setSelectedItems(prev => 
-                                  prev.map((i, idx) => idx === index ? { ...i, price: newPrice } : i)
-                                );
-                              }}
-                              className="h-8 bg-[#2f3e46] border-[#52796f] text-[#cad2c5] text-xs text-right pr-6"
-                              placeholder="Τιμή"
-                            />
-                            <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[#cad2c5] text-xs">€</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
             
             {/* Selection Counter */}
             <div className="text-center text-sm text-[#84a98c] flex-shrink-0">
@@ -1338,8 +1034,210 @@ const DetailsTab = React.memo(() => {
           </div>
         </DialogContent>
       </Dialog>
+        )}
+
+        {/* Details list - Original implementation with table */}
+        <div className="flex-1 overflow-y-auto pb-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-2">
+              <svg className="animate-spin h-5 w-5 text-[#52796f]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+          ) : error ? (
+            <div className="p-2 bg-red-900/30 text-red-300 border border-red-800 rounded-md text-xs">
+              {error}
+            </div>
+          ) : details.length === 0 && selectedDetails.length === 0 ? (
+            <div className="text-center py-8 text-[#84a98c]">
+              Δεν υπάρχουν στοιχεία. Πατήστε "Προσθήκη" για να προσθέσετε στοιχεία στην προσφορά.
+            </div>
+          ) : (
+            <>
+              {/* Existing details from database and selected details for UI */}
+              {(details.length > 0 || selectedDetails.length > 0) && (
+                <>
+                  <div className={`overflow-y-auto border border-[#52796f] rounded-md ${
+                    details.length + selectedDetails.length > 6 ? 'max-h-[350px]' : 'h-auto'
+                  } mb-4`}>
+                    <table className="w-full text-xs text-[#cad2c5] details-table">
+                      <thead className="details-table-header">
+                        <tr className="border-b border-[#52796f]">
+                          <th className="text-left py-2 px-3 font-medium text-[#84a98c]" colSpan={2}>Κατηγορία / Περιγραφή</th>
+                          <th className="text-center py-2 px-3 font-medium text-[#84a98c] w-48">Μονάδα</th>
+                          <th className="text-center py-2 px-3 font-medium text-[#84a98c]">Τιμή</th>
+                          {isEditing && <th className="w-10 py-2 px-3"></th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Combine database and selected details */}
+                        {Array.from(new Set([
+                          ...details.map(detail => detail.category_id),
+                          ...selectedDetails.map(detail => detail.category_id)
+                        ])).map(categoryId => {
+                          // Get all details for this category
+                          const categoryDetails = [
+                            ...selectedDetails.filter(detail => detail.category_id === categoryId),
+                            ...details.filter(detail => detail.category_id === categoryId)
+                          ];
+                          
+                          // Get the category object from the first detail
+                          const category = categoryDetails[0]?.category;
+                          const categoryName = category?.category_name || "-";
+                          
+                          return (
+                            <React.Fragment key={categoryId}>
+                              {/* Category row */}
+                              <tr className="bg-[#354f52]/70 category-row">
+                                <td colSpan={isEditing ? 5 : 4} className="py-2 px-3 font-medium">
+                                  {categoryName.length > 40 ? (
+                                    <GlobalTooltip content={categoryName} position="top">
+                                      <span>
+                                        {categoryName.substring(0, 40)}
+                                        <span className="ml-1 ellipsis-blue">...</span>
+                                      </span>
+                                    </GlobalTooltip>
+                                  ) : (
+                                    categoryName
+                                  )}
+                                </td>
+                              </tr>
+                              
+                              {/* Subcategory rows */}
+                              {categoryDetails.map((detail) => {
+                                const isUIOnly = detail.id.startsWith('ui-');
+                                
+                                return (
+                                  <tr key={detail.id} 
+                                    className={`hover:bg-[#2f3e46] ${isUIOnly ? 'bg-[#354f52]/30' : ''}`} 
+                                    data-row-id={detail.id}>
+                                    <td className="w-4 py-2">
+                                      {isUIOnly && (
+                                        <span className="inline-block w-3 h-3 rounded-full bg-[#84a98c] ml-1" title="Προσωρινό - Δεν έχει αποθηκευτεί"></span>
+                                      )}
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <span className="text-[#84a98c]">
+                                        {detail.subcategory?.subcategory_name && detail.subcategory.subcategory_name.length > 30 ? (
+                                          <GlobalTooltip content={detail.subcategory.subcategory_name} position="top">
+                                            <span>
+                                              {detail.subcategory.subcategory_name.substring(0, 30)}
+                                              <span className="ml-1 ellipsis-blue">...</span>
+                                            </span>
+                                          </GlobalTooltip>
+                                        ) : (
+                                          detail.subcategory?.subcategory_name || '-'
+                                        )}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      {isEditing ? (
+                                        <div className="flex items-center justify-center">
+                                          <GlobalDropdown
+                                            options={units.map(unit => unit.id)}
+                                            value={detail.unit_id || ""}
+                                            onSelect={(value) => handleUnitChange(detail.id, value, detail.id.startsWith('ui-'))}
+                                            disabled={loading}
+                                            className="w-44 mx-auto"
+                                            renderOption={(id) => {
+                                              const unit = units.find(u => u.id === id);
+                                              return unit ? truncateText(unit.name, 30) : id;
+                                            }}
+                                            placeholder="Μονάδα"
+                                            header="Μονάδα"
+                                          />
+                                        </div>
+                                      ) : (
+                                        detail.unit?.name && detail.unit.name.length > 10 ? (
+                                          <GlobalTooltip content={detail.unit.name} position="top">
+                                            <span>
+                                              {detail.unit.name.substring(0, 10)}
+                                              <span className="ml-1 ellipsis-blue">...</span>
+                                            </span>
+                                          </GlobalTooltip>
+                                        ) : (
+                                          detail.unit?.name || '-'
+                                        )
+                                      )}
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      {isEditing ? (
+                                        <div className="flex items-center justify-center">
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={detail.price.toString()}
+                                            onChange={(e) => {
+                                              const value = parseFloat(e.target.value);
+                                              if (!isNaN(value)) {
+                                                handlePriceChange(detail.id, value, detail.id.startsWith('ui-'));
+                                              }
+                                            }}
+                                            className="bg-[#354f52] text-[#cad2c5] text-xs border-[#52796f] hover:bg-[#2f3e46] w-20 text-center"
+                                          />
+                                          <span className="ml-1 text-[#84a98c] text-xs">€</span>
+                                        </div>
+                                      ) : (
+                                        <span>{detail.price.toFixed(2)} €</span>
+                                      )}
+                                    </td>
+                                    {isEditing && (
+                                      <td className="py-2 px-3 text-center">
+                                        <div 
+                                          className="delete-btn inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-[#354f52]/70 cursor-pointer"
+                                          aria-label="Διαγραφή"
+                                          title="Διαγραφή"
+                                          data-ui-only={detail.id.startsWith('ui-')}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            
+                                            // Get the row directly for immediate UI feedback
+                                            const row = e.currentTarget.closest('tr');
+                                            if (row) {
+                                              // Add visual feedback but keep row in DOM
+                                              row.classList.add('deleting-row');
+                                              row.style.opacity = '0.3';
+                                              
+                                              // Critical: Mark row with data attributes for deletion tracking
+                                              row.setAttribute('data-deleted', 'true');
+                                              row.setAttribute('data-deleted-id', detail.id.toString());
+                                            }
+                                            
+                                            // Register the item for deletion with the context
+                                            if (context?.registerDeletedDetails) {
+                                              context.registerDeletedDetails(detail.id);
+                                            }
+                                            
+                                            // Also track it in our local state for backup
+                                            setManuallyDeletedIds(prev => [...prev, detail.id.toString()]);
+                                          }}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-[#84a98c] hover:text-[#cad2c5]" />
+                                        </div>
+                                      </td>
+                                    )}
+                                  </tr>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 });
 
 export default DetailsTab;
+
+/* The CSS styles below are causing errors and have been moved to OffersDialog.tsx */

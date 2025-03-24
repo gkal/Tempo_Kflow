@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { formatPhoneNumber } from '@/lib/utils';
+import { formatPhoneNumber } from '@/utils';
 
 /**
  * Custom hook for handling phone number formatting with specific requirements:

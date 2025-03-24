@@ -3,24 +3,63 @@ import ReactDOM from "react-dom";
 import { Check, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface CustomDropdownProps {
-  options?: { value: string; label: string }[];
-  value?: string;
-  onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+// Common types
+type DropdownOption = { value: string; label: string };
+type DropdownChangeEvent = React.ChangeEvent<HTMLSelectElement>;
+
+// Common interface for shared props
+interface DropdownBaseProps {
+  options: DropdownOption[];
+  value: string;
+  onChange?: (e: DropdownChangeEvent) => void;
   name?: string;
-  placeholder?: string;
   className?: string;
   disabled?: boolean;
 }
 
-export interface SearchBarDropdownProps {
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  name?: string;
-  className?: string;
-  disabled?: boolean;
+export interface CustomDropdownProps extends Partial<DropdownBaseProps> {
+  placeholder?: string;
 }
+
+export interface SearchBarDropdownProps extends DropdownBaseProps {}
+
+// Utility functions
+const createChangeEvent = (name: string, value: string): DropdownChangeEvent => {
+  return {
+    target: {
+      name,
+      value,
+    }
+  } as DropdownChangeEvent;
+};
+
+const useOutsideClick = (ref: React.RefObject<HTMLElement>, callback: () => void) => {
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        callback();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [ref, callback]);
+};
+
+const calculateDropdownPosition = (triggerElement: HTMLElement | null): { top: number, left: number, width: number } => {
+  if (!triggerElement) {
+    return { top: 0, left: 0, width: 0 };
+  }
+  
+  const rect = triggerElement.getBoundingClientRect();
+  return {
+    top: rect.bottom + window.scrollY + 5,
+    left: rect.left + window.scrollX,
+    width: rect.width,
+  };
+};
 
 // Simple dropdown component
 const BaseCustomDropdown: React.FC<CustomDropdownProps> = ({
@@ -48,29 +87,13 @@ const BaseCustomDropdown: React.FC<CustomDropdownProps> = ({
       return;
     }
     
-    onChange?.({
-      target: {
-        name: name || '',
-        value: optionValue,
-      }
-    } as React.ChangeEvent<HTMLSelectElement>);
+    onChange?.(createChangeEvent(name, optionValue));
     
     setIsOpen(false);
   };
 
   // Handle click outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+  useOutsideClick(dropdownRef, () => setIsOpen(false));
 
   // Toggle dropdown
   const toggleDropdown = () => {
@@ -98,9 +121,7 @@ const BaseCustomDropdown: React.FC<CustomDropdownProps> = ({
           disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
         )}
         disabled={disabled}
-        onClick={() => {
-          toggleDropdown();
-        }}
+        onClick={toggleDropdown}
       >
         <span className="text-right w-full pr-2 truncate">
           {selectedOption?.label || placeholder}
@@ -186,7 +207,6 @@ const SearchBarCustomDropdown: React.FC<SearchBarDropdownProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [hasReceivedOptions, setHasReceivedOptions] = useState(false);
-  const prevOptionsRef = useRef<{ value: string; label: string }[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{top: number, left: number, width: number}>({
@@ -195,6 +215,9 @@ const SearchBarCustomDropdown: React.FC<SearchBarDropdownProps> = ({
     width: 0
   });
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+  
+  // Store previous options to handle empty options case
+  const prevOptionsRef = useRef<DropdownOption[]>([]);
   
   // Create portal container when component mounts
   useEffect(() => {
@@ -294,12 +317,7 @@ const SearchBarCustomDropdown: React.FC<SearchBarDropdownProps> = ({
       return;
     }
     
-    onChange({
-      target: {
-        name: name || '',
-        value: optionValue,
-      }
-    } as React.ChangeEvent<HTMLSelectElement>);
+    onChange(createChangeEvent(name, optionValue));
     
     setIsOpen(false);
   };

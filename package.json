@@ -19,7 +19,11 @@
     "version:major": "node scripts/add-version.js major",
     "version:minor": "node scripts/add-version.js minor",
     "version:patch": "node scripts/add-version.js patch",
-    "update-schema": "node scripts/update-schema.js"
+    "update-schema": "node scripts/update-schema.js",
+    "find-unused": "node src/scripts/find-unused-code.js src ts,tsx",
+    "find-unused:utils": "node src/scripts/find-unused-code.js src ts,tsx --focus=utils --output=unused-utils.json",
+    "find-unused:services": "node src/scripts/find-unused-code.js src ts,tsx --focus=services --output=unused-services.json",
+    "find-unused:business": "node src/scripts/find-unused-code.js src ts,tsx --exclude=components/ui --output=unused-business-components.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.6.0",

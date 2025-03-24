@@ -1,0 +1,892 @@
+{
+  "summary": {
+    "totalExports": 603,
+    "potentiallyUnused": 603,
+    "scanDate": "2025-03-23T16:58:15.495Z"
+  },
+  "unusedExportsByFile": {
+    "src\\components\\contacts\\ContactCard.tsx": [
+      "ContactCard"
+    ],
+    "src\\components\\contacts\\ContactDialog.tsx": [
+      "ContactDialog"
+    ],
+    "src\\components\\contacts\\ContactList.tsx": [
+      "ContactList"
+    ],
+    "src\\components\\contacts\\PositionDialog.tsx": [
+      "PositionDialog"
+    ],
+    "src\\components\\customers\\CustomerContextMenu.tsx": [
+      "CustomerContextMenu"
+    ],
+    "src\\components\\customers\\CustomerDialog.tsx": [
+      "CustomerDialog"
+    ],
+    "src\\components\\customers\\OfferDialogManager.tsx": [
+      "dialogManager",
+      "OfferDialogContainer",
+      "openNewOfferDialog",
+      "openEditOfferDialog"
+    ],
+    "src\\components\\customers\\OffersDialog.tsx": [
+      "OffersDialogProps",
+      "OfferDialogContextType",
+      "OfferDialogContext"
+    ],
+    "src\\components\\customers\\OffersTable.tsx": [
+      "OffersTableRef"
+    ],
+    "src\\components\\examples\\DialogExample.tsx": [
+      "DialogExample"
+    ],
+    "src\\components\\layout\\AppLayout.tsx": [
+      "AppLayout"
+    ],
+    "src\\components\\layout\\HeaderBar.tsx": [
+      "HeaderBar"
+    ],
+    "src\\components\\layout\\index.ts": [
+      "AppLayout",
+      "NavSidebar",
+      "HeaderBar"
+    ],
+    "src\\components\\layout\\MainLayout.tsx": [
+      "MainLayout"
+    ],
+    "src\\components\\layout\\NavSidebar.tsx": [
+      "NavSidebar"
+    ],
+    "src\\components\\offers\\improved\\OfferDetails.tsx": [
+      "OfferDetails"
+    ],
+    "src\\components\\offers\\improved\\OfferRow.tsx": [
+      "OfferRow"
+    ],
+    "src\\components\\offers\\improved\\OffersTable.tsx": [
+      "OffersTable"
+    ],
+    "src\\components\\offers\\improved\\ResultFilter.tsx": [
+      "ResultFilter"
+    ],
+    "src\\components\\offers\\improved\\StatusFilter.tsx": [
+      "StatusFilter"
+    ],
+    "src\\components\\tasks\\TaskDialog.tsx": [
+      "TaskDialog"
+    ],
+    "src\\components\\tasks\\TaskItem.tsx": [
+      "TaskItem"
+    ],
+    "src\\components\\tasks\\TaskList.tsx": [
+      "TaskList"
+    ],
+    "src\\components\\ui\\AccessibleAlertDialog.tsx": [
+      "AccessibleAlertDialog"
+    ],
+    "src\\components\\ui\\AccessibleDialog.tsx": [
+      "AccessibleDialogProps",
+      "AccessibleDialog"
+    ],
+    "src\\components\\ui\\accordion.tsx": [
+      "Accordion",
+      "AccordionItem",
+      "AccordionTrigger",
+      "AccordionContent"
+    ],
+    "src\\components\\ui\\alert-dialog.tsx": [
+      "AlertDialog",
+      "AlertDialogPortal",
+      "AlertDialogOverlay",
+      "AlertDialogTrigger",
+      "AlertDialogContent",
+      "AlertDialogHeader",
+      "AlertDialogFooter",
+      "AlertDialogTitle",
+      "AlertDialogDescription",
+      "AlertDialogAction",
+      "AlertDialogCancel"
+    ],
+    "src\\components\\ui\\alert.tsx": [
+      "Alert",
+      "AlertTitle",
+      "AlertDescription"
+    ],
+    "src\\components\\ui\\app-tabs.tsx": [
+      "AppTabs",
+      "AppTabsList",
+      "AppTabsTrigger",
+      "AppTabsContent"
+    ],
+    "src\\components\\ui\\aspect-ratio.tsx": [
+      "AspectRatio"
+    ],
+    "src\\components\\ui\\avatar.tsx": [
+      "Avatar",
+      "AvatarImage",
+      "AvatarFallback"
+    ],
+    "src\\components\\ui\\badge.tsx": [
+      "BadgeProps",
+      "Badge",
+      "badgeVariants"
+    ],
+    "src\\components\\ui\\button.tsx": [
+      "ButtonProps",
+      "Button",
+      "buttonVariants"
+    ],
+    "src\\components\\ui\\calendar.tsx": [
+      "CalendarProps",
+      "Calendar"
+    ],
+    "src\\components\\ui\\card.tsx": [
+      "Card",
+      "CardHeader",
+      "CardFooter",
+      "CardTitle",
+      "CardDescription",
+      "CardContent"
+    ],
+    "src\\components\\ui\\carousel.tsx": [
+      "type CarouselApi",
+      "Carousel",
+      "CarouselContent",
+      "CarouselItem",
+      "CarouselPrevious",
+      "CarouselNext"
+    ],
+    "src\\components\\ui\\checkbox.tsx": [
+      "Checkbox"
+    ],
+    "src\\components\\ui\\close-button.tsx": [
+      "CloseButton"
+    ],
+    "src\\components\\ui\\collapsible.tsx": [
+      "Collapsible",
+      "CollapsibleTrigger",
+      "CollapsibleContent"
+    ],
+    "src\\components\\ui\\command.tsx": [
+      "Command",
+      "CommandDialog",
+      "CommandInput",
+      "CommandList",
+      "CommandEmpty",
+      "CommandGroup",
+      "CommandItem",
+      "CommandShortcut",
+      "CommandSeparator"
+    ],
+    "src\\components\\ui\\context-menu.tsx": [
+      "ContextMenu",
+      "ContextMenuTrigger",
+      "ContextMenuContent",
+      "ContextMenuItem",
+      "ContextMenuCheckboxItem",
+      "ContextMenuRadioItem",
+      "ContextMenuLabel",
+      "ContextMenuSeparator",
+      "ContextMenuShortcut",
+      "ContextMenuGroup",
+      "ContextMenuPortal",
+      "ContextMenuSub",
+      "ContextMenuSubContent",
+      "ContextMenuSubTrigger",
+      "ContextMenuRadioGroup"
+    ],
+    "src\\components\\ui\\custom-alert-dialog.tsx": [
+      "CustomAlertDialogContent"
+    ],
+    "src\\components\\ui\\custom-dropdown.tsx": [
+      "CustomDropdownProps",
+      "SearchBarDropdownProps",
+      "CustomDropdown",
+      "SearchBarCustomDropdown"
+    ],
+    "src\\components\\ui\\custom-menu.tsx": [
+      "CustomMenu",
+      "CustomMenuItem"
+    ],
+    "src\\components\\ui\\custom-tabs.tsx": [
+      "SimpleTabs",
+      "CustomTabs",
+      "AppTabs",
+      "AppTabsList",
+      "AppTabsTrigger",
+      "AppTabsContent"
+    ],
+    "src\\components\\ui\\data-select.tsx": [
+      "DataSelect",
+      "DataSelectGroup",
+      "DataSelectValue",
+      "DataSelectTrigger",
+      "DataSelectContent",
+      "DataSelectItem"
+    ],
+    "src\\components\\ui\\data-table-base.tsx": [
+      "SortDirection",
+      "Column",
+      "DataTableBaseProps",
+      "DataTableBase"
+    ],
+    "src\\components\\ui\\data-table-examples.tsx": [
+      "AutoSizingColumnsExample",
+      "FixedWidthCategoriesExample",
+      "ColumnVisibilityExample",
+      "ExpandableRowsExample",
+      "SmartWidthDistributionExample"
+    ],
+    "src\\components\\ui\\dialog.tsx": [
+      "useDialogState",
+      "Dialog",
+      "DialogPortal",
+      "DialogOverlay",
+      "DialogTrigger",
+      "DialogClose",
+      "DialogContent",
+      "DialogHeader",
+      "DialogFooter",
+      "DialogTitle",
+      "DialogDescription"
+    ],
+    "src\\components\\ui\\DialogUtilities.tsx": [
+      "DialogUtilities"
+    ],
+    "src\\components\\ui\\drawer.tsx": [
+      "Drawer",
+      "DrawerPortal",
+      "DrawerOverlay",
+      "DrawerTrigger",
+      "DrawerClose",
+      "DrawerContent",
+      "DrawerHeader",
+      "DrawerFooter",
+      "DrawerTitle",
+      "DrawerDescription"
+    ],
+    "src\\components\\ui\\dropdown-menu.tsx": [
+      "DropdownMenu",
+      "DropdownMenuTrigger",
+      "DropdownMenuContent",
+      "DropdownMenuItem",
+      "DropdownMenuCheckboxItem",
+      "DropdownMenuRadioItem",
+      "DropdownMenuLabel",
+      "DropdownMenuSeparator",
+      "DropdownMenuShortcut",
+      "DropdownMenuGroup",
+      "DropdownMenuPortal",
+      "DropdownMenuSub",
+      "DropdownMenuSubContent",
+      "DropdownMenuSubTrigger",
+      "DropdownMenuRadioGroup"
+    ],
+    "src\\components\\ui\\error-dialog.tsx": [
+      "ErrorDialog"
+    ],
+    "src\\components\\ui\\form.tsx": [
+      "useFormField",
+      "Form",
+      "FormItem",
+      "FormLabel",
+      "FormControl",
+      "FormDescription",
+      "FormMessage",
+      "FormField"
+    ],
+    "src\\components\\ui\\FormField.tsx": [
+      "FormField",
+      "FormCheckField",
+      "FormSection",
+      "FormActions"
+    ],
+    "src\\components\\ui\\GlobalDialogProvider.tsx": [
+      "useDialog",
+      "GlobalDialogProvider"
+    ],
+    "src\\components\\ui\\GlobalDropdown.tsx": [
+      "GlobalDropdown"
+    ],
+    "src\\components\\ui\\GlobalTooltip.tsx": [
+      "GlobalTooltip",
+      "TruncateWithTooltip",
+      "TooltipProvider",
+      "Tooltip",
+      "TooltipTrigger",
+      "useTooltip",
+      "TooltipContent",
+      "RadixTooltip",
+      "SimpleTooltip"
+    ],
+    "src\\components\\ui\\hover-card.tsx": [
+      "HoverCard",
+      "HoverCardTrigger",
+      "HoverCardContent"
+    ],
+    "src\\components\\ui\\input.tsx": [
+      "InputProps",
+      "Input"
+    ],
+    "src\\components\\ui\\label.tsx": [
+      "Label"
+    ],
+    "src\\components\\ui\\LoadingDots.tsx": [
+      "LoadingDots"
+    ],
+    "src\\components\\ui\\menubar.tsx": [
+      "Menubar",
+      "MenubarMenu",
+      "MenubarTrigger",
+      "MenubarContent",
+      "MenubarItem",
+      "MenubarSeparator",
+      "MenubarLabel",
+      "MenubarCheckboxItem",
+      "MenubarRadioGroup",
+      "MenubarRadioItem",
+      "MenubarPortal",
+      "MenubarSubContent",
+      "MenubarSubTrigger",
+      "MenubarGroup",
+      "MenubarSub",
+      "MenubarShortcut"
+    ],
+    "src\\components\\ui\\navigation-menu.tsx": [
+      "navigationMenuTriggerStyle",
+      "NavigationMenu",
+      "NavigationMenuList",
+      "NavigationMenuItem",
+      "NavigationMenuContent",
+      "NavigationMenuTrigger",
+      "NavigationMenuLink",
+      "NavigationMenuIndicator",
+      "NavigationMenuViewport"
+    ],
+    "src\\components\\ui\\NotificationPanel.tsx": [
+      "NotificationPanel"
+    ],
+    "src\\components\\ui\\pagination.tsx": [
+      "Pagination",
+      "PaginationContent",
+      "PaginationLink",
+      "PaginationItem",
+      "PaginationPrevious",
+      "PaginationNext",
+      "PaginationEllipsis"
+    ],
+    "src\\components\\ui\\popover.tsx": [
+      "Popover",
+      "PopoverTrigger",
+      "PopoverContent",
+      "PopoverAnchor"
+    ],
+    "src\\components\\ui\\progress.tsx": [
+      "Progress"
+    ],
+    "src\\components\\ui\\radio-group.tsx": [
+      "RadioGroup",
+      "RadioGroupItem"
+    ],
+    "src\\components\\ui\\resizable.tsx": [
+      "ResizablePanelGroup",
+      "ResizablePanel",
+      "ResizableHandle"
+    ],
+    "src\\components\\ui\\scroll-area.tsx": [
+      "ScrollArea",
+      "ScrollBar"
+    ],
+    "src\\components\\ui\\search-bar.tsx": [
+      "SearchBar"
+    ],
+    "src\\components\\ui\\search-select.tsx": [
+      "SearchSelect",
+      "SearchSelectGroup",
+      "SearchSelectValue",
+      "SearchSelectTrigger",
+      "SearchSelectContent",
+      "SearchSelectItem"
+    ],
+    "src\\components\\ui\\select.tsx": [
+      "Select",
+      "SelectGroup",
+      "SelectValue",
+      "SelectTrigger",
+      "SelectContent",
+      "SelectLabel",
+      "SelectItem",
+      "SelectSeparator",
+      "SelectScrollUpButton",
+      "SelectScrollDownButton"
+    ],
+    "src\\components\\ui\\separator.tsx": [
+      "Separator"
+    ],
+    "src\\components\\ui\\sheet.tsx": [
+      "Sheet",
+      "SheetPortal",
+      "SheetOverlay",
+      "SheetTrigger",
+      "SheetClose",
+      "SheetContent",
+      "SheetHeader",
+      "SheetFooter",
+      "SheetTitle",
+      "SheetDescription"
+    ],
+    "src\\components\\ui\\skeleton.tsx": [
+      "Skeleton"
+    ],
+    "src\\components\\ui\\slider.tsx": [
+      "Slider"
+    ],
+    "src\\components\\ui\\switch.tsx": [
+      "Switch"
+    ],
+    "src\\components\\ui\\table.tsx": [
+      "Table",
+      "TableHeader",
+      "TableBody",
+      "TableFooter",
+      "TableHead",
+      "TableRow",
+      "TableCell",
+      "TableCaption"
+    ],
+    "src\\components\\ui\\tabs.tsx": [
+      "Tabs",
+      "TabsList",
+      "TabsTrigger",
+      "TabsContent"
+    ],
+    "src\\components\\ui\\textarea.tsx": [
+      "TextareaProps",
+      "Textarea"
+    ],
+    "src\\components\\ui\\toast.tsx": [
+      "type ToastProps",
+      "type ToastActionElement",
+      "ToastProvider",
+      "ToastViewport",
+      "Toast",
+      "ToastTitle",
+      "ToastDescription",
+      "ToastClose",
+      "ToastAction"
+    ],
+    "src\\components\\ui\\toaster.tsx": [
+      "Toaster"
+    ],
+    "src\\components\\ui\\toggle.tsx": [
+      "Toggle",
+      "toggleVariants"
+    ],
+    "src\\components\\ui\\tooltip.tsx": [
+      "TooltipProvider",
+      "Tooltip",
+      "TooltipTrigger",
+      "TooltipContent",
+      "useTooltip",
+      "CustomTooltip",
+      "SimpleTooltip"
+    ],
+    "src\\components\\ui\\truncated-text.tsx": [
+      "TruncatedText"
+    ],
+    "src\\components\\ui\\use-toast.ts": [
+      "reducer",
+      "useToast",
+      "toast"
+    ],
+    "src\\components\\ui\\ValidatedInput.tsx": [
+      "ValidatedInput",
+      "ValidatedTextarea",
+      "ValidatedSelect"
+    ],
+    "src\\components\\ui\\version-history.tsx": [
+      "VersionHistory"
+    ],
+    "src\\global.d.ts": [
+      "setupCustomValidationMessages",
+      "ValidationMessages",
+      "ValidationPatterns",
+      "checkRequiredFields",
+      "setCustomValidationMessage",
+      "setupWarningSuppressions",
+      "addWarningSuppressionPattern",
+      "setupLogSuppressions",
+      "disableCustomLoggingFunctions"
+    ],
+    "src\\hooks\\useCustomerOffers.ts": [
+      "useCustomerOffers"
+    ],
+    "src\\hooks\\useDialogCleanup.ts": [
+      "useDialogCleanup",
+      "createDialogId"
+    ],
+    "src\\hooks\\useDialogHelpers.ts": [
+      "BaseDialogOptions",
+      "ConfirmDialogOptions",
+      "AlertDialogOptions",
+      "useDialogHelpers"
+    ],
+    "src\\hooks\\usePhoneFormat.ts": [
+      "usePhoneFormat"
+    ],
+    "src\\hooks\\useUser.ts": [
+      "useUser"
+    ],
+    "src\\lib\\auth.ts": [
+      "AuthError",
+      "LoginCredentials",
+      "NewUserData",
+      "getRememberedUser",
+      "logoutUser",
+      "isLoggedIn"
+    ],
+    "src\\lib\\AuthContext.tsx": [
+      "AuthProvider",
+      "useAuth"
+    ],
+    "src\\lib\\disableAutocomplete.ts": [
+      "disableAutocomplete"
+    ],
+    "src\\lib\\featureFlags.ts": [
+      "FeatureName",
+      "FeatureFlags",
+      "isFeatureEnabled",
+      "withFeature",
+      "debugLog",
+      "errorLog",
+      "featureGate"
+    ],
+    "src\\lib\\FormContext.tsx": [
+      "FormContext",
+      "FormProvider",
+      "useFormContext",
+      "useFormRegistration"
+    ],
+    "src\\lib\\hooks\\useDialogHelpers.ts": [
+      "ConfirmDialogOptions",
+      "AlertDialogOptions",
+      "useDialogHelpers"
+    ],
+    "src\\lib\\notificationEvents.ts": [
+      "NotificationEventType",
+      "NotificationData",
+      "NotificationEventData",
+      "notificationEvents",
+      "notifyNewNotification",
+      "notifyNotificationRead",
+      "notifyNotificationsCleared"
+    ],
+    "src\\lib\\permissions.ts": [
+      "Permission",
+      "ModulePermissions",
+      "UserRole",
+      "Module",
+      "Action",
+      "RolePermissions",
+      "checkPermission",
+      "withPermission"
+    ],
+    "src\\lib\\RealtimeProvider.tsx": [
+      "useRealtime",
+      "RealtimeProvider"
+    ],
+    "src\\lib\\styles\\close-button.ts": [
+      "closeButtonStyles",
+      "CloseButtonStyles",
+      "getCloseButtonStyle",
+      "getCloseButtonClasses"
+    ],
+    "src\\lib\\styles\\datatable.ts": [
+      "dataTableStyles",
+      "DataTableStyles",
+      "getDataTableStyle",
+      "getDataTableStyle",
+      "getDataTableStyle"
+    ],
+    "src\\lib\\styles\\search-bar.ts": [
+      "searchBarStyles",
+      "SearchBarStyles",
+      "getSearchBarStyle"
+    ],
+    "src\\lib\\styles\\utils.ts": [
+      "deepFreeze",
+      "getStyleValue",
+      "classNames"
+    ],
+    "src\\lib\\supabaseClient.ts": [
+      "supabase",
+      "User",
+      "getCurrentUser",
+      "getCurrentSession",
+      "getAuthSession"
+    ],
+    "src\\lib\\useRealtimeSubscription.ts": [
+      "useRealtimeSubscription"
+    ],
+    "src\\lib\\utils.ts": [
+      "cn"
+    ],
+    "src\\lib\\version-utils.ts": [
+      "compareVersions",
+      "getLatestVersion"
+    ],
+    "src\\lib\\version.ts": [
+      "VersionEntry",
+      "SemanticVersion",
+      "parseVersion",
+      "formatReleaseDate",
+      "VERSION_HISTORY",
+      "CURRENT_VERSION",
+      "VERSION",
+      "getVersionEntry",
+      "getNewerVersions"
+    ],
+    "src\\pages\\home.tsx": [
+      "Home"
+    ],
+    "src\\routes.ts": [
+      "routes"
+    ],
+    "src\\scripts\\cleanup-helpers.ts": [
+      "findFilesRecursive",
+      "getFileStats",
+      "replaceConsoleStatementsInFile",
+      "findUnusedFiles",
+      "findDuplicatedCode",
+      "generateCleanupReport"
+    ],
+    "src\\services\\api\\types.ts": [
+      "DbResponse",
+      "TableName",
+      "Customer",
+      "Contact",
+      "ContactPosition",
+      "Department",
+      "Offer",
+      "OfferDetail",
+      "Task",
+      "User",
+      "ServiceCategory",
+      "ServiceSubcategory",
+      "Unit",
+      "Notification",
+      "OfferHistory"
+    ],
+    "src\\services\\offerDetailsService.ts": [
+      "fetchOfferDetails",
+      "addOfferDetail",
+      "updateOfferDetail",
+      "deleteOfferDetail",
+      "fetchServiceCategories",
+      "fetchSubcategories",
+      "fetchMeasurementUnits"
+    ],
+    "src\\types\\auth.ts": [
+      "User",
+      "HistoryLog"
+    ],
+    "src\\types\\offer-details.ts": [
+      "ServiceCategory",
+      "ServiceSubcategory",
+      "MeasurementUnit",
+      "OfferDetail",
+      "OfferDetailFormData"
+    ],
+    "src\\types\\supabase.ts": [
+      "Json",
+      "Database",
+      "Tables",
+      "TablesInsert",
+      "TablesUpdate",
+      "Enums",
+      "CompositeTypes"
+    ],
+    "src\\utils\\apiUtils.ts": [
+      "ApiResponse",
+      "ApiError",
+      "ApiOptions",
+      "formatApiError",
+      "createSuccessResponse",
+      "createErrorResponse",
+      "isSuccessResponse",
+      "parseApiData",
+      "createTimeoutController",
+      "formatQueryParams"
+    ],
+    "src\\utils\\browserUtils.ts": [
+      "disableAutocomplete",
+      "detectBrowserFeature",
+      "browserUtils"
+    ],
+    "src\\utils\\componentUtils.ts": [
+      "logDeprecationWarning",
+      "withDeprecationWarning"
+    ],
+    "src\\utils\\consoleReplacer.ts": [
+      "loggingConsole",
+      "findConsoleStatements",
+      "replaceConsoleStatements",
+      "hasLoggingImport",
+      "addLoggingImport"
+    ],
+    "src\\utils\\errorUtils.ts": [
+      "ErrorType",
+      "ErrorResponse",
+      "createError",
+      "handleSupabaseError",
+      "handleFormError",
+      "getUserErrorMessage",
+      "isNetworkError",
+      "getFieldErrors"
+    ],
+    "src\\utils\\eventUtils.ts": [
+      "AppEventType",
+      "BaseEventData",
+      "EntityEventData",
+      "AppEventMap",
+      "addEventListener",
+      "removeEventListener",
+      "dispatchEvent",
+      "createEventHandlers",
+      "createCustomEvent",
+      "onceEvent"
+    ],
+    "src\\utils\\formatUtils.ts": [
+      "formatDate",
+      "formatDateTime",
+      "safeFormatDateTime",
+      "formatDateISO",
+      "formatCurrency",
+      "formatPhoneNumber",
+      "DateParts",
+      "extractDateParts"
+    ],
+    "src\\utils\\formHelpers.ts": [
+      "useFormWatch",
+      "setMultipleFields",
+      "resetFormWithValues",
+      "formHelpers"
+    ],
+    "src\\utils\\formValidation.ts": [
+      "ValidationMessages",
+      "ValidationPatterns",
+      "setupCustomValidationMessages",
+      "ValidationRule",
+      "ValidationStatus",
+      "FormValidationState",
+      "useFormValidation",
+      "setCustomValidationMessage",
+      "checkRequiredFields"
+    ],
+    "src\\utils\\index.ts": [
+      "setupUtilities",
+      "utils",
+      "truncateWithNullHandling",
+      "capitalize",
+      "slugify",
+      "textTruncate"
+    ],
+    "src\\utils\\loggingUtils.ts": [
+      "LogLevel",
+      "logDebug",
+      "logInfo",
+      "logWarning",
+      "logError",
+      "configureLogging",
+      "createPrefixedLogger"
+    ],
+    "src\\utils\\stringUtils.ts": [
+      "truncateText",
+      "truncate",
+      "generateSlug",
+      "capitalizeWords",
+      "normalizeText",
+      "getInitials"
+    ],
+    "src\\utils\\styleUtils.ts": [
+      "cn",
+      "classNames",
+      "deepFreeze",
+      "getStyleValue",
+      "StatusType",
+      "ResultType",
+      "formatStatus",
+      "formatResult",
+      "getStatusClass",
+      "getResultClass",
+      "ButtonSize",
+      "TooltipPosition",
+      "getCloseButtonClasses",
+      "getTooltipPositionClass",
+      "getSkeletonClasses",
+      "getInputClasses",
+      "styles"
+    ],
+    "src\\utils\\suppressWarnings.ts": [
+      "setupWarningSuppressions",
+      "addWarningSuppressionPattern",
+      "setupLogSuppressions",
+      "disableCustomLoggingFunctions"
+    ],
+    "src\\utils\\textUtils.ts": [
+      "truncateWithNullHandling",
+      "truncate",
+      "capitalize",
+      "slugify"
+    ],
+    "src\\utils\\validationModule.ts": [
+      "ValidationPatterns",
+      "ValidationMessages",
+      "ValidationMessagesEN",
+      "ValidationResult",
+      "ValidationFunction",
+      "validResult",
+      "invalidResult",
+      "validateRequired",
+      "validatePattern",
+      "validateLength",
+      "validateEmail",
+      "validatePhone",
+      "validateAfm",
+      "validateUrl",
+      "validateMultiple",
+      "ValidationRule",
+      "ValidationStatus",
+      "FormValidationState",
+      "useFormValidation",
+      "setupCustomValidationMessages",
+      "setCustomValidationMessage",
+      "checkRequiredFields",
+      "validation"
+    ],
+    "src\\utils\\validationUtils.ts": [
+      "ValidationResult",
+      "validResult",
+      "invalidResult",
+      "validateEmail",
+      "validateUrl",
+      "validateAfm",
+      "validateVat",
+      "validatePhone",
+      "validateDate",
+      "validateRange",
+      "validatePositiveNumber",
+      "validatePercentage",
+      "validateAlphanumeric",
+      "validateMultiple",
+      "validateRequired",
+      "validateLength"
+    ],
+    "src\\verify-db-setup.ts": [
+      "verifyDatabaseSetup",
+      "verifyFunctions",
+      "verifyCustomerStatusIndex",
+      "verifyOfferIndexes"
+    ]
+  }
+}

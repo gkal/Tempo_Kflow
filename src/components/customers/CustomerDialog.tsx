@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogDescription,
 } from "@/components/ui/alert-dialog";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabaseClient';
 import { PlusIcon } from "lucide-react";
 import { useFormRegistration } from '@/lib/FormContext';
 import { useFormContext } from '@/lib/FormContext';

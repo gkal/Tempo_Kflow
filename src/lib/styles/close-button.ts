@@ -6,19 +6,7 @@
  *
  * 🚫 DO NOT MODIFY THESE VALUES unless explicitly instructed to do so!
  */
-
-function deepFreeze<T extends object>(obj: T): Readonly<T> {
-  Object.keys(obj).forEach((prop) => {
-    if (
-      typeof (obj as any)[prop] === "object" &&
-      (obj as any)[prop] !== null &&
-      !Object.isFrozen((obj as any)[prop])
-    ) {
-      deepFreeze((obj as any)[prop]);
-    }
-  });
-  return Object.freeze(obj);
-}
+import { deepFreeze } from './utils';
 
 export const closeButtonStyles = deepFreeze({
   // Colors

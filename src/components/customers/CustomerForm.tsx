@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { supabase } from '@/lib/supabaseClient';
 import { Search, Plus, ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePhoneFormat } from "@/hooks/usePhoneFormat";
+import { validateRequired, validateEmail, validatePhone, validateMultiple } from "../../utils/validationUtils";
+import { useMountEffect } from "@/hooks/useMountEffect";
+import { createPrefixedLogger, logDebug, logError, logInfo, logWarning } from "@/utils/loggingUtils";
 
 // Map of normalized customer types that match the database constraint
 const CUSTOMER_TYPE_MAP = {
@@ -137,6 +140,9 @@ const CustomerForm = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteSuccessful, setIsDeleteSuccessful] = useState(false);
+
+  // Create a logger for this component
+  const logger = createPrefixedLogger('CustomerForm');
 
   // Fetch customer data if editing
   useEffect(() => {
@@ -293,10 +299,18 @@ const CustomerForm = ({
   };
 
   const isFormValid = () => {
-    // Check mandatory fields
-    return (
-      formData.company_name.trim() !== "" && formData.telephone.trim() !== ""
-    );
+    // Use our validation utilities to check mandatory fields
+    const companyNameResult = validateRequired(formData.company_name.trim());
+    const phoneResult = validatePhone(formData.telephone.trim());
+    
+    // Email validation if provided
+    let emailValid = true;
+    if (formData.email && formData.email.trim() !== "") {
+      const emailResult = validateEmail(formData.email.trim());
+      emailValid = emailResult.isValid;
+    }
+    
+    return companyNameResult.isValid && phoneResult.isValid && emailValid;
   };
 
   // Update parent component about form validity whenever form data changes
@@ -309,13 +323,13 @@ const CustomerForm = ({
   const [saveDisabled, setSaveDisabled] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log("Form submission started");
+    logDebug("Form submission started");
     e.preventDefault();
-    console.log("Default form submission prevented");
+    logDebug("Default form submission prevented");
     
     // If there's a temporary customer type, apply it now
     if (tempCustomerType !== null) {
-      console.log("Applying temporary customer type:", tempCustomerType);
+      logDebug("Applying temporary customer type:", tempCustomerType);
       setFormData(prev => ({
         ...prev,
         customer_type: tempCustomerType
@@ -331,148 +345,135 @@ const CustomerForm = ({
     // CRITICAL FIX: Ensure customer_type is ALWAYS one of the allowed values
     const allowedCustomerTypes = ["Εταιρεία,", "Ιδιώτης,", "Δημόσιο,", "Οικοδομές", "Εκτακτος", "Εκτακτος πελάτης", "Εκτακτη εταιρία"];
     if (!allowedCustomerTypes.includes(submissionData.customer_type)) {
-      console.log("Warning: customer_type not in allowed list, forcing to 'Εταιρεία,'");
+      logWarning("Warning: customer_type not in allowed list, forcing to 'Εταιρεία,'");
       submissionData.customer_type = "Εταιρεία,"; // Use a safe default value
     }
     
     // ❗ IMPORTANT: Debug log of the actual value being sent to the database
-    console.log("FINAL customer_type value:", submissionData.customer_type);
+    logDebug("FINAL customer_type value:", submissionData.customer_type);
     
-    // Validation checks
-    console.log("Starting validation checks");
-    let isValid = true;
-    const form = e.currentTarget as HTMLFormElement;
-    const requiredInputs = form.querySelectorAll('input[required], select[required], textarea[required]');
+    // Validation checks using our new validation utilities
+    logDebug("Starting validation checks");
     
-    requiredInputs.forEach(input => {
-      const element = input as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
-      if (!element.value) {
-        isValid = false;
-        console.log("Required field empty:", element.id || element.name);
-        
-        // Show custom Greek validation message
-        alert('Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία');
-        
-        // Focus the first empty required field
-        element.focus();
-        
-        // Stop checking after finding the first empty field
-        return;
+    // Check required fields using the form data directly
+    const requiredFields = ['company_name', 'telephone'];
+    const validationResults = requiredFields.map(field => {
+      const value = submissionData[field];
+      const isEmpty = !value || value.trim() === '';
+      if (isEmpty) {
+        logWarning(`Required field empty: ${field}`);
       }
+      return { field, isValid: !isEmpty };
     });
     
+    // If any required field is invalid, show error and stop submission
+    const isValid = validationResults.every(result => result.isValid);
+    
     if (!isValid) {
-      console.log("Validation failed, stopping submission");
+      logWarning("Validation failed, stopping submission");
+      setError("Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία");
       return;
     }
     
-    // Continue with form submission
-    console.log("Validation passed, continuing with submission");
-    setLoading(true);
-    setError("");
-    setSuccess(false);
+    logDebug("Validation passed, continuing with submission");
+    setSaveDisabled(true);
     
     try {
+      // If customerId is provided, update existing customer
       if (customerId) {
-        console.log("Updating existing customer with ID:", customerId);
-        // Update existing customer
+        logDebug("Updating existing customer with ID:", customerId);
+        
         const { data, error } = await supabase
           .from("customers")
-          .update({
-            ...submissionData,
-            modified_by: user?.id,
-            updated_at: new Date().toISOString(),
-            primary_contact_id: submissionData.primary_contact_id || null,
-          })
+          .update(submissionData)
           .eq("id", customerId)
           .select();
-
+        
         if (error) {
-          console.error("Supabase update error:", error);
           throw error;
         }
         
-        console.log("Customer updated successfully, response:", data);
-        // Set success state
-        setSuccess(true);
-        console.log("Success state set to true");
+        logInfo("Customer updated successfully, response:", data);
         
-        // Call onSave with the existing ID and company name
+        // Set success state and call onSave callback if provided
+        setSuccess(true);
+        logDebug("Success state set to true");
+        
         if (onSave) {
-          console.log("Calling onSave callback with:", customerId, formData.company_name);
+          logDebug("Calling onSave callback with:", customerId, formData.company_name);
           onSave(customerId, formData.company_name);
         }
         
-        // Dispatch a custom event to notify of successful save
-        console.log("Dispatching customer-form-success event");
-        document.dispatchEvent(new CustomEvent('customer-form-success'));
+        // Dispatch a success event that other components can listen for
+        logDebug("Dispatching customer-form-success event");
+        dispatchEvent(new CustomEvent("customer-form-success"));
       } else {
-        console.log("Creating new customer");
+        // Create new customer
+        logDebug("Creating new customer");
         
-        // Use the actual customer_type selected by the user
+        // Make sure fields for new customers are valid
         const insertData = {
           ...submissionData,
-          created_by: user?.id,
-          modified_by: user?.id,
-          status: "active",
-          primary_contact_id: null,
+          active: true,
+          created_at: new Date().toISOString(),
+          service_level: submissionData.service_level ? submissionData.service_level : 'standard',
         };
         
-        console.log("Insertion data with customer_type:", insertData);
+        logDebug("Insertion data with customer_type:", insertData);
         
-        // Create new customer
         const { data, error } = await supabase
           .from("customers")
-          .insert([insertData])
+          .insert(insertData)
           .select();
-
+        
         if (error) {
-          console.error("Supabase insert error:", error);
           throw error;
         }
-
-        console.log("New customer created successfully, response:", data);
-        // Set success state
+        
+        logInfo("New customer created successfully, response:", data);
+        
         setSuccess(true);
         
-        // Set the customerId to the newly created customer's ID
+        // Get the ID of the newly created customer
         let newCustomerId = null;
+        
         if (data && data.length > 0) {
           newCustomerId = data[0].id;
-          console.log("New customer ID:", newCustomerId);
-          setCustomerId(newCustomerId);
-        } else {
-          console.error("No data returned from insert operation");
+          logDebug("New customer ID:", newCustomerId);
         }
-
-        // Call onSave with the new ID and company name
+        
+        // Call onSave callback if provided
         if (onSave) {
-          console.log("Calling onSave callback with:", newCustomerId, formData.company_name);
+          logDebug("Calling onSave callback with:", newCustomerId, formData.company_name);
           onSave(newCustomerId, formData.company_name);
         }
         
-        // Dispatch a custom event to notify of successful save
-        console.log("Dispatching customer-form-success event");
-        document.dispatchEvent(new CustomEvent('customer-form-success'));
+        // Dispatch a success event
+        logDebug("Dispatching customer-form-success event");
+        dispatchEvent(new CustomEvent("customer-form-success"));
       }
       
-      // Reset tempCustomerType after successful submission
-      if (tempCustomerType !== null) {
-        console.log("Resetting tempCustomerType");
-        setTempCustomerType(null);
-      }
-    } catch (error: any) {
-      console.error("Error during save operation:", error);
-      const errorMessage = error.message || "Σφάλμα κατά την αποθήκευση";
-      console.log("Setting error message:", errorMessage);
-      setError(errorMessage);
+      // Reset temporary customer type
+      logDebug("Resetting tempCustomerType");
+      setTempCustomerType(null);
+      
+    } catch (error) {
+      const errorMessage = error.message || 'An error occurred while saving the customer';
+      setSuccess(false);
+      logError("Setting error message:", errorMessage);
+      
       if (onError) {
-        console.log("Calling onError callback with:", errorMessage);
+        logDebug("Calling onError callback with:", errorMessage);
         onError(errorMessage);
       }
+      
+      toast({
+        title: "Σφάλμα",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
-      console.log("Setting loading to false");
-      setLoading(false);
+      setSaveDisabled(false);
     }
   };
 
@@ -482,7 +483,7 @@ const CustomerForm = ({
     if (saveButton) {
       const originalClick = saveButton.onclick;
       saveButton.onclick = (e) => {
-        console.log("Hidden save button clicked");
+        logger.debug("Hidden save button clicked");
         if (originalClick) {
           return originalClick.call(saveButton, e);
         }
@@ -492,7 +493,7 @@ const CustomerForm = ({
     return () => {
       const saveButton = document.getElementById('save-customer-form');
       if (saveButton) {
-        saveButton.onclick = null;
+        // Cleanup if needed
       }
     };
   }, []);
@@ -572,6 +573,20 @@ const CustomerForm = ({
       setContactToDelete(null);
       setIsDeleteSuccessful(false);
       setShowDeleteDialog(false);
+    }
+  };
+
+  const handleHiddenSaveButtonClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    logger.debug("Hidden save button clicked");
+    if (isFormValid()) {
+      handleSubmit(e);
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Σφάλμα επικύρωσης",
+        description: "Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία με το σωστό τρόπο."
+      });
     }
   };
 

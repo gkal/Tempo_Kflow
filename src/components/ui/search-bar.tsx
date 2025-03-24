@@ -3,13 +3,16 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { SearchBarCustomDropdown } from "@/components/ui/custom-dropdown";
 
-// Support both formats of column definitions
+// Types for better code clarity
+type SearchOption = { value: string; label: string };
+type ColumnChangeHandler = (column: string) => void;
+
 interface SearchBarProps {
   onChange: (value: string) => void;
   value: string;
-  options: { value: string; label: string }[]; // Options for the dropdown
-  selectedColumn: string; // Currently selected column
-  onColumnChange: (column: string) => void; // Function to handle column change
+  options: SearchOption[];
+  selectedColumn: string;
+  onColumnChange: ColumnChangeHandler;
   placeholder?: string;
   className?: string;
 }
