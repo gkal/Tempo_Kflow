@@ -181,21 +181,38 @@ export function TaskDialog({ isOpen, onClose, taskId, offerId: propOfferId, onTa
   };
 
   const fetchTask = async () => {
-    setIsLoadingData(true);
     try {
-      // First, get the basic task data
+      setIsLoadingData(true);
+      setError(null);
+      
       const { data, error } = await supabase
         .from("tasks")
         .select("*")
         .eq("id", taskId)
         .single();
-
-      if (error) throw error;
       
-      // Prepare task data object
-      let taskData = { ...data };
+      if (error) {
+        throw error;
+      }
       
-      // Batch fetch users and offers instead of one by one
+      if (!data) {
+        throw new Error("Task not found");
+      }
+      
+      // Create a more complete task object that matches our Task interface
+      const taskData = {
+        ...data,
+        creator: undefined as { id: string; email: string; fullname?: string } | undefined,
+        assignee: undefined as { id: string; email: string; fullname?: string } | undefined,
+        offer: undefined as { 
+          id: string; 
+          customer_id: string; 
+          customers: { company_name: string }; 
+          requirements?: string 
+        } | undefined
+      };
+      
+      // Collect user IDs to fetch
       const usersToFetch = [];
       if (data.created_by) usersToFetch.push(data.created_by);
       if (data.assigned_to) usersToFetch.push(data.assigned_to);

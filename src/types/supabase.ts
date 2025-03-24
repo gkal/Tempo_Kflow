@@ -127,51 +127,275 @@ export type Database = {
           },
         ]
       }
+      tasks: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          status: string
+          priority: string | null
+          due_date: string | null
+          assigned_to: string | null
+          created_by: string
+          created_at: string
+          updated_at: string | null
+          completed_at: string | null
+          is_deleted: boolean | null
+          deleted_at: string | null
+          customer_id: string | null
+          offer_id: string | null
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          status: string
+          priority?: string | null
+          due_date?: string | null
+          assigned_to?: string | null
+          created_by: string
+          created_at?: string
+          updated_at?: string | null
+          completed_at?: string | null
+          is_deleted?: boolean | null
+          deleted_at?: string | null
+          customer_id?: string | null
+          offer_id?: string | null
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          status?: string
+          priority?: string | null
+          due_date?: string | null
+          assigned_to?: string | null
+          created_by?: string
+          created_at?: string
+          updated_at?: string | null
+          completed_at?: string | null
+          is_deleted?: boolean | null
+          deleted_at?: string | null
+          customer_id?: string | null
+          offer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          sender_id: string | null
+          message: string
+          type: string
+          read: boolean
+          created_at: string
+          related_task_id: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          sender_id?: string | null
+          message: string
+          type: string
+          read?: boolean
+          created_at?: string
+          related_task_id?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          sender_id?: string | null
+          message?: string
+          type?: string
+          read?: boolean
+          created_at?: string
+          related_task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_task_id_fkey"
+            columns: ["related_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      customers: {
+        Row: {
+          id: string
+          company_name: string
+          contact_name: string | null
+          email: string | null
+          phone: string | null
+          address: string | null
+          created_at: string
+          updated_at: string | null
+          primary_contact_id: string | null
+          customer_type: string | null
+          afm: string | null
+          doy: string | null
+          postal_code: string | null
+          town: string | null
+          telephone: string | null
+          webpage: string | null
+          fax_number: string | null
+          notes: string | null
+          status: string | null
+          service_level: string | null
+          deleted_at: string | null
+        }
+        Insert: {
+          id?: string
+          company_name: string
+          contact_name?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          created_at?: string
+          updated_at?: string | null
+          primary_contact_id?: string | null
+          customer_type?: string | null
+          afm?: string | null
+          doy?: string | null
+          postal_code?: string | null
+          town?: string | null
+          telephone?: string | null
+          webpage?: string | null
+          fax_number?: string | null
+          notes?: string | null
+          status?: string | null
+          service_level?: string | null
+          deleted_at?: string | null
+        }
+        Update: {
+          id?: string
+          company_name?: string
+          contact_name?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          created_at?: string
+          updated_at?: string | null
+          primary_contact_id?: string | null
+          customer_type?: string | null
+          afm?: string | null
+          doy?: string | null
+          postal_code?: string | null
+          town?: string | null
+          telephone?: string | null
+          webpage?: string | null
+          fax_number?: string | null
+          notes?: string | null
+          status?: string | null
+          service_level?: string | null
+          deleted_at?: string | null
+        }
+        Relationships: []
+      }
       offers: {
         Row: {
           id: string
           customer_id: string
-          created_at: string
-          source: Database["public"]["Enums"]["incoming_source"]
           requirements: string | null
-          amount: string | null
+          amount: number | null
+          offer_result: string | null
+          result: string | null
+          created_at: string
+          updated_at: string | null
+          assigned_to: string | null
+          source: string | null
           customer_comments: string | null
           our_comments: string | null
-          status: Database["public"]["Enums"]["offer_status"]
-          result: Database["public"]["Enums"]["offer_result"] | null
-          assigned_to: string | null
-          created_by: string | null
-          updated_at: string | null
+          hma: boolean | null
+          certificate: string | null
+          address: string | null
+          postal_code: string | null
+          town: string | null
+          status: string | null
+          contact_id: string | null
+          deleted_at: string | null
         }
         Insert: {
           id?: string
           customer_id: string
-          created_at?: string
-          source: Database["public"]["Enums"]["incoming_source"]
           requirements?: string | null
-          amount?: string | null
+          amount?: number | null
+          offer_result?: string | null
+          result?: string | null
+          created_at?: string
+          updated_at?: string | null
+          assigned_to?: string | null
+          source?: string | null
           customer_comments?: string | null
           our_comments?: string | null
-          status?: Database["public"]["Enums"]["offer_status"]
-          result?: Database["public"]["Enums"]["offer_result"] | null
-          assigned_to?: string | null
-          created_by?: string | null
-          updated_at?: string | null
+          hma?: boolean | null
+          certificate?: string | null
+          address?: string | null
+          postal_code?: string | null
+          town?: string | null
+          status?: string | null
+          contact_id?: string | null
+          deleted_at?: string | null
         }
         Update: {
           id?: string
           customer_id?: string
-          created_at?: string
-          source?: Database["public"]["Enums"]["incoming_source"]
           requirements?: string | null
-          amount?: string | null
+          amount?: number | null
+          offer_result?: string | null
+          result?: string | null
+          created_at?: string
+          updated_at?: string | null
+          assigned_to?: string | null
+          source?: string | null
           customer_comments?: string | null
           our_comments?: string | null
-          status?: Database["public"]["Enums"]["offer_status"]
-          result?: Database["public"]["Enums"]["offer_result"] | null
-          assigned_to?: string | null
-          created_by?: string | null
-          updated_at?: string | null
+          hma?: boolean | null
+          certificate?: string | null
+          address?: string | null
+          postal_code?: string | null
+          town?: string | null
+          status?: string | null
+          contact_id?: string | null
+          deleted_at?: string | null
         }
         Relationships: [
           {
@@ -187,22 +411,278 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          }
+        ]
+      }
+      contacts: {
+        Row: {
+          id: string
+          customer_id: string
+          full_name: string
+          position: string | null
+          telephone: string | null
+          mobile: string | null
+          email: string | null
+          internal_telephone: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string | null
+          status: string | null
+        }
+        Insert: {
+          id?: string
+          customer_id: string
+          full_name: string
+          position?: string | null
+          telephone?: string | null
+          mobile?: string | null
+          email?: string | null
+          internal_telephone?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          id?: string
+          customer_id?: string
+          full_name?: string
+          position?: string | null
+          telephone?: string | null
+          mobile?: string | null
+          email?: string | null
+          internal_telephone?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      contact_positions: {
+        Row: {
+          id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      offer_history: {
+        Row: {
+          id: string
+          offer_id: string
+          previous_status: string | null
+          new_status: string
+          previous_assigned_to: string | null
+          new_assigned_to: string | null
+          previous_result: string | null
+          new_result: string | null
+          previous_amount: string | null
+          new_amount: string | null
+          previous_requirements: string | null
+          new_requirements: string | null
+          notes: string | null
+          changed_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          offer_id: string
+          previous_status?: string | null
+          new_status: string
+          previous_assigned_to?: string | null
+          new_assigned_to?: string | null
+          previous_result?: string | null
+          new_result?: string | null
+          previous_amount?: string | null
+          new_amount?: string | null
+          previous_requirements?: string | null
+          new_requirements?: string | null
+          notes?: string | null
+          changed_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          offer_id?: string
+          previous_status?: string | null
+          new_status?: string
+          previous_assigned_to?: string | null
+          new_assigned_to?: string | null
+          previous_result?: string | null
+          new_result?: string | null
+          previous_amount?: string | null
+          new_amount?: string | null
+          previous_requirements?: string | null
+          new_requirements?: string | null
+          notes?: string | null
+          changed_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_history_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "offers_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: "offer_history_changed_by_fkey"
+            columns: ["changed_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           }
         ]
       }
+      offer_details: {
+        Row: {
+          id: string
+          offer_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          offer_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          offer_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_details_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      service_categories: {
+        Row: {
+          id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      service_subcategories: {
+        Row: {
+          id: string
+          name: string
+          category_id: string
+          subcategory_name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          category_id: string
+          subcategory_name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          category_id?: string
+          subcategory_name?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      units: {
+        Row: {
+          id: string
+          name: string
+          created_at: string
+          updated_at: string | null
+          date_created: string | null
+          date_updated: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          created_at?: string
+          updated_at?: string | null
+          date_created?: string | null
+          date_updated?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          created_at?: string
+          updated_at?: string | null
+          date_created?: string | null
+          date_updated?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      soft_delete_record: {
+        Args: {
+          table_name: string
+          record_id: string
+        }
+        Returns: string
+      }
+      list_deleted_records: {
+        Args: {
+          table_name: string
+        }
+        Returns: {
+          id: string
+          deleted_at: string
+          [key: string]: any
+        }[]
+      }
+      cleanup_all_soft_deleted_records: {
+        Args: Record<string, never>
+        Returns: string
+      }
     }
     Enums: {
       user_role: "Admin" | "Super User" | "User" | "Μόνο ανάγνωση"

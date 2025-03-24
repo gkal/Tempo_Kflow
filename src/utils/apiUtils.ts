@@ -16,6 +16,7 @@
 
 import { PostgrestError } from '@supabase/supabase-js';
 import logger from './loggingUtils';
+import { useLoading } from '@/lib/LoadingContext';
 
 /**
  * Standard API response format
@@ -188,10 +189,11 @@ export async function safeApiCall<T>(
   const opts = { ...defaultApiOptions, ...options };
   let retryCount = 0;
   
+  const { showLoading, hideLoading } = useLoading();
+  
   // Show loading indicator if requested
   if (opts.showLoading) {
-    // Implementation would depend on your loading state management
-    // e.g., dispatch({ type: 'SET_LOADING', payload: true });
+    showLoading();
   }
   
   try {
@@ -243,8 +245,7 @@ export async function safeApiCall<T>(
   } finally {
     // Hide loading indicator if requested
     if (opts.showLoading) {
-      // Implementation would depend on your loading state management
-      // e.g., dispatch({ type: 'SET_LOADING', payload: false });
+      hideLoading();
     }
   }
 }

@@ -22,7 +22,7 @@ export default function ProtectedRoute({
 
   // Show loader while auth status is being verified
   if (loading) {
-    return <LoadingSpinner message="Authenticating user" />;
+    return <LoadingSpinner />;
   }
 
   // Redirect unauthenticated users to login page

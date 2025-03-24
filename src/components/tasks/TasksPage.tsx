@@ -354,23 +354,49 @@ export default function TasksPage() {
       
       // Enrich tasks with related data from maps
       const enrichedTasks = tasksData.map(task => {
-        const enrichedTask: Task = { ...task };
+        // Create a new object with the correct Task type shape
+        const enrichedTask = {
+          ...task,
+          title: task.title || '',
+          description: task.description || '',
+          status: (task.status as "pending" | "in_progress" | "completed" | "cancelled") || "pending",
+          creator: undefined as { id: string; email?: string; fullname?: string } | undefined,
+          assignee: undefined as { id: string; email?: string; fullname?: string } | undefined,
+          offer: undefined as {
+            id: string;
+            customer_id: string;
+            requirements?: string;
+            customers?: { company_name: string; id: string; }
+          } | undefined
+        };
         
         // Add creator and assignee
         if (task.created_by && usersMap[task.created_by]) {
-          enrichedTask.creator = usersMap[task.created_by];
+          enrichedTask.creator = {
+            ...usersMap[task.created_by],
+            email: usersMap[task.created_by]?.email || ''
+          };
         }
         
         if (task.assigned_to && usersMap[task.assigned_to]) {
           enrichedTask.assignee = usersMap[task.assigned_to];
         }
         
-        // Add offer data
+        // Add offer if it exists
         if (task.offer_id && offersMap[task.offer_id]) {
-          enrichedTask.offer = offersMap[task.offer_id];
+          const offer = offersMap[task.offer_id];
+          enrichedTask.offer = {
+            id: offer.id,
+            customer_id: offer.customer_id,
+            requirements: offer.requirements || '',
+            customers: {
+              company_name: offer.customer?.company_name || offer.customers?.company_name || '',
+              id: offer.customer?.id || offer.customers?.id || ''
+            }
+          };
         }
         
-        return enrichedTask;
+        return enrichedTask as unknown as Task;
       });
       
       setTasks(enrichedTasks);

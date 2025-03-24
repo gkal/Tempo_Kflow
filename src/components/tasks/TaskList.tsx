@@ -6,24 +6,15 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Plus } from 'lucide-react';
 import { useRealtimeSubscription } from '@/lib/useRealtimeSubscription';
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  due_date: string;
-  created_by: string;
-  assigned_to: string;
-  created_at: string;
-  offer_id?: string;
-  assigned_user?: {
-    fullname: string;
-  };
-  created_user?: {
-    fullname: string;
-  };
-}
+import { Task } from '@/services/api/types';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
 
 interface TaskListProps {
   offerId?: string;
@@ -32,6 +23,7 @@ interface TaskListProps {
   loading?: boolean;
   onTaskStatusChange?: (taskId: string, newStatus: string) => Promise<void>;
   onTaskDelete?: (taskId: string) => Promise<void>;
+  refreshTrigger?: boolean;
 }
 
 export function TaskList({ 
@@ -40,7 +32,8 @@ export function TaskList({
   tasks: propTasks, 
   loading: propLoading, 
   onTaskStatusChange, 
-  onTaskDelete 
+  onTaskDelete,
+  refreshTrigger
 }: TaskListProps) {
   const { user } = useAuth();
   const [localTasks, setLocalTasks] = useState<Task[]>([]);
@@ -52,22 +45,20 @@ export function TaskList({
   const loading = propLoading !== undefined ? propLoading : isLoading;
 
   const fetchTasks = async () => {
-    // Skip fetching if tasks are provided via props
-    if (propTasks !== undefined) return;
-    if (!user) return;
-    
     setIsLoading(true);
+    
+    if (propTasks) {
+      setLocalTasks(propTasks);
+      setIsLoading(false);
+      return;
+    }
     
     let query = supabase
       .from('tasks')
-      .select(`
-        *,
-        assigned_user:assigned_to(fullname),
-        created_user:created_by(fullname)
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
     
-    // Filter by offer if provided
+    // Filter by offer ID if provided
     if (offerId) {
       query = query.eq('offer_id', offerId);
     }
@@ -80,7 +71,8 @@ export function TaskList({
     const { data, error } = await query;
     
     if (data && !error) {
-      setLocalTasks(data);
+      // Use type assertion to handle missing required properties
+      setLocalTasks(data as unknown as Task[]);
     }
     
     setIsLoading(false);
@@ -88,7 +80,7 @@ export function TaskList({
 
   useEffect(() => {
     fetchTasks();
-  }, [user, offerId, showAssignedToMe]);
+  }, [offerId, showAssignedToMe, user, propTasks, refreshTrigger]);
 
   // Set up real-time subscription for tasks
   useEffect(() => {

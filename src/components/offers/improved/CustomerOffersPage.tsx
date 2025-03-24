@@ -26,6 +26,7 @@ import {
 import { openNewOfferDialog, openEditOfferDialog } from '../../customers/OfferDialogManager';
 import { Badge } from "@/components/ui/badge";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
+import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
 
 // Customer interface
 interface Customer {
@@ -280,7 +281,7 @@ export default function CustomerOffersPage() {
       }
       
       // Store the result in the cache using both the customer ID and the cache key
-      const offersData = data || [];
+      const offersData = (data || []) as unknown as Offer[];
       setCustomerOffers(prev => {
         // Create a new object with all previous entries
         const newState = { ...prev };
@@ -800,26 +801,19 @@ export default function CustomerOffersPage() {
                 </td>
                 <td key={`actions-${offer.id}`} className="px-3 py-2 text-xs text-center w-[50px]">
                   {isAdminOrSuperUser && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteClick(row.id, offer.id);
-                            }}
-                            className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
-                          <p>Διαγραφή προσφοράς</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <GlobalTooltip content="Διαγραφή προσφοράς">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(row.id, offer.id);
+                        }}
+                        className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </GlobalTooltip>
                   )}
                 </td>
               </tr>
@@ -861,24 +855,26 @@ export default function CustomerOffersPage() {
         
         return (
           <div className="flex items-center justify-center w-full h-full">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                // No need for setTimeout - directly toggle the expanded state
-                // The fetchCustomerOffers is now called inside toggleCustomerExpanded
-                toggleCustomerExpanded(row.id);
-              }}
-              className="h-8 w-8 hover:bg-[#52796f]/60 hover:text-white transition-colors duration-200 rounded-full text-[#cad2c5] flex items-center justify-center relative group"
-            >
-              <span className="absolute inset-0 rounded-full bg-[#52796f]/0 group-hover:bg-[#52796f]/30 transition-colors duration-200"></span>
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4 relative z-10" />
-              ) : (
-                <ChevronRight className="h-4 w-4 relative z-10" />
-              )}
-            </Button>
+            <GlobalTooltip content={isExpanded ? "Συρρίξτε για κλείσιμο" : "Συρρίξτε για ανάπτυξη"}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // No need for setTimeout - directly toggle the expanded state
+                  // The fetchCustomerOffers is now called inside toggleCustomerExpanded
+                  toggleCustomerExpanded(row.id);
+                }}
+                className="h-8 w-8 hover:bg-[#52796f]/60 hover:text-white transition-colors duration-200 rounded-full text-[#cad2c5] flex items-center justify-center relative group"
+              >
+                <span className="absolute inset-0 rounded-full bg-[#52796f]/0 group-hover:bg-[#52796f]/30 transition-colors duration-200"></span>
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4 relative z-10" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 relative z-10" />
+                )}
+              </Button>
+            </GlobalTooltip>
           </div>
         );
       },

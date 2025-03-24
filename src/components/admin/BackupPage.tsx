@@ -68,7 +68,7 @@ export default function BackupPage() {
     for (const table of TABLES_TO_BACKUP) {
       try {
         const { count, error } = await supabase
-          .from(table.id)
+          .from(table.id as any)
           .select("*", { count: "exact", head: true });
         
         if (error) {
@@ -147,7 +147,7 @@ export default function BackupPage() {
       
       while (hasMore) {
         const { data, error, count } = await supabase
-          .from(tableId)
+          .from(tableId as any)
           .select("*")
           .range(page * pageSize, (page + 1) * pageSize - 1);
         

@@ -41,20 +41,13 @@ export type TableName =
  */
 export interface Customer {
   id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  vat_number?: string;
-  tax_office?: string;
-  created_at?: string;
-  updated_at?: string;
-  is_active?: boolean;
-  is_deleted?: boolean;
-  deleted_at?: string;
-  website?: string;
-  industry?: string;
-  contact_person?: string;
+  company_name: string;
+  contact_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  created_at: string;
+  updated_at?: string | null;
 }
 
 /**
@@ -100,22 +93,47 @@ export interface Department {
 export interface Offer {
   id: string;
   customer_id: string;
-  created_at?: string;
-  source: "Email" | "Phone" | "Site" | "Physical";
-  requirements?: string;
-  amount?: string;
-  customer_comments?: string;
-  our_comments?: string;
-  status: "pending" | "accepted" | "rejected" | "completed";
-  offer_date?: string;
-  delivery_date?: string;
-  updated_at?: string;
+  requirements: string | null;
+  amount: string | number | null;
+  offer_result: string | null;
+  result: string | null;
+  created_at: string;
+  updated_at: string | null;
+  assigned_to: string | null;
+  source: string | null;
+  customer_comments: string | null;
+  our_comments?: string | null;
+  hma?: boolean | null;
+  certificate?: string | null;
+  address?: string | null;
+  postal_code?: string | null;
+  town?: string | null;
+  status?: string | null;
+  contact_id?: string | null;
+  special_conditions?: string;
+  sent_at?: string | null;
+  assigned_user?: User | { id: string; fullname: string };
+  customer?: Customer | {
+    id: string;
+    company_name: string;
+  };
+  customers?: {
+    id: string;
+    company_name: string;
+  };
+  assignee?: {
+    id: string;
+    fullname: string;
+  };
   created_by?: string;
-  updated_by?: string;
-  contact_id?: string;
-  is_deleted?: boolean;
-  deleted_at?: string;
-  offer_number?: string;
+  customer_name?: string;
+  deleted_at?: string | null;
+  title?: string;
+  offer_details?: OfferDetail[];
+  created_user?: User[] | {
+    id: string;
+    fullname: string;
+  }[];
 }
 
 /**
@@ -141,19 +159,33 @@ export interface OfferDetail {
 export interface Task {
   id: string;
   title: string;
-  description?: string;
-  status: "pending" | "in_progress" | "completed" | "canceled";
-  priority: "low" | "medium" | "high";
-  due_date?: string;
-  assigned_to?: string;
-  created_by?: string;
-  created_at?: string;
-  updated_at?: string;
-  completed_at?: string;
-  is_deleted?: boolean;
-  deleted_at?: string;
-  customer_id?: string;
-  offer_id?: string;
+  description: string;
+  status: "pending" | "in_progress" | "completed" | "cancelled";
+  priority: string;
+  due_date: string;
+  assigned_to: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  completed_at: string;
+  contact_id: string | null;
+  offer_id: string | null;
+  customer_id: string | null;
+  creator?: { id: string; email?: string; fullname?: string } | undefined;
+  assignee?: { id: string; email?: string; fullname?: string } | undefined;
+  assigned_user?: { id: string; fullname: string; email?: string };
+  offer?: {
+    id: string;
+    customer_id: string;
+    requirements?: string;
+    customers?: { company_name: string }
+  } | undefined;
+  customer?: Customer;
+  deleted_at?: string | null;
+  isParent?: boolean;
+  children?: Task[];
+  creator_id?: string;
+  assignee_id?: string;
 }
 
 /**
@@ -162,13 +194,16 @@ export interface Task {
 export interface User {
   id: string;
   email: string;
-  created_at?: string;
-  first_name?: string;
-  last_name?: string;
-  role: "admin" | "user" | "manager";
-  is_active: boolean;
+  username?: string;
+  password?: string;
+  fullname: string;
   department_id?: string;
-  last_login?: string;
+  phone?: string;
+  role: "Admin" | "Super User" | "User" | "Μόνο ανάγνωση";
+  status?: string;
+  created_at: string;
+  updated_at?: string | null;
+  last_login_at?: string | null;
   avatar_url?: string;
 }
 
@@ -178,7 +213,12 @@ export interface User {
 export interface ServiceCategory {
   id: string;
   name: string;
-  created_at?: string;
+  created_at: string;
+  date_created?: string;
+  date_updated?: string;
+  user_create?: string;
+  user_updated?: string;
+  category_name?: string;
 }
 
 /**
@@ -188,7 +228,21 @@ export interface ServiceSubcategory {
   id: string;
   name: string;
   category_id: string;
-  created_at?: string;
+  subcategory_name?: string;
+  created_at: string;
+  date_created?: string;
+  date_updated?: string;
+  user_create?: string;
+  user_updated?: string;
+}
+
+/**
+ * Category with subcategories type
+ */
+export interface CategoryWithSubcategories extends ServiceCategory {
+  isSubcategory: boolean;
+  category_id?: string;
+  subcategory_name?: string;
 }
 
 /**
@@ -207,14 +261,29 @@ export interface Unit {
 export interface Notification {
   id: string;
   user_id: string;
-  title: string;
+  sender_id?: string | null;
   message: string;
-  is_read: boolean;
-  created_at?: string;
-  type: "info" | "warning" | "success" | "error";
-  link?: string;
-  reference_id?: string;
-  reference_type?: string;
+  type: string;
+  read: boolean;
+  created_at: string;
+  related_task_id?: string | null;
+  // Relations
+  sender?: {
+    id: string;
+    fullname: string;
+  };
+  task?: {
+    id: string;
+    title: string;
+    offer_id?: string;
+  };
+  offer?: {
+    id: string;
+    customer: {
+      id: string;
+      company_name: string;
+    };
+  };
 }
 
 /**
@@ -230,4 +299,14 @@ export interface OfferHistory {
   created_at?: string;
   ip_address?: string;
   user_agent?: string;
+}
+
+/**
+ * Interface for records that have been soft-deleted
+ */
+export interface DeletedRecord {
+  id: string;
+  deleted_at: string;
+  record: any;
+  table: string;
 } 

@@ -116,23 +116,36 @@ const highlightMatch = (text: any, searchTerm: string): React.ReactNode => {
     const searchTermLower = searchTerm.trim().toLowerCase();
     const textLower = textStr.toLowerCase();
     
+    // Early return if no match
     if (!textLower.includes(searchTermLower)) {
       return textStr;
     }
     
-    // Find first match only for better performance
-    const index = textLower.indexOf(searchTermLower);
-    if (index === -1) return textStr;
+    // Escape special regex characters in the search term
+    const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-    const beforeMatch = textStr.substring(0, index);
-    const match = textStr.substring(index, index + searchTermLower.length);
-    const afterMatch = textStr.substring(index + searchTermLower.length);
+    // Create a regex that matches the search term case-insensitively
+    const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
+    const parts = textStr.split(regex);
     
     return (
       <span key={`highlight-${searchTerm}-${textStr.substring(0, 10)}`}>
-        {beforeMatch}
-        <span className="bg-[#52796f] text-white px-0.5 rounded-sm">{match}</span>
-        {afterMatch}
+        {parts.map((part, index) => {
+          const isMatch = part.toLowerCase() === searchTermLower;
+          
+          if (isMatch) {
+            return (
+              <span 
+                key={index} 
+                className="bg-[#52796f] text-white px-0.5 rounded-sm"
+                aria-label={`Highlighted text: ${part}`}
+              >
+                {part}
+              </span>
+            );
+          }
+          return part;
+        })}
       </span>
     );
   } catch (error) {
@@ -278,13 +291,26 @@ export function DataTableBase({
       return;
     }
     
-    const sortedData = sortData(data, sortConfig.key, sortConfig.direction);
+    let processedData = [...data];
+    
+    // Apply search filter if search term exists
+    if (searchTerm && searchTerm.trim() && searchColumn) {
+      const searchTermLower = searchTerm.trim().toLowerCase();
+      processedData = processedData.filter(row => {
+        const value = row[searchColumn];
+        if (!value) return false;
+        return String(value).toLowerCase().includes(searchTermLower);
+      });
+    }
+    
+    // Sort the filtered data
+    const sortedData = sortData(processedData, sortConfig.key, sortConfig.direction);
     setFilteredData(sortedData);
     
     // Reset pagination when data changes
     setPage(1);
     setDisplayedData(sortedData.slice(0, pageSize));
-  }, [data, sortConfig, sortData, pageSize]);
+  }, [data, sortConfig, sortData, pageSize, searchTerm, searchColumn]);
 
   // Handle infinite scrolling
   useEffect(() => {
@@ -402,7 +428,7 @@ export function DataTableBase({
     // Skip rendering if row is null or undefined
     if (!row) return null;
     
-    const rowKey = `row-${row.id || index}-${searchTerm}`;
+    const rowKey = `row-${row.id || index}`;
     
     const defaultRow = (
       <tr
@@ -422,7 +448,7 @@ export function DataTableBase({
           
           const cellValue = row[column.accessor];
           const columnType = column.type || inferColumnType(column.accessor);
-          const cellKey = `cell-${row.id || index}-${column.accessor}-${searchTerm}`;
+          const cellKey = `cell-${row.id || index}-${column.accessor}`;
 
           return (
             <td
@@ -447,8 +473,7 @@ export function DataTableBase({
                 }
                 
                 // Apply highlighting if needed
-                if (shouldHighlight && cellValue && searchTerm && 
-                    String(cellValue).toLowerCase().includes(searchTerm.toLowerCase().trim())) {
+                if (shouldHighlight && cellValue) {
                   return highlightMatch(cellValue, searchTerm);
                 } 
                 
@@ -532,17 +557,14 @@ export function DataTableBase({
 
   // JSX for loading state in the table
   const renderTableLoading = () => (
-    <TableRow>
-      <TableCell colSpan={columns.length} className="h-32 text-center">
-        <div className="flex flex-col items-center justify-center">
-          <LoadingSpinner 
-            fullScreen={false} 
-            message={loadingStateMessage || "Φόρτωση δεδομένων..."} 
-            delayBeforeSpinner={300} // Show spinner faster to reduce perception of slowness
-          />
-        </div>
-      </TableCell>
-    </TableRow>
+    <div className="w-full h-[750px] flex items-center justify-center bg-[#2f3e46]">
+      <div className="flex flex-col items-center justify-center">
+        <LoadingSpinner 
+          fullScreen={false} 
+          delayBeforeSpinner={300} // Show spinner faster to reduce perception of slowness
+        />
+      </div>
+    </div>
   );
 
   // JSX for empty state in the table
@@ -585,31 +607,33 @@ export function DataTableBase({
         )}
         
         {/* Main table container */}
-        <div className="relative overflow-hidden border border-[#52796f] rounded-md bg-[#2f3e46]">
-          <div
-            className="overflow-x-auto overflow-y-auto scrollbar-visible"
-            style={{ maxHeight: "calc(70vh - 8rem)", height: "750px" }}
-          >
-            <div className="min-w-full inline-block align-middle">
-              <table className="min-w-full table-fixed border-collapse">
-                {renderTableHeader()}
+        {isLoading && !displayedData.length ? (
+          renderTableLoading()
+        ) : (
+          <div className="relative overflow-hidden border border-[#52796f] rounded-md bg-[#2f3e46]">
+            <div
+              className="overflow-x-auto overflow-y-auto scrollbar-visible"
+              style={{ maxHeight: "calc(70vh - 8rem)", height: "750px" }}
+            >
+              <div className="min-w-full inline-block align-middle">
+                <table className="min-w-full table-fixed border-collapse">
+                  {renderTableHeader()}
 
-                <tbody className="divide-y divide-[#52796f]/30">
-                  {isLoading && !displayedData.length ? (
-                    renderTableLoading()
-                  ) : !isLoading && data.length === 0 && showEmptyState ? (
-                    renderTableEmptyState()
-                  ) : (
-                    displayedData.map((row, index) => renderTableRow(row, index))
-                  )}
+                  <tbody className="divide-y divide-[#52796f]/30">
+                    {!isLoading && data.length === 0 && showEmptyState ? (
+                      renderTableEmptyState()
+                    ) : (
+                      displayedData.map((row, index) => renderTableRow(row, index))
+                    )}
 
-                  {/* Loader for infinite scrolling */}
-                  {isLoading && displayedData.length > 0 && renderScrollLoader()}
-                </tbody>
-              </table>
+                    {/* Loader for infinite scrolling */}
+                    {isLoading && displayedData.length > 0 && renderScrollLoader()}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
       
       {/* Footer - completely outside the main container */}

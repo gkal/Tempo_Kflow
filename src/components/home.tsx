@@ -25,7 +25,6 @@ const OffersPage = lazy(() => import("./offers/improved/CustomerOffersPage"));
  */
 const LoadingContent = () => (
   <LoadingSpinner 
-    message="Loading content" 
     fullScreen={false} 
     className="p-8"
   />

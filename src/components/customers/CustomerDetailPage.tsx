@@ -40,17 +40,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import OffersTable, { OffersTableRef } from "./OffersTable";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { openNewOfferDialog, openEditOfferDialog } from './OfferDialogManager';
 import { CustomerDialog } from "./CustomerDialog";
 import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
+import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -748,13 +743,15 @@ export default function CustomerDetailPage() {
           </div>
           
           <div className="flex items-center space-x-3">
-            <Button
-              onClick={() => setShowCustomerDialog(true)}
-              className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Επεξεργασία
-            </Button>
+            <GlobalTooltip content="Edit customer">
+              <Button
+                onClick={() => setShowCustomerDialog(true)}
+                className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Επεξεργασία
+              </Button>
+            </GlobalTooltip>
             <CloseButton 
               size="md" 
               onClick={() => navigate('/customers')} 

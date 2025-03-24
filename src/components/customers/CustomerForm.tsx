@@ -28,29 +28,31 @@ import {
 } from "@/components/ui/alert-dialog";
 import { usePhoneFormat } from "@/hooks/usePhoneFormat";
 import { validateRequired, validateEmail, validatePhone, validateMultiple } from "../../utils/validationUtils";
-import { useMountEffect } from "@/hooks/useMountEffect";
+import { useMountEffect } from "../../hooks/useMountEffect";
 import { createPrefixedLogger, logDebug, logError, logInfo, logWarning } from "@/utils/loggingUtils";
+import { useLoading } from '@/lib/LoadingContext';
 
 // Map of normalized customer types that match the database constraint
 const CUSTOMER_TYPE_MAP = {
-  "Εταιρεία": "Εταιρεία,",
-  "Ιδιώτης": "Ιδιώτης,",
-  "Δημόσιο": "Δημόσιο,",
+  "Εταιρεία": "Εταιρεία",
+  "Ιδιώτης": "Ιδιώτης",
+  "Δημόσιο": "Δημόσιο",
   "Οικοδομές": "Οικοδομές",
-  "Εκτακτος": "Εκτακτος",
-  "Εκτακτος πελάτης": "Εκτακτος πελάτης",
-  "Εκτακτη εταιρία": "Εκτακτη εταιρία"
+  "Εκτακτος Πελάτης": "Εκτακτος Πελάτης",
+  "Εκτακτη Εταιρία": "Εκτακτη Εταιρία"
 };
 
-// Display options for customer types - to match exactly what's in the database
+// List of valid customer types that satisfy the database check constraint
+const VALID_CUSTOMER_TYPES = ["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές", "Εκτακτος Πελάτης", "Εκτακτη Εταιρία"];
+
+// Display options for customer types - these are what users see
 const CUSTOMER_TYPE_OPTIONS = [
   "Εταιρεία", 
   "Ιδιώτης", 
   "Δημόσιο", 
   "Οικοδομές",
-  "Εκτακτος",
-  "Εκτακτος πελάτης",
-  "Εκτακτη εταιρία"
+  "Εκτακτος Πελάτης",
+  "Εκτακτη Εταιρία"
 ];
 
 // Custom styles for select dropdown
@@ -99,6 +101,29 @@ interface CustomerFormProps {
   keepDialogOpen?: boolean;
 }
 
+interface CustomerFormSubmissionData {
+  customer_type: string;
+  company_name: string;
+  afm: string;
+  doy: string;
+  address: string;
+  postal_code: string;
+  town: string;
+  telephone: string;
+  email: string;
+  webpage: string;
+  fax_number: string;
+  notes: string;
+  primary_contact_id: string;
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string | null;
+  status?: string | null;
+  deleted_at?: string | null;
+  contact_name?: string | null;
+  phone?: string | null;
+}
+
 const CustomerForm = ({
   customerId: initialCustomerId,
   onSave,
@@ -108,6 +133,7 @@ const CustomerForm = ({
   onError,
   keepDialogOpen = false,
 }: CustomerFormProps) => {
+  const { showLoading, hideLoading } = useLoading();
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -154,7 +180,7 @@ const CustomerForm = ({
 
   const fetchCustomerData = async () => {
     try {
-      setLoading(true);
+      showLoading();
       const { data, error } = await supabase
         .from("customers")
         .select(
@@ -188,7 +214,7 @@ const CustomerForm = ({
       console.error("Error fetching customer:", error);
       setError("Σφάλμα κατά την ανάκτηση δεδομένων πελάτη");
     } finally {
-      setLoading(false);
+      hideLoading();
     }
   };
 
@@ -256,41 +282,16 @@ const CustomerForm = ({
   ) => {
     const { name, value } = e.target;
     
-    // Handle telephone separately using our custom hook
+    // Special handling for telephone field
     if (name === "telephone") {
+      // Cast to HTMLInputElement as handlePhoneChange expects that specific type
       const result = handlePhoneChange(e as React.ChangeEvent<HTMLInputElement>);
       setFormData((prev) => ({
         ...prev,
-        [name]: result.value,
+        telephone: result.value,
       }));
-      return;
-    }
-    
-    // If this is a customer_type change from the dropdown, store it in temp state
-    if (name === "customer_type" && tempCustomerType !== null) {
-      // Use the normalized temp value
-      const normalizedValue = CUSTOMER_TYPE_MAP[tempCustomerType] || tempCustomerType;
-      setFormData((prev) => ({
-        ...prev,
-        customer_type: normalizedValue,
-      }));
-      // Reset the temp value
-      setTempCustomerType(null);
-    } 
-    // Special handling for AFM field - only allow numbers and max 8 characters
-    else if (name === "afm") {
-      // Remove any non-numeric characters
-      const numericValue = value.replace(/\D/g, '');
-      // Limit to 8 characters
-      const limitedValue = numericValue.slice(0, 8);
-      
-      setFormData((prev) => ({
-        ...prev,
-        [name]: limitedValue,
-      }));
-    }
-    else {
-      // For all other fields, update normally
+    } else {
+      // Handle all other inputs normally
       setFormData((prev) => ({
         ...prev,
         [name]: value,
@@ -299,90 +300,65 @@ const CustomerForm = ({
   };
 
   const isFormValid = () => {
-    // Use our validation utilities to check mandatory fields
-    const companyNameResult = validateRequired(formData.company_name.trim());
-    const phoneResult = validatePhone(formData.telephone.trim());
+    // Get trimmed values for validation
+    const companyNameValue = formData.company_name.trim();
+    const telephoneValue = phoneValue.trim();
     
-    // Email validation if provided
-    let emailValid = true;
-    if (formData.email && formData.email.trim() !== "") {
-      const emailResult = validateEmail(formData.email.trim());
-      emailValid = emailResult.isValid;
-    }
+    // Check both required fields individually
+    const hasCompanyName = companyNameValue !== '';
+    const hasTelephone = telephoneValue !== '';
     
-    return companyNameResult.isValid && phoneResult.isValid && emailValid;
+    // Both fields must be filled for the form to be valid
+    return hasCompanyName && hasTelephone;
   };
 
-  // Update parent component about form validity whenever form data changes
+  // Update parent component about form validity whenever form data or phone value changes
   useEffect(() => {
     if (onValidityChange) {
-      onValidityChange(isFormValid());
+      const isValid = isFormValid();
+      onValidityChange(isValid);
     }
-  }, [formData, onValidityChange]);
+  }, [formData, phoneValue, onValidityChange]);
 
   const [saveDisabled, setSaveDisabled] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    logDebug("Form submission started");
     e.preventDefault();
-    logDebug("Default form submission prevented");
-    
-    // If there's a temporary customer type, apply it now
-    if (tempCustomerType !== null) {
-      logDebug("Applying temporary customer type:", tempCustomerType);
-      setFormData(prev => ({
-        ...prev,
-        customer_type: tempCustomerType
-      }));
-    }
-    
-    // Create a copy of the form data that includes any temp customer type
-    const submissionData = {
-      ...formData,
-      ...(tempCustomerType !== null ? { customer_type: tempCustomerType } : {})
-    };
-    
-    // CRITICAL FIX: Ensure customer_type is ALWAYS one of the allowed values
-    const allowedCustomerTypes = ["Εταιρεία,", "Ιδιώτης,", "Δημόσιο,", "Οικοδομές", "Εκτακτος", "Εκτακτος πελάτης", "Εκτακτη εταιρία"];
-    if (!allowedCustomerTypes.includes(submissionData.customer_type)) {
-      logWarning("Warning: customer_type not in allowed list, forcing to 'Εταιρεία,'");
-      submissionData.customer_type = "Εταιρεία,"; // Use a safe default value
-    }
-    
-    // ❗ IMPORTANT: Debug log of the actual value being sent to the database
-    logDebug("FINAL customer_type value:", submissionData.customer_type);
-    
-    // Validation checks using our new validation utilities
-    logDebug("Starting validation checks");
-    
-    // Check required fields using the form data directly
-    const requiredFields = ['company_name', 'telephone'];
-    const validationResults = requiredFields.map(field => {
-      const value = submissionData[field];
-      const isEmpty = !value || value.trim() === '';
-      if (isEmpty) {
-        logWarning(`Required field empty: ${field}`);
-      }
-      return { field, isValid: !isEmpty };
-    });
-    
-    // If any required field is invalid, show error and stop submission
-    const isValid = validationResults.every(result => result.isValid);
-    
-    if (!isValid) {
-      logWarning("Validation failed, stopping submission");
-      setError("Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία");
-      return;
-    }
-    
-    logDebug("Validation passed, continuing with submission");
-    setSaveDisabled(true);
-    
+    showLoading();
     try {
+      // Check form validity before proceeding
+      const valid = isFormValid();
+      if (!valid) {
+        setError("Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία");
+        return;
+      }
+      
+      // Apply the temporary customer type immediately to ensure it's in formData
+      const currentCustomerType = tempCustomerType !== null ? tempCustomerType : formData.customer_type;
+      
+      // Create a copy of the form data with the correct customer type and phone value
+      const submissionData: CustomerFormSubmissionData = {
+        ...formData,
+        customer_type: currentCustomerType,
+        // Use the phoneValue from hook which contains the correctly formatted number
+        telephone: phoneValue,
+        // For new records, ensure primary_contact_id is null or empty string based on whether ID exists
+        primary_contact_id: customerId 
+          ? (formData.primary_contact_id || null) // Use null, not empty string for existing customers
+          : ""
+      };
+      
+      // CRITICAL FIX: Ensure customer_type is ALWAYS one of the allowed values
+      if (!VALID_CUSTOMER_TYPES.includes(submissionData.customer_type)) {
+        submissionData.customer_type = "Εταιρεία"; // Use a safe default value without trailing comma
+      }
+      
+      // Validation checks using our new validation utilities
+      
+      setSaveDisabled(true);
+      
       // If customerId is provided, update existing customer
       if (customerId) {
-        logDebug("Updating existing customer with ID:", customerId);
-        
         const { data, error } = await supabase
           .from("customers")
           .update(submissionData)
@@ -390,80 +366,59 @@ const CustomerForm = ({
           .select();
         
         if (error) {
+          console.error('Update failed with error:', error);
           throw error;
         }
         
-        logInfo("Customer updated successfully, response:", data);
-        
-        // Set success state and call onSave callback if provided
         setSuccess(true);
-        logDebug("Success state set to true");
         
         if (onSave) {
-          logDebug("Calling onSave callback with:", customerId, formData.company_name);
           onSave(customerId, formData.company_name);
         }
         
         // Dispatch a success event that other components can listen for
-        logDebug("Dispatching customer-form-success event");
         dispatchEvent(new CustomEvent("customer-form-success"));
       } else {
         // Create new customer
-        logDebug("Creating new customer");
-        
-        // Make sure fields for new customers are valid
-        const insertData = {
-          ...submissionData,
-          active: true,
-          created_at: new Date().toISOString(),
-          service_level: submissionData.service_level ? submissionData.service_level : 'standard',
-        };
-        
-        logDebug("Insertion data with customer_type:", insertData);
-        
-        const { data, error } = await supabase
-          .from("customers")
-          .insert(insertData)
-          .select();
+        const { data: customerData, error } = await createNewCustomer(submissionData);
         
         if (error) {
           throw error;
         }
-        
-        logInfo("New customer created successfully, response:", data);
         
         setSuccess(true);
         
         // Get the ID of the newly created customer
         let newCustomerId = null;
         
-        if (data && data.length > 0) {
-          newCustomerId = data[0].id;
-          logDebug("New customer ID:", newCustomerId);
+        if (customerData && customerData.length > 0) {
+          newCustomerId = customerData[0].id;
         }
         
         // Call onSave callback if provided
         if (onSave) {
-          logDebug("Calling onSave callback with:", newCustomerId, formData.company_name);
           onSave(newCustomerId, formData.company_name);
         }
         
         // Dispatch a success event
-        logDebug("Dispatching customer-form-success event");
         dispatchEvent(new CustomEvent("customer-form-success"));
       }
       
       // Reset temporary customer type
-      logDebug("Resetting tempCustomerType");
       setTempCustomerType(null);
       
     } catch (error) {
-      const errorMessage = error.message || 'An error occurred while saving the customer';
+      console.error('Error saving customer:', error);
+      let errorMessage = error.message || 'An error occurred while saving the customer';
+      
+      // Provide a user-friendly error message
+      if (errorMessage.includes('column') || errorMessage.includes('schema')) {
+        errorMessage = 'Προέκυψε πρόβλημα με τη δομή της βάσης δεδομένων. Παρακαλώ επικοινωνήστε με το διαχειριστή.';
+      }
+      
       setSuccess(false);
-      logError("Setting error message:", errorMessage);
       
       if (onError) {
-        logDebug("Calling onError callback with:", errorMessage);
         onError(errorMessage);
       }
       
@@ -474,6 +429,7 @@ const CustomerForm = ({
       });
     } finally {
       setSaveDisabled(false);
+      hideLoading();
     }
   };
 
@@ -483,7 +439,6 @@ const CustomerForm = ({
     if (saveButton) {
       const originalClick = saveButton.onclick;
       saveButton.onclick = (e) => {
-        logger.debug("Hidden save button clicked");
         if (originalClick) {
           return originalClick.call(saveButton, e);
         }
@@ -577,18 +532,95 @@ const CustomerForm = ({
   };
 
   const handleHiddenSaveButtonClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    logger.debug("Hidden save button clicked");
-    if (isFormValid()) {
-      handleSubmit(e);
+    // Check both required fields explicitly
+    const companyNameEmpty = !formData.company_name.trim();
+    const telephoneEmpty = !phoneValue.trim();
+    
+    // Only proceed if both fields are filled
+    if (!companyNameEmpty && !telephoneEmpty) {
+      // Form is valid, proceed with submission
+      handleSubmit(e as unknown as React.FormEvent);
     } else {
+      // Prevent default and show error for invalid form
+      e.preventDefault();
+      
+      // Show specific error message based on what's missing
+      let errorMessage = "Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία: ";
+      if (companyNameEmpty && telephoneEmpty) {
+        errorMessage += "Επωνυμία και Τηλέφωνο";
+      } else if (companyNameEmpty) {
+        errorMessage += "Επωνυμία";
+      } else if (telephoneEmpty) {
+        errorMessage += "Τηλέφωνο";
+      }
+      
       toast({
         variant: "destructive",
         title: "Σφάλμα επικύρωσης",
-        description: "Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία με το σωστό τρόπο."
+        description: errorMessage
       });
     }
   };
+
+  // Create new customer with fallback for field errors
+  async function createNewCustomer(data: CustomerFormSubmissionData) {
+    try {
+      // First attempt with minimal fields to avoid schema issues
+      const basicCustomerData = {
+        company_name: data.company_name,
+        telephone: data.telephone,
+        customer_type: data.customer_type,
+        created_at: new Date().toISOString(),
+        // Include these only if they have values
+        ...(data.afm ? { afm: data.afm } : {}),
+        ...(data.doy ? { doy: data.doy } : {}),
+        ...(data.address ? { address: data.address } : {}),
+        ...(data.town ? { town: data.town } : {}),
+        ...(data.postal_code ? { postal_code: data.postal_code } : {}),
+        ...(data.email ? { email: data.email } : {}),
+        ...(data.webpage ? { webpage: data.webpage } : {}),
+        ...(data.fax_number ? { fax_number: data.fax_number } : {}),
+        ...(data.notes ? { notes: data.notes } : {})
+      };
+      
+      const { data: responseData, error } = await supabase
+        .from("customers")
+        .insert(basicCustomerData)
+        .select();
+        
+      if (error) {
+        throw error;
+      }
+      
+      return { data: responseData, error: null };
+    } catch (insertError) {
+      console.error('Customer creation failed:', insertError);
+      
+      // If first attempt fails, try with absolute minimal fields
+      try {
+        // Create minimal required data - only what's absolutely necessary
+        const minimalFields = {
+          company_name: data.company_name,
+          telephone: data.telephone, 
+          customer_type: "Εταιρεία"
+        };
+        
+        const { data: retryData, error } = await supabase
+          .from("customers")
+          .insert(minimalFields)
+          .select();
+          
+        if (error) {
+          throw error;
+        }
+        
+        return { data: retryData, error: null };
+      } catch (retryError) {
+        console.error('All attempts failed:', retryError);
+        return { data: null, error: retryError };
+      }
+    }
+  }
 
   return (
     <div className="h-full overflow-auto bg-[#2f3e46] text-[#cad2c5]">
@@ -709,6 +741,11 @@ const CustomerForm = ({
                         // Store the normalized value
                         const normalizedValue = CUSTOMER_TYPE_MAP[value] || value;
                         setTempCustomerType(normalizedValue);
+                        // Also update the form data immediately
+                        setFormData(prev => ({
+                          ...prev,
+                          customer_type: normalizedValue
+                        }));
                       }}
                       placeholder="Επιλέξτε τύπο πελάτη"
                     />

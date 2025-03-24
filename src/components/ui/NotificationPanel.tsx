@@ -233,7 +233,7 @@ const useNotifications = (userId: string | undefined, isOpen: boolean) => {
         };
       });
 
-      setNotifications(transformedNotifications);
+      setNotifications(transformedNotifications as Notification[]);
     } catch (error) {
       console.error('Error fetching notifications:', error);
       setError('Αδυναμία φόρτωσης ειδοποιήσεων');
@@ -292,7 +292,7 @@ export function NotificationPanel({ isOpen, onClose }: NotificationPanelProps) {
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
       
       // Send notification to parent component
-      notifyNotificationRead();
+      notifyNotificationRead(notificationId, user.id);
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -315,7 +315,10 @@ export function NotificationPanel({ isOpen, onClose }: NotificationPanelProps) {
       setNotifications([]);
       
       // Send notification to parent component
-      notifyNotificationRead();
+      // Notify about all notifications being read
+      notifications.forEach(notification => {
+        notifyNotificationRead(notification.id, user.id);
+      });
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
@@ -335,14 +338,14 @@ export function NotificationPanel({ isOpen, onClose }: NotificationPanelProps) {
       
       const { data, error } = await supabase
         .from('notifications')
-        .insert(newNotification)
+        .insert(newNotification as any)
         .select('*')
         .single();
         
       if (error) throw error;
       
       if (data) {
-        setNotifications(prev => [data, ...prev]);
+        setNotifications(prev => [data as unknown as Notification, ...prev]);
         setNewNotificationText('');
         setShowNewNotificationForm(false);
       }

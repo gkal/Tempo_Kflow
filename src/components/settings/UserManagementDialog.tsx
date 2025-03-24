@@ -173,7 +173,7 @@ export default function UserManagementDialog({
             email: formData.email,
             phone: formData.phone,
             department_id: formData.department_id,
-            role: formData.role,
+            role: formData.role as any,
             status: formData.status,
           }]);
 

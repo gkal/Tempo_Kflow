@@ -21,11 +21,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import {
-  Tooltip,
+  GlobalTooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@/components/ui/GlobalTooltip";
 import {
   Select,
   SelectContent,
@@ -59,7 +59,7 @@ interface CustomerTypeFilterProps {
 }
 
 // These must match exactly what's allowed in the database
-const customerTypeOptions = ["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές", "Εκτακτος", "Εκτακτος πελάτης", "Εκτακτη εταιρία"];
+const customerTypeOptions = ["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές", "Εκτακτος Πελάτης", "Εκτακτη Εταιρία"];
 
 const CustomerTypeFilter: React.FC<CustomerTypeFilterProps> = ({ 
   availableTypes, 
@@ -378,26 +378,19 @@ const CustomerRow = React.memo(({
                       </td>
                       <td className="px-3 py-2 text-xs text-center w-[50px]">
                         {isAdminOrSuperUser && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteOffer(row.id, offer.id);
-                                  }}
-                                  className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
-                                <p>Διαγραφή προσφοράς</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <GlobalTooltip content="Διαγραφή προσφοράς">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteOffer(row.id, offer.id);
+                              }}
+                              className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </GlobalTooltip>
                         )}
                       </td>
                     </tr>
@@ -871,17 +864,10 @@ export default function CustomersPage() {
   
   // Update fetchCustomers to be more efficient and prevent double rendering
   const fetchCustomers = useCallback(async () => {
-    // Set loading state immediately
-    setLoading(true);
-
-    // Set throttle timeout to prevent rapid successive calls
-    throttleTimeoutRef.current = setTimeout(() => {
-      throttleTimeoutRef.current = null;
-    }, 300); // 300ms throttle
-    
-    const requestId = ++requestIdCounter.current;
-    
     try {
+      setLoading(true);
+      const requestId = ++requestIdCounter.current;
+      
       // Build the initial query
       let query = supabase
         .from('customers')
@@ -896,6 +882,11 @@ export default function CustomersPage() {
       // Add status filter if not 'all'
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
+      }
+
+      // Apply search filter if searchTerm exists
+      if (searchTerm && searchColumn) {
+        query = query.ilike(searchColumn, `%${searchTerm}%`);
       }
       
       // Execute the query
@@ -914,8 +905,6 @@ export default function CustomersPage() {
       const responseData = response.data || [];
       
       // Fetch offer counts for all customers
-      
-      // Get all customer IDs
       const customerIds = responseData.map(customer => customer.id);
       
       // Fetch offer counts in a single query
@@ -940,23 +929,13 @@ export default function CustomersPage() {
         
         // Add offer counts to customers
         responseData.forEach(customer => {
-          customer.offersCount = offerCountMap[customer.id] || 0;
-        });
-      }
-      
-      // Apply client-side search filtering if searchTerm is present
-      let filteredData = responseData;
-      if (searchTerm && searchColumn) {
-        filteredData = responseData.filter(customer => {
-          const value = customer[searchColumn];
-          if (!value) return false;
-          return String(value).toLowerCase().includes(searchTerm.toLowerCase());
+          (customer as any).offersCount = offerCountMap[customer.id] || 0;
         });
       }
       
       // Update state directly
       setCustomers(responseData);
-      setFilteredCustomers(filteredData);
+      setFilteredCustomers(responseData);
       
       // Set a minimal query time for UI feedback
       setQueryTime("0.00");
@@ -1255,41 +1234,35 @@ export default function CustomersPage() {
         
         return (
           <div className="flex justify-center">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Set the customer to delete and show the confirmation dialog
-                      setCustomerToDelete(row);
-                      // Ensure the dialog is shown after customerToDelete is set
-                      setTimeout(() => {
-                        setShowDeleteAlert(true);
-                      }, 50);
-                    }}
-                    className="h-8 w-8 hover:bg-[#354f52] text-red-500 hover:text-red-400"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f]">
-                  <p>{isAdminUser ? "Διαγραφή πελάτη" : "Απενεργοποίηση πελάτη"}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <GlobalTooltip content={isAdminUser ? "Διαγραφή πελάτη" : "Απενεργοποίηση πελάτη"}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Set the customer to delete and show the confirmation dialog
+                  setCustomerToDelete(row);
+                  // Ensure the dialog is shown after customerToDelete is set
+                  setTimeout(() => {
+                    setShowDeleteAlert(true);
+                  }, 50);
+                }}
+                className="h-8 w-8 hover:bg-[#354f52] text-red-500 hover:text-red-400"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </GlobalTooltip>
           </div>
         );
       },
     },
   ], [isAdminOrSuperUser, toggleCustomerExpanded, toggleCustomerStatus]);
 
-  const handleColumnChange = (column: string) => {
+  // Update the handleColumnChange function to be more efficient
+  const handleColumnChange = useCallback((column: string) => {
     setSelectedColumn(column);
-    setSearchColumn(column); // Update the searchColumn state as well
-  };
+    setSearchColumn(column);
+  }, []);
 
   // Add the handleDeleteOffer function before renderCustomRow
   const handleDeleteOffer = (customerId: string, offerId: string) => {
@@ -1512,7 +1485,7 @@ export default function CustomersPage() {
         // First delete sequence: Offers
           const { error: offersError } = await supabase
             .from('offers')
-            .update({ deleted_at: deletedAt })
+            .update({ deleted_at: deletedAt } as any)
             .eq('customer_id', customerId);
           
           if (offersError) {
@@ -1540,7 +1513,7 @@ export default function CustomersPage() {
           for (const offer of offerIds) {
             const { error: offerDetailsError } = await supabase
                 .from('offer_details')
-                .update({ deleted_at: deletedAt })
+                .update({ deleted_at: deletedAt } as any)
               .eq('offer_id', offer.id);
                 
             if (offerDetailsError) {
@@ -1569,7 +1542,7 @@ export default function CustomersPage() {
         updateOperation("Διαγραφή επαφών...");
           const { error: contactsError } = await supabase
             .from('contacts')
-            .update({ deleted_at: deletedAt })
+            .update({ deleted_at: deletedAt } as any)
             .eq('customer_id', customerId);
           
           if (contactsError) {
@@ -1965,6 +1938,11 @@ export default function CustomersPage() {
     }
   }, [customers, customerOffers, fetchCustomerOffers]);
 
+  // Remove the useEffect for search term changes since it's handled in fetchCustomers
+  useEffect(() => {
+    fetchCustomers();
+  }, [debouncedSearchTerm, searchColumn, debouncedCustomerTypes, statusFilter]);
+
   // If showing the form, render it instead of the customer list
   return (
     <div className="p-4">
@@ -1986,11 +1964,7 @@ export default function CustomersPage() {
 
       <div className="flex justify-between items-center mb-4">
         <div className="w-1/4">
-          {queryTime && (
-            <span className="text-xs text-[#84a98c]">
-              Χρόνος ερωτήματος: {queryTime}
-            </span>
-          )}
+          {/* Removed query time display */}
         </div>
         
         <div className="flex-1 flex justify-center items-center gap-2">

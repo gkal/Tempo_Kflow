@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { PlusIcon } from "lucide-react";
 import { useFormRegistration } from '@/lib/FormContext';
 import { useFormContext } from '@/lib/FormContext';
+import { logDebug } from "@/utils/loggingUtils";
 
 interface CustomerFormData {
   company_name?: string;
@@ -202,6 +203,10 @@ export function CustomerDialog({
     }
   };
 
+  const handleFormValidityChange = (valid: boolean) => {
+    setIsFormValid(valid);
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -228,7 +233,7 @@ export function CustomerDialog({
                 customerId={customer?.id}
                 onSave={handleSave}
                 onCancel={handleCancel}
-                onValidityChange={setIsFormValid}
+                onValidityChange={handleFormValidityChange}
                 onError={handleError}
                 keepDialogOpen={isNewCustomer}
               />

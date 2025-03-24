@@ -315,7 +315,7 @@ export function ContactDialog({
             email: formData.email,
             internal_telephone: formData.internal_telephone,
             notes: formData.notes,
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
           })
           .eq("id", contactId);
 

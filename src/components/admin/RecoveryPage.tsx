@@ -58,7 +58,8 @@ const TABLES_WITH_SOFT_DELETE = [
 type DeletedRecord = {
   id: string;
   deleted_at: string;
-  record: any;
+  record?: any;
+  [key: string]: any;
 };
 
 // Define a type for table IDs to fix type errors
@@ -374,7 +375,10 @@ function OfferName({ offerId }: { offerId: string }) {
         if (error) throw error;
         
         if (data) {
-          setOfferName(data.title || `Προσφορά: ${data.amount || ''}`);
+          // Safety check if data might be a SelectQueryError
+          const safeData = data as any;
+          const offerTitle = safeData.title || `Προσφορά: ${safeData.amount || ''}`;
+          setOfferName(offerTitle);
         }
       } catch (error) {
         console.error('Error fetching offer name:', error);
@@ -533,7 +537,7 @@ export default function RecoveryPage() {
     const relations: {[key: string]: boolean} = {};
     
     try {
-      if (isActiveTab(activeTab, 'offers') && record.record.customer_id) {
+      if (isActiveTab(activeTab, 'offers') && record.record?.customer_id) {
         // Check if customer exists
         const { data: customerData, error: customerError } = await supabase
           .from('customers')
@@ -554,7 +558,7 @@ export default function RecoveryPage() {
         relations.offerDetails = detailsData && detailsData.length > 0;
       }
       
-      if (isActiveTab(activeTab, 'contacts') && record.record.customer_id) {
+      if (isActiveTab(activeTab, 'contacts') && record.record?.customer_id) {
         // Check if customer exists
         const { data: customerData, error: customerError } = await supabase
           .from('customers')
@@ -566,7 +570,7 @@ export default function RecoveryPage() {
         relations.customer = !!customerData;
       }
       
-      if (isActiveTab(activeTab, 'offer_details') && record.record.offer_id) {
+      if (isActiveTab(activeTab, 'offer_details') && record.record?.offer_id) {
         // Check if offer exists
         const { data: offerData, error: offerError } = await supabase
           .from('offers')
@@ -582,11 +586,11 @@ export default function RecoveryPage() {
     } catch (error) {
       console.error('Error checking related records:', error);
       // Default to showing warnings
-      if (isActiveTab(activeTab, 'offers') && record.record.customer_id) {
+      if (isActiveTab(activeTab, 'offers') && record.record?.customer_id) {
         relations.customer = false;
-      } else if (isActiveTab(activeTab, 'contacts') && record.record.customer_id) {
+      } else if (isActiveTab(activeTab, 'contacts') && record.record?.customer_id) {
         relations.customer = false;
-      } else if (isActiveTab(activeTab, 'offer_details') && record.record.offer_id) {
+      } else if (isActiveTab(activeTab, 'offer_details') && record.record?.offer_id) {
         relations.offer = false;
       }
       setRelatedRecordsExist(relations);
@@ -887,7 +891,7 @@ export default function RecoveryPage() {
           // Restore any offer_details related to this offer
           const { error: detailsError } = await supabase
             .from('offer_details')
-            .update({ deleted_at: null })
+            .update({ deleted_at: null } as any)
             .eq('offer_id', selectedRecord.id); // Use the ID from the DeletedRecord object
           
           if (detailsError) {

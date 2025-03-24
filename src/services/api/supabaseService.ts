@@ -34,16 +34,6 @@ import {
 } from './types';
 
 /**
- * Type assertion function to bypass Supabase's strict typing
- * This is needed because Supabase's client has strict table typing that doesn't
- * work well with our dynamic table name approach
- */
-const fromTable = (table: TableName) => {
-  // @ts-ignore - We're intentionally bypassing type checking here to support dynamic table names
-  return supabase.from(table);
-};
-
-/**
  * Fetch records from a table with optional filters and sorting
  * 
  * @param table - Database table name
@@ -81,7 +71,9 @@ export async function fetchRecords<T>(
   }
 ): Promise<DbResponse<T | T[]>> {
   try {
-    let query = fromTable(table).select(options?.select || '*');
+    // Use a direct approach without type instantiation depth issues
+    const client: any = supabase;
+    let query = client.from(table).select(options?.select || '*');
 
     // Apply filters if provided
     if (options?.filters) {
@@ -111,15 +103,15 @@ export async function fetchRecords<T>(
     }
 
     // Execute query
-    const { data, error } = options?.single 
+    const response = options?.single 
       ? await query.single() 
       : await query;
 
-    if (error) {
-      return { data: null, error, status: 'error' };
+    if (response.error) {
+      return { data: null, error: response.error, status: 'error' };
     }
 
-    return { data: data as T | T[], error: null, status: 'success' };
+    return { data: response.data as (T | T[]), error: null, status: 'success' };
   } catch (error) {
     console.error(`Error fetching records from ${table}:`, error);
     return { 
@@ -157,16 +149,19 @@ export async function createRecord<T>(
   data: Partial<T>
 ): Promise<DbResponse<T>> {
   try {
-    const { data: result, error } = await fromTable(table)
-      .insert(data as any)
+    // Use a direct approach without type instantiation depth issues
+    const client: any = supabase;
+    const query = client.from(table);
+    const response = await query
+      .insert(data)
       .select()
       .single();
 
-    if (error) {
-      return { data: null, error, status: 'error' };
+    if (response.error) {
+      return { data: null, error: response.error, status: 'error' };
     }
 
-    return { data: result as T, error: null, status: 'success' };
+    return { data: response.data as T, error: null, status: 'success' };
   } catch (error) {
     console.error(`Error creating record in ${table}:`, error);
     return { 
@@ -212,17 +207,20 @@ export async function updateRecord<T>(
   idField: string = 'id'
 ): Promise<DbResponse<T>> {
   try {
-    const { data: result, error } = await fromTable(table)
-      .update(data as any)
+    // Use a direct approach without type instantiation depth issues
+    const client: any = supabase;
+    const query = client.from(table);
+    const response = await query
+      .update(data)
       .eq(idField, id)
       .select()
       .single();
-
-    if (error) {
-      return { data: null, error, status: 'error' };
+    
+    if (response.error) {
+      return { data: null, error: response.error, status: 'error' };
     }
 
-    return { data: result as T, error: null, status: 'success' };
+    return { data: response.data as T, error: null, status: 'success' };
   } catch (error) {
     console.error(`Error updating record in ${table}:`, error);
     return { 
@@ -261,12 +259,15 @@ export async function deleteRecord(
   idField: string = 'id'
 ): Promise<{ error: Error | null; status: 'success' | 'error' }> {
   try {
-    const { error } = await fromTable(table)
+    // Use a direct approach without type instantiation depth issues
+    const client: any = supabase;
+    const query = client.from(table);
+    const response = await query
       .delete()
       .eq(idField, id);
 
-    if (error) {
-      return { error, status: 'error' };
+    if (response.error) {
+      return { error: response.error, status: 'error' };
     }
 
     return { error: null, status: 'success' };
@@ -307,17 +308,20 @@ export async function softDeleteRecord<T extends { is_deleted?: boolean; deleted
       deleted_at: new Date().toISOString(),
     };
 
-    const { data: result, error } = await fromTable(table)
-      .update(softDeleteData as any)
+    // Use a direct approach without type instantiation depth issues
+    const client: any = supabase;
+    const query = client.from(table);
+    const response = await query
+      .update(softDeleteData)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) {
-      return { data: null, error, status: 'error' };
+    if (response.error) {
+      return { data: null, error: response.error, status: 'error' };
     }
 
-    return { data: result as T, error: null, status: 'success' };
+    return { data: response.data as T, error: null, status: 'success' };
   } catch (error) {
     console.error(`Error soft deleting record from ${table}:`, error);
     return { 
@@ -362,16 +366,19 @@ export async function fetchRecordById<T>(
   idField: string = 'id'
 ): Promise<DbResponse<T>> {
   try {
-    const { data, error } = await fromTable(table)
+    // Use a direct approach without type instantiation depth issues
+    const client: any = supabase;
+    const query = client.from(table);
+    const response = await query
       .select(select)
       .eq(idField, id)
       .single();
 
-    if (error) {
-      return { data: null, error, status: 'error' };
+    if (response.error) {
+      return { data: null, error: response.error, status: 'error' };
     }
 
-    return { data: data as T, error: null, status: 'success' };
+    return { data: response.data as T, error: null, status: 'success' };
   } catch (error) {
     console.error(`Error fetching record by ID from ${table}:`, error);
     return { 
@@ -383,12 +390,12 @@ export async function fetchRecordById<T>(
 }
 
 /**
- * Fetch records with related data using joins
+ * Fetch records with joins to related tables
  * 
- * @param table - Primary table name
- * @param select - Select statement including join columns
- * @param options - Query options for filtering, ordering, etc.
- * @returns Promise with the fetched records
+ * @param table - Database table name
+ * @param select - Fields to select including joined tables
+ * @param options - Query options including filters, ordering, etc.
+ * @returns Promise with joined data
  * 
  * @example
  * ```tsx
@@ -425,7 +432,9 @@ export async function fetchJoinedRecords<T>(
   }
 ): Promise<DbResponse<T[]>> {
   try {
-    let query = fromTable(table).select(select);
+    // Use a direct approach without type instantiation depth issues
+    const client: any = supabase;
+    let query = client.from(table).select(select);
 
     // Apply filters if provided
     if (options?.filters) {
@@ -454,13 +463,13 @@ export async function fetchJoinedRecords<T>(
       query = query.range(options.range.from, options.range.to);
     }
 
-    const { data, error } = await query;
+    const response = await query;
 
-    if (error) {
-      return { data: null, error, status: 'error' };
+    if (response.error) {
+      return { data: null, error: response.error, status: 'error' };
     }
 
-    return { data: data as T[], error: null, status: 'success' };
+    return { data: response.data as T[], error: null, status: 'success' };
   } catch (error) {
     console.error(`Error fetching joined records from ${table}:`, error);
     return { 
@@ -507,16 +516,18 @@ export async function searchRecords<T>(
   }
 ): Promise<DbResponse<T[]>> {
   if (!searchTerm || !fields.length) {
-    return fetchRecords<T[]>(table, {
+    return fetchRecords(table, {
       select: options?.select,
       order: options?.order,
       limit: options?.limit,
       filters: options?.additionalFilters
-    });
+    }) as Promise<DbResponse<T[]>>;
   }
 
   try {
-    let query = fromTable(table).select(options?.select || '*');
+    // Use a direct approach without type instantiation depth issues
+    const client: any = supabase;
+    let query = client.from(table).select(options?.select || '*');
 
     // Apply additional filters
     if (options?.additionalFilters) {
@@ -551,13 +562,13 @@ export async function searchRecords<T>(
       query = query.limit(options.limit);
     }
 
-    const { data, error } = await query;
+    const response = await query;
 
-    if (error) {
-      return { data: null, error, status: 'error' };
+    if (response.error) {
+      return { data: null, error: response.error, status: 'error' };
     }
 
-    return { data: data as T[], error: null, status: 'success' };
+    return { data: response.data as T[], error: null, status: 'success' };
   } catch (error) {
     console.error(`Error searching records in ${table}:`, error);
     return { 
@@ -598,7 +609,9 @@ export async function countRecords(
   filters?: Record<string, any>
 ): Promise<DbResponse<number>> {
   try {
-    let query = fromTable(table).select('*', { count: 'exact', head: true });
+    // Use a direct approach without type instantiation depth issues
+    const client: any = supabase;
+    let query = client.from(table).select('*', { count: 'exact', head: true });
 
     // Apply filters if provided
     if (filters) {
@@ -609,15 +622,81 @@ export async function countRecords(
       });
     }
 
-    const { count, error } = await query;
+    const response = await query;
 
-    if (error) {
-      return { data: null, error, status: 'error' };
+    if (response.error) {
+      return { data: null, error: response.error, status: 'error' };
     }
 
-    return { data: count || 0, error: null, status: 'success' };
+    return { data: response.count || 0, error: null, status: 'success' };
   } catch (error) {
     console.error(`Error counting records in ${table}:`, error);
+    return { 
+      data: null, 
+      error: error instanceof Error ? error : new Error(String(error)), 
+      status: 'error' 
+    };
+  }
+}
+
+/**
+ * Fetch records with complex filtering options
+ */
+export async function fetchRecordsWithOptions<T>(
+  table: TableName,
+  options?: {
+    select?: string;
+    filters?: Record<string, any>;
+    order?: { column: string; ascending?: boolean };
+    limit?: number;
+    range?: { from: number; to: number };
+    single?: boolean;
+  }
+): Promise<DbResponse<T | T[]>> {
+  try {
+    // Use a direct approach without type instantiation depth issues
+    const client: any = supabase;
+    let query = client.from(table).select(options?.select || '*');
+
+    // Apply filters if provided
+    if (options?.filters) {
+      Object.entries(options.filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          query = query.eq(key, value);
+        }
+      });
+    }
+
+    // Apply order if provided
+    if (options?.order) {
+      query = query.order(
+        options.order.column, 
+        { ascending: options.order.ascending ?? true }
+      );
+    }
+
+    // Apply limit if provided
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+
+    // Apply range if provided
+    if (options?.range) {
+      query = query.range(options.range.from, options.range.to);
+    }
+
+    // Execute query
+    const response = options?.single 
+      ? await query.single() 
+      : await query;
+
+    if (response.error) {
+      return { data: null, error: response.error, status: 'error' };
+    }
+
+    return { data: response.data as (T | T[]), error: null, status: 'success' };
+  } catch (error) {
+    console.error(`Error fetching records from ${table}:`, error);
     return { 
       data: null, 
       error: error instanceof Error ? error : new Error(String(error)), 

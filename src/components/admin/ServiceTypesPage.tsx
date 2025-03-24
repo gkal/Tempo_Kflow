@@ -45,6 +45,8 @@ declare global {
 // Define the service category interface
 interface ServiceCategory {
   id: string;
+  name: string;
+  created_at: string;
   category_name: string;
   date_created: string;
   date_updated: string | null;
@@ -55,8 +57,10 @@ interface ServiceCategory {
 // Define the service subcategory interface
 interface ServiceSubcategory {
   id: string;
-  subcategory_name: string;
+  name: string;
   category_id: string;
+  created_at: string;
+  subcategory_name: string;
   date_created: string;
   date_updated: string | null;
   user_create: string;
@@ -65,8 +69,10 @@ interface ServiceSubcategory {
 
 // Define the combined type for display in the table
 interface CategoryWithSubcategories extends ServiceCategory {
-  isSubcategory?: boolean;
+  isSubcategory: boolean;
   parentId?: string;
+  category_id?: string;
+  subcategory_name?: string;
 }
 
 // Define the department interface
@@ -344,18 +350,23 @@ function CategoriesTab() {
 
       if (subcategoriesError) throw subcategoriesError;
       
-      setSubcategories(subcategoriesData || []);
+      setSubcategories(subcategoriesData as ServiceSubcategory[] || []);
       
       // Combine categories and subcategories for display
       const combinedData: CategoryWithSubcategories[] = [];
       
       // Process each category and its subcategories
-      categoriesData?.forEach(category => {
+      (categoriesData as any[])?.forEach(category => {
         // Add the main category
         combinedData.push({
           ...category,
-          isSubcategory: false
-        });
+          isSubcategory: false,
+          category_name: category.category_name || category.name || '',
+          date_created: category.created_at || '',
+          date_updated: '',
+          user_create: '',
+          user_updated: ''
+        } as CategoryWithSubcategories);
         
         // Find and add subcategories under their parent
         const relatedSubcategories = subcategoriesData?.filter(
@@ -365,14 +376,16 @@ function CategoriesTab() {
         relatedSubcategories.forEach(subcategory => {
           combinedData.push({
             id: subcategory.id,
-            category_name: subcategory.subcategory_name,
-            date_created: subcategory.date_created,
-            date_updated: subcategory.date_updated,
-            user_create: subcategory.user_create,
-            user_updated: subcategory.user_updated,
+            name: subcategory.name,
+            created_at: subcategory.created_at,
+            category_name: subcategory.subcategory_name || subcategory.name || '',
+            date_created: subcategory.created_at,
+            date_updated: null,
+            user_create: '',
+            user_updated: null,
             isSubcategory: true,
             parentId: subcategory.category_id
-          });
+          } as CategoryWithSubcategories);
         });
       });
       
@@ -421,8 +434,7 @@ function CategoriesTab() {
             category_name: formData.category_name,
             date_updated: new Date().toISOString(),
             user_updated: user?.id,
-          })
-          .eq("id", currentCategory.id);
+          } as any);
 
         if (error) throw error;
         
@@ -438,7 +450,7 @@ function CategoriesTab() {
             subcategory_name: formData.category_name,
             date_updated: new Date().toISOString(),
             user_updated: user?.id,
-          })
+          } as any)
           .eq("id", currentCategory.id);
 
         if (error) throw error;
@@ -455,7 +467,7 @@ function CategoriesTab() {
             category_name: formData.category_name,
             date_created: new Date().toISOString(),
             user_create: user?.id,
-          });
+          } as any);
 
         if (error) throw error;
         
@@ -506,7 +518,7 @@ function CategoriesTab() {
           category_id: currentParentCategory?.id,
           date_created: new Date().toISOString(),
           user_create: user?.id,
-        });
+        } as any);
 
       if (error) throw error;
       

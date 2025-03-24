@@ -104,28 +104,24 @@ export function useDialogHelpers() {
           id: dialogId,
           title: options.title || 'Confirmation',
           showCloseButton: false,
-          content: (
-            <div className="space-y-4">
-              <div className="py-2">{options.message}</div>
-              <div className="flex justify-end space-x-2">
-                <button
-                  type="button"
-                  className={`px-4 py-2 rounded ${options.cancelButtonClass || 'btn-secondary'}`}
-                  onClick={handleCancel}
-                >
-                  {options.cancelText || 'Cancel'}
-                </button>
-                <button
-                  type="button"
-                  className={`px-4 py-2 rounded ${options.confirmButtonClass || 'btn-primary'}`}
-                  onClick={handleConfirm}
-                  autoFocus
-                >
-                  {options.confirmText || 'Confirm'}
-                </button>
-              </div>
-            </div>
-          ),
+          content: React.createElement('div', { className: "space-y-4" }, [
+            React.createElement('div', { className: "py-2", key: 'message' }, options.message),
+            React.createElement('div', { className: "flex justify-end space-x-2", key: 'buttons' }, [
+              React.createElement('button', {
+                type: "button",
+                className: `px-4 py-2 rounded ${options.cancelButtonClass || 'btn-secondary'}`,
+                onClick: handleCancel,
+                key: 'cancel'
+              }, options.cancelText || 'Cancel'),
+              React.createElement('button', {
+                type: "button",
+                className: `px-4 py-2 rounded ${options.confirmButtonClass || 'btn-primary'}`,
+                onClick: handleConfirm,
+                autoFocus: true,
+                key: 'confirm'
+              }, options.confirmText || 'Confirm')
+            ])
+          ])
         });
       });
     },
@@ -151,21 +147,18 @@ export function useDialogHelpers() {
           id: dialogId,
           title: options.title || 'Alert',
           showCloseButton: false,
-          content: (
-            <div className="space-y-4">
-              <div className="py-2">{options.message}</div>
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  className={`px-4 py-2 rounded ${options.okButtonClass || 'btn-primary'}`}
-                  onClick={handleOk}
-                  autoFocus
-                >
-                  {options.okText || 'OK'}
-                </button>
-              </div>
-            </div>
-          ),
+          content: React.createElement('div', { className: "space-y-4" }, [
+            React.createElement('div', { className: "py-2", key: 'message' }, options.message),
+            React.createElement('div', { className: "flex justify-end", key: 'buttons' }, 
+              React.createElement('button', {
+                type: "button",
+                className: `px-4 py-2 rounded ${options.okButtonClass || 'btn-primary'}`,
+                onClick: handleOk,
+                autoFocus: true,
+                key: 'ok'
+              }, options.okText || 'OK')
+            )
+          ])
         });
       });
     },

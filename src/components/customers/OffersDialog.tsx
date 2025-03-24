@@ -464,19 +464,19 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
               // Use created_at for both fields since offer_date doesn't exist in DB
               offer_date: dateString,
               created_at: dateString,
-              source: data.source || defaultSource,
-              amount: data.amount || "",
-              requirements: data.requirements || "",
-              customer_comments: data.customer_comments || "",
-              our_comments: data.our_comments || "",
-              offer_result: data.offer_result || "wait_for_our_answer",
-              result: data.result || null,
-              assigned_to: data.assigned_to || user?.id || "",
-              hma: data.hma || false,
-              certificate: data.certificate || "",
-              address: data.address || "",
-              postal_code: data.postal_code || "",
-              town: data.town || ""
+              source: (data as any).source || defaultSource,
+              amount: (data as any).amount || "",
+              requirements: (data as any).requirements || "",
+              customer_comments: (data as any).customer_comments || "",
+              our_comments: (data as any).our_comments || "",
+              offer_result: (data as any).offer_result || "wait_for_our_answer",
+              result: (data as any).result || null,
+              assigned_to: (data as any).assigned_to || user?.id || "",
+              hma: (data as any).hma || false,
+              certificate: (data as any).certificate || "",
+              address: (data as any).address || "",
+              postal_code: (data as any).tk || "", // Map tk from database to postal_code in form
+              town: (data as any).town || ""
             });
             
             // Set the contact ID from the fetched data
@@ -631,13 +631,67 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         return null;
       }
       
+      // Convert amount to number if it exists
+      const amountValue = formData.amount ? parseFloat(formData.amount) : null;
+
+      // Prepare the offer data
+      const offerData = {
+        customer_id: customerId,
+        source: formData.source,
+        amount: amountValue,
+        requirements: formData.requirements || "",
+        customer_comments: formData.customer_comments || "",
+        our_comments: formData.our_comments || "",
+        offer_result: formData.offer_result || "wait_for_our_answer",
+        result: formData.result && formData.result !== "none" ? formData.result : null,
+        assigned_to: formData.assigned_to || user?.id,
+        hma: formData.hma || false,
+        certificate: formData.certificate || "",
+        address: formData.address || "",
+        tk: formData.postal_code || "",
+        town: formData.town || "",
+        contact_id: selectedContactId,
+        created_by: user?.id
+      };
+      
       if (offerId && !offerId.startsWith('temp-')) {
-        // If we already have a real offer ID, return it
-        return offerId;
+        // If we have a real offer ID, update the existing offer
+        const { data, error } = await supabase
+          .from("offers")
+          .update({
+            ...offerData,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", offerId)
+          .select()
+          .single();
+        
+        if (error) {
+          console.error("Error updating offer:", error);
+          throw error;
+        }
+        
+        return data.id;
       } else {
-        // If no offer ID exists or it's a temporary ID, return null
-        // This prevents any database interactions until the form is explicitly saved
-        return null;
+        // Create a new offer
+        const { data, error } = await supabase
+          .from("offers")
+          .insert({
+            ...offerData,
+            created_at: formData.created_at || new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (error) {
+          console.error("Error creating offer:", error);
+          throw error;
+        }
+        
+        // Update the component state with the new offer ID
+        setOfferId(data.id);
+        
+        return data.id;
       }
     } catch (error) {
       console.error("Error in saveOfferAndGetId:", error);

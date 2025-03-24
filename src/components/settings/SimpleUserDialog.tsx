@@ -180,7 +180,7 @@ export default function SimpleUserDialog({
             email: formData.email,
             phone: formData.phone,
             department_id: formData.department_id,
-            role: formData.role,
+            role: formData.role as any, // Use type assertion to match enum
             status: formData.status,
           }]);
 

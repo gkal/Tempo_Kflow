@@ -2,12 +2,7 @@ import React from "react";
 import { formatDateTime } from "@/utils/formatUtils";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Edit, Trash2 } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
 import { OfferDetails } from "./OfferDetails";
 
 interface OfferRowProps {
@@ -161,48 +156,34 @@ export function OfferRow({
         {/* Actions */}
         <td className="p-2">
           <div className="flex items-center justify-center space-x-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditClick(offer.id);
-                    }}
-                    className="h-8 w-8 hover:bg-[#354f52] text-[#cad2c5]"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Επεξεργασία</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <GlobalTooltip content="Edit offer">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditClick(offer.id);
+                }}
+                className="h-8 w-8 hover:bg-[#354f52] text-[#cad2c5]"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </GlobalTooltip>
 
             {isAdminOrSuperUser && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteClick(offer.id);
-                      }}
-                      className="h-8 w-8 hover:bg-[#354f52] text-red-400"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Διαγραφή</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <GlobalTooltip content="Delete offer">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteClick(offer.id);
+                  }}
+                  className="h-8 w-8 hover:bg-[#354f52] text-red-400"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </GlobalTooltip>
             )}
           </div>
         </td>

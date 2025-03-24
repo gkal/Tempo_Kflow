@@ -93,7 +93,7 @@ export default function ImprovedOffersPage() {
       if (error) throw error;
       
       // Process the data
-      const offersWithData = data || [];
+      const offersWithData = (data || []) as unknown as Offer[];
       
       setOffers(offersWithData);
       applySearchFilter(offersWithData, searchTerm);

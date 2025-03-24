@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
+import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
 
 // Add a ref type for the component
 export interface OffersTableRef {
@@ -568,47 +569,33 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
       width: "100px",
       cell: (value, row) => (
         <div className="flex items-center justify-center space-x-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditOffer(value);
-                  }}
-                  className="h-8 w-8 hover:bg-[#354f52] text-[#cad2c5]"
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Επεξεργασία</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <GlobalTooltip content="Επεξεργασία">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditOffer(value);
+              }}
+              className="h-8 w-8 hover:bg-[#354f52] text-[#cad2c5]"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          </GlobalTooltip>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteClick(value);
-                  }}
-                  className="h-8 w-8 hover:bg-[#354f52] text-red-400"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Διαγραφή</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <GlobalTooltip content="Διαγραφή">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteClick(value);
+              }}
+              className="h-8 w-8 hover:bg-[#354f52] text-red-400"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </GlobalTooltip>
         </div>
       ),
     },

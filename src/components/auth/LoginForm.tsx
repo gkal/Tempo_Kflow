@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import type { User } from "@/types/auth";
 import type { Database } from "@/types/supabase";
+import { useLoading } from '@/lib/LoadingContext';
 
 // Type for the login form data
 interface LoginFormData {
@@ -44,6 +45,7 @@ const initialFormData: LoginFormData = {
 export default function LoginForm() {
   const navigate = useNavigate();
   const { checkAuth, error: authError } = useAuth();
+  const { showLoading, hideLoading } = useLoading();
   const [isLoading, setIsLoading] = useState(false);
   const [isFirstUser, setIsFirstUser] = useState(false);
   const [formData, setFormData] = useState<LoginFormData>(initialFormData);
@@ -113,16 +115,19 @@ export default function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    showLoading();
     setError("");
     setSuccess(false);
 
     if (!formData.username) {
       setError("Παρακαλώ εισάγετε το όνομα χρήστη");
+      hideLoading();
       return;
     }
 
     if (formData.password.length < 6) {
       setError("Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες");
+      hideLoading();
       return;
     }
 
@@ -132,6 +137,7 @@ export default function LoginForm() {
         if (!formData.fullname || !formData.email || !formData.phone) {
           setError("Παρακαλώ συμπληρώστε όλα τα πεδία");
           setIsLoading(false);
+          hideLoading();
           return;
         }
         await createFirstAdmin(formData);
@@ -154,6 +160,7 @@ export default function LoginForm() {
       setError(errorMessage);
     } finally {
       setIsLoading(false);
+      hideLoading();
     }
   };
 

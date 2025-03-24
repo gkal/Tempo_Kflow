@@ -17,12 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ErrorDialog } from "@/components/ui/error-dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
 import React from "react";
 import { openNewOfferDialog, openEditOfferDialog } from '../customers/OfferDialogManager';
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
@@ -193,7 +188,7 @@ export default function OffersPage() {
       }
       
       // Process the data
-      const offersWithData = (data as Offer[])?.map(offer => {
+      const offersWithData = ((data || []) as unknown as Offer[])?.map(offer => {
         return {
           ...offer,
           isExpanded: expandedOffers[offer.id] || false,
@@ -487,48 +482,34 @@ export default function OffersPage() {
       width: "100px",
       cell: (value, row) => (
         <div className="flex items-center justify-center space-x-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditOffer(row.id);
-                  }}
-                  className="h-8 w-8 hover:bg-[#354f52] text-[#cad2c5]"
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Επεξεργασία</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <GlobalTooltip content="Edit offer">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditOffer(row.id);
+              }}
+              className="h-8 w-8 hover:bg-[#354f52] text-[#cad2c5]"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          </GlobalTooltip>
 
           {isAdminOrSuperUser && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClick(row.id);
-                    }}
-                    className="h-8 w-8 hover:bg-[#354f52] text-red-400"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Διαγραφή</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <GlobalTooltip content="Delete offer">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteClick(row.id);
+                }}
+                className="h-8 w-8 hover:bg-[#354f52] text-red-400"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </GlobalTooltip>
           )}
         </div>
       ),

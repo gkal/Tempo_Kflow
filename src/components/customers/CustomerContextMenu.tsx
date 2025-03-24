@@ -3,6 +3,7 @@ import ReactDOM from "react-dom";
 import { Phone, Mail, Globe, User, Plus } from "lucide-react";
 import "../ui/dropdown.css";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
+import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
 
 interface CustomerContextMenuProps {
   children: React.ReactNode;

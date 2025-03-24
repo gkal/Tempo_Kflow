@@ -17,12 +17,6 @@ import {
   Layers,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useAuth } from "@/lib/AuthContext";
 
 export default function Sidebar() {
@@ -132,161 +126,106 @@ export default function Sidebar() {
         </div>
         <Separator className="my-4 bg-[#52796f]" />
         <nav className="space-y-1">
-          <TooltipProvider>
-            {/* Main navigation items */}
-            {navigation.map((item) => (
-              <Tooltip key={item.name}>
-                <TooltipTrigger asChild>
-                  <Link
-                    to={item.href}
-                    className={cn(
-                      "flex items-center px-2 py-2 text-sm font-medium rounded-md group transition-colors",
-                      isMenuActive(item.href)
-                        ? "bg-[#52796f] text-[#cad2c5]"
-                        : "text-[#84a98c] hover:bg-[#354f52] hover:text-[#cad2c5]",
-                    )}
-                  >
-                    <item.icon className={cn(
-                      "h-5 w-5",
-                      isMenuActive(item.href)
-                        ? "text-[#cad2c5]"
-                        : "text-[#84a98c] group-hover:text-[#cad2c5]"
-                    )} />
-                    {!isCollapsed && <span className={cn(
-                      "ml-3",
-                      isMenuActive(item.href)
-                        ? "text-[#cad2c5]"
-                        : "text-[#84a98c] group-hover:text-[#cad2c5]"
-                    )}>{item.name}</span>}
-                  </Link>
-                </TooltipTrigger>
-                {isCollapsed && (
-                  <TooltipContent side="right">{item.name}</TooltipContent>
-                )}
-              </Tooltip>
-            ))}
-            
-            {/* Settings dropdown */}
-            <div ref={settingsMenuRef} className="relative">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div
-                    onClick={() => setSettingsOpen(!settingsOpen)}
-                    className={cn(
-                      "flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md group transition-colors cursor-pointer",
-                      isSettingsActive || settingsOpen
-                        ? "bg-[#52796f] text-[#cad2c5]"
-                        : "text-[#84a98c] hover:bg-[#354f52] hover:text-[#cad2c5]",
-                    )}
-                    aria-expanded={settingsOpen}
-                  >
-                    <div className="flex items-center">
-                      <Settings className={cn(
-                        "h-5 w-5",
-                        isSettingsActive || settingsOpen
-                          ? "text-[#cad2c5]"
-                          : "text-[#84a98c] group-hover:text-[#cad2c5]"
-                      )} />
-                      {!isCollapsed && <span className={cn(
-                        "ml-3",
-                        isSettingsActive || settingsOpen
-                          ? "text-[#cad2c5]"
-                          : "text-[#84a98c] group-hover:text-[#cad2c5]"
-                      )}>Ρυθμίσεις</span>}
-                    </div>
-                    {!isCollapsed && (
-                      settingsOpen 
-                        ? <ChevronDown className={cn(
-                            "h-4 w-4",
-                            isSettingsActive || settingsOpen
-                              ? "text-[#cad2c5]"
-                              : "text-[#84a98c] group-hover:text-[#cad2c5]"
-                          )} />
-                        : <ChevronRight className={cn(
-                            "h-4 w-4",
-                            isSettingsActive || settingsOpen
-                              ? "text-[#cad2c5]"
-                              : "text-[#84a98c] group-hover:text-[#cad2c5]"
-                          )} />
-                    )}
-                  </div>
-                </TooltipTrigger>
-                {isCollapsed && (
-                  <TooltipContent side="right">Ρυθμίσεις</TooltipContent>
-                )}
-              </Tooltip>
-              
-              {/* Settings submenu */}
-              {settingsOpen && !isCollapsed && (
-                <div className="mt-1 pl-7 space-y-1 border-l-2 border-[#52796f]">
-                  {settingsItems.map((item) => (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      className={cn(
-                        "flex items-center px-2 py-2 text-sm font-medium rounded-md group transition-colors",
-                        isMenuActive(item.href)
-                          ? "bg-[#52796f] text-[#cad2c5]"
-                          : "text-[#84a98c] hover:bg-[#354f52] hover:text-[#cad2c5]",
-                      )}
-                      onClick={(e) => {
-                        // Prevent the default behavior which would close the menu
-                        e.stopPropagation();
-                      }}
-                    >
-                      <item.icon className={cn(
-                        "h-4 w-4",
-                        isMenuActive(item.href)
-                          ? "text-[#cad2c5]"
-                          : "text-[#84a98c] group-hover:text-[#cad2c5]"
-                      )} />
-                      <span className={cn(
-                        "ml-3",
-                        isMenuActive(item.href)
-                          ? "text-[#cad2c5]"
-                          : "text-[#84a98c] group-hover:text-[#cad2c5]"
-                      )}>{item.name}</span>
-                    </Link>
-                  ))}
-                </div>
+          {navigation.map((item) => (
+            <Link
+              key={item.name}
+              to={item.href}
+              className={cn(
+                "flex items-center px-2 py-2 text-sm font-medium rounded-md group transition-colors",
+                isMenuActive(item.href)
+                  ? "bg-[#52796f] text-[#cad2c5]"
+                  : "text-[#84a98c] hover:bg-[#354f52] hover:text-[#cad2c5]",
               )}
-              
-              {/* For collapsed mode, show settings items in tooltip */}
-              {settingsOpen && isCollapsed && (
-                <div className="absolute left-full top-0 ml-2 w-48 bg-[#354f52] rounded-md shadow-lg z-10">
-                  {settingsItems.map((item) => (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      className={cn(
-                        "flex items-center px-4 py-2 text-sm font-medium group transition-colors",
-                        isMenuActive(item.href)
-                          ? "bg-[#52796f] text-[#cad2c5]"
-                          : "text-[#84a98c] hover:bg-[#354f52] hover:text-[#cad2c5]",
-                      )}
-                      onClick={(e) => {
-                        // Prevent the default behavior which would close the menu
-                        e.stopPropagation();
-                      }}
-                    >
-                      <item.icon className={cn(
-                        "h-4 w-4 mr-2",
-                        isMenuActive(item.href)
-                          ? "text-[#cad2c5]"
-                          : "text-[#84a98c] group-hover:text-[#cad2c5]"
-                      )} />
-                      <span className={cn(
-                        "",
-                        isMenuActive(item.href)
-                          ? "text-[#cad2c5]"
-                          : "text-[#84a98c] group-hover:text-[#cad2c5]"
-                      )}>{item.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
+            >
+              <item.icon className={cn(
+                "h-5 w-5",
+                isMenuActive(item.href)
+                  ? "text-[#cad2c5]"
+                  : "text-[#84a98c] group-hover:text-[#cad2c5]"
+              )} />
+              {!isCollapsed && <span className={cn(
+                "ml-3",
+                isMenuActive(item.href)
+                  ? "text-[#cad2c5]"
+                  : "text-[#84a98c] group-hover:text-[#cad2c5]"
+              )}>{item.name}</span>}
+            </Link>
+          ))}
+          
+          {/* Settings dropdown */}
+          <div
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            className={cn(
+              "flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md group transition-colors cursor-pointer",
+              isSettingsActive || settingsOpen
+                ? "bg-[#52796f] text-[#cad2c5]"
+                : "text-[#84a98c] hover:bg-[#354f52] hover:text-[#cad2c5]",
+            )}
+            aria-expanded={settingsOpen}
+          >
+            <div className="flex items-center">
+              <Settings className={cn(
+                "h-5 w-5",
+                isSettingsActive || settingsOpen
+                  ? "text-[#cad2c5]"
+                  : "text-[#84a98c] group-hover:text-[#cad2c5]"
+              )} />
+              {!isCollapsed && <span className={cn(
+                "ml-3",
+                isSettingsActive || settingsOpen
+                  ? "text-[#cad2c5]"
+                  : "text-[#84a98c] group-hover:text-[#cad2c5]"
+              )}>Ρυθμίσεις</span>}
             </div>
-          </TooltipProvider>
+            {!isCollapsed && (
+              settingsOpen 
+                ? <ChevronDown className={cn(
+                    "h-4 w-4",
+                    isSettingsActive || settingsOpen
+                      ? "text-[#cad2c5]"
+                      : "text-[#84a98c] group-hover:text-[#cad2c5]"
+                  )} />
+                : <ChevronRight className={cn(
+                    "h-4 w-4",
+                    isSettingsActive || settingsOpen
+                      ? "text-[#cad2c5]"
+                      : "text-[#84a98c] group-hover:text-[#cad2c5]"
+                  )} />
+            )}
+          </div>
+            
+          {settingsOpen && !isCollapsed && (
+            <div className="mt-1 pl-7 space-y-1 border-l-2 border-[#52796f]">
+              {settingsItems.map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={cn(
+                    "flex items-center px-2 py-2 text-sm font-medium rounded-md group transition-colors",
+                    isMenuActive(item.href)
+                      ? "bg-[#52796f] text-[#cad2c5]"
+                      : "text-[#84a98c] hover:bg-[#354f52] hover:text-[#cad2c5]",
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
+                  <item.icon className={cn(
+                    "h-4 w-4",
+                    isMenuActive(item.href)
+                      ? "text-[#cad2c5]"
+                      : "text-[#84a98c] group-hover:text-[#cad2c5]"
+                  )} />
+                  <span className={cn(
+                    "ml-3",
+                    isMenuActive(item.href)
+                      ? "text-[#cad2c5]"
+                      : "text-[#84a98c] group-hover:text-[#cad2c5]"
+                  )}>{item.name}</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </nav>
       </div>
     </div>
