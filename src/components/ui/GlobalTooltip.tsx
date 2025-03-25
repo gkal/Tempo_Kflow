@@ -1,4 +1,4 @@
-import React, { ReactNode, useMemo, useRef, useEffect } from "react";
+import React, { ReactNode, useMemo, useRef, useEffect, useState } from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/utils";
 import "../../styles/tooltip.css";
@@ -21,6 +21,8 @@ interface GlobalTooltipProps {
   className?: string;
   /** Whether the tooltip is disabled */
   disabled?: boolean;
+  /** Skip portal to prevent unmounting issues in certain cases */
+  skipPortal?: boolean;
 }
 
 /**
@@ -33,38 +35,116 @@ export function GlobalTooltip({
   position = "top",
   className = "",
   disabled = false,
+  skipPortal = false,
 }: GlobalTooltipProps) {
   // Don't render tooltip if disabled
   if (disabled) return <>{children}</>;
   
-  return (
-    <TooltipPrimitive.Provider delayDuration={100}>
-      <TooltipPrimitive.Root>
-        <TooltipPrimitive.Trigger asChild>
-          {children}
-        </TooltipPrimitive.Trigger>
-        <TooltipPrimitive.Portal container={document.body}>
-          <TooltipPrimitive.Content 
-            className={cn(
-              "z-[9999] overflow-hidden rounded-md bg-[#2f3e46] px-3 py-1.5 text-xs text-[#cad2c5] border border-[#52796f] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-              className
-            )}
-            style={{ 
-              maxWidth: `${maxWidth}px`,
-              borderWidth: "1px", // Ensure only 1px border
-              boxShadow: "0 4px 15px rgba(0, 0, 0, 0.3)" // Add shadow for depth
-            }}
-            sideOffset={1}
-            side={position}
-            forceMount={false}
-          >
-            {content}
-            <TooltipPrimitive.Arrow width={12} height={6} className="fill-[#52796f]" />
-          </TooltipPrimitive.Content>
-        </TooltipPrimitive.Portal>
-      </TooltipPrimitive.Root>
-    </TooltipPrimitive.Provider>
-  );
+  // Store portal container reference to ensure it exists
+  const portalRef = useRef<HTMLElement | null>(null);
+  const tooltipId = useRef(`tooltip-${Math.random().toString(36).substring(2, 9)}`);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  
+  // Set up portal reference and mounted state
+  useEffect(() => {
+    portalRef.current = document.body;
+    setIsMounted(true);
+    
+    return () => {
+      // Important: Close tooltip before unmounting
+      setIsOpen(false);
+      
+      // Add a delay before marking component as unmounted to allow animation to complete
+      setTimeout(() => {
+        setIsMounted(false);
+        
+        // Find and clean up any orphaned tooltip elements with our ID
+        try {
+          const tooltipElements = document.querySelectorAll(`[data-tooltip-id="${tooltipId.current}"]`);
+          tooltipElements.forEach(el => {
+            if (el.parentNode) {
+              el.parentNode.removeChild(el);
+            }
+          });
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }, 50);
+    };
+  }, []);
+  
+  // If portal container isn't ready or component isn't mounted, just render children
+  if (!isMounted || (!portalRef.current && !skipPortal)) {
+    return <>{children}</>;
+  }
+  
+  try {
+    return (
+      <TooltipPrimitive.Provider delayDuration={100}>
+        <TooltipPrimitive.Root 
+          open={isOpen} 
+          onOpenChange={(open) => {
+            setIsOpen(open);
+          }}
+        >
+          <TooltipPrimitive.Trigger asChild>
+            {children}
+          </TooltipPrimitive.Trigger>
+          {skipPortal ? (
+            <TooltipPrimitive.Content 
+              className={cn(
+                "z-[9999] overflow-hidden rounded-md bg-[#2f3e46] px-3 py-1.5 text-xs text-[#cad2c5] border border-[#52796f] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+                className
+              )}
+              style={{ 
+                maxWidth: `${maxWidth}px`,
+                borderWidth: "1px", // Ensure only 1px border
+                boxShadow: "0 4px 15px rgba(0, 0, 0, 0.3)" // Add shadow for depth
+              }}
+              sideOffset={1}
+              side={position}
+              forceMount={false as any}
+              data-tooltip-id={tooltipId.current}
+            >
+              {content}
+              <TooltipPrimitive.Arrow width={12} height={6} className="fill-[#52796f]" />
+            </TooltipPrimitive.Content>
+          ) : (
+            // Only render portal if tooltip is open to prevent unmounting issues
+            isOpen && isMounted && (
+              <TooltipPrimitive.Portal container={portalRef.current} data-radix-tooltip-portal>
+                <TooltipPrimitive.Content 
+                  className={cn(
+                    "z-[9999] overflow-hidden rounded-md bg-[#2f3e46] px-3 py-1.5 text-xs text-[#cad2c5] border border-[#52796f] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+                    className
+                  )}
+                  style={{ 
+                    maxWidth: `${maxWidth}px`,
+                    borderWidth: "1px", // Ensure only 1px border
+                    boxShadow: "0 4px 15px rgba(0, 0, 0, 0.3)" // Add shadow for depth
+                  }}
+                  sideOffset={1}
+                  side={position}
+                  forceMount={true}
+                  data-tooltip-id={tooltipId.current}
+                  onEscapeKeyDown={() => setIsOpen(false)}
+                  onPointerDownOutside={() => setIsOpen(false)}
+                >
+                  {content}
+                  <TooltipPrimitive.Arrow width={12} height={6} className="fill-[#52796f]" />
+                </TooltipPrimitive.Content>
+              </TooltipPrimitive.Portal>
+            )
+          )}
+        </TooltipPrimitive.Root>
+      </TooltipPrimitive.Provider>
+    );
+  } catch (error) {
+    // Fallback in case of rendering error
+    console.error("Tooltip rendering error:", error);
+    return <>{children}</>;
+  }
 }
 
 /**
@@ -104,6 +184,88 @@ const getMultiLineStyles = (maxLines: number) => ({
   textOverflow: 'ellipsis',
   maxWidth: '100%'
 });
+
+/**
+ * SafeTooltip - A wrapper around GlobalTooltip with enhanced error handling
+ * This component helps prevent DOM node removal errors by carefully managing portal mounting/unmounting
+ */
+export function SafeTooltip({
+  children,
+  content,
+  maxWidth = 800,
+  position = "top",
+  className = "",
+  disabled = false
+}: GlobalTooltipProps) {
+  // State to track if component is about to unmount
+  const [isUnmounting, setIsUnmounting] = useState(false);
+  
+  // Use a ref to track any created portal elements
+  const portalRef = useRef<HTMLElement | null>(null);
+  const tooltipId = useRef(`safe-tooltip-${Math.random().toString(36).substring(2, 9)}`);
+  
+  // Effect to clean up tooltip portal elements when unmounting
+  useEffect(() => {
+    return () => {
+      setIsUnmounting(true);
+      
+      // Use a timeout to ensure cleanup happens after React unmounting
+      setTimeout(() => {
+        try {
+          // Find any tooltip portals with our ID
+          const tooltipElements = document.querySelectorAll(`[data-tooltip-id="${tooltipId.current}"]`);
+          tooltipElements.forEach(el => {
+            if (el && el.parentNode) {
+              try {
+                el.parentNode.removeChild(el);
+              } catch (e) {
+                // Ignore removal errors
+              }
+            }
+          });
+          
+          // Also look for any tooltip portals from Radix
+          const radixPortals = document.querySelectorAll('[data-radix-tooltip-content]');
+          radixPortals.forEach(portal => {
+            try {
+              if (portal && portal.parentNode) {
+                portal.parentNode.removeChild(portal);
+              }
+            } catch (e) {
+              // Ignore removal errors
+            }
+          });
+        } catch (e) {
+          // Ignore any errors during cleanup
+        }
+      }, 50);
+    };
+  }, []);
+  
+  // Don't render tooltip if disabled or currently unmounting
+  if (disabled || isUnmounting) {
+    return <>{children}</>;
+  }
+  
+  try {
+    return (
+      <GlobalTooltip
+        content={content}
+        maxWidth={maxWidth}
+        position={position}
+        className={className}
+        skipPortal={true} // Use skipPortal to avoid portal-related issues
+        disabled={disabled || isUnmounting}
+      >
+        {children}
+      </GlobalTooltip>
+    );
+  } catch (error) {
+    // Fallback in case of errors
+    console.error("SafeTooltip rendering error:", error);
+    return <>{children}</>;
+  }
+}
 
 /**
  * TruncateWithTooltip - A helper component for truncating text and showing a tooltip
@@ -163,7 +325,7 @@ export function TruncateWithTooltip({
   // For multi-line mode with tooltip
   if (multiLine) {
     return (
-      <GlobalTooltip 
+      <SafeTooltip
         content={<div className="whitespace-pre-wrap max-w-full">{text}</div>}
         maxWidth={finalMaxWidth}
         position={finalPosition}
@@ -176,13 +338,13 @@ export function TruncateWithTooltip({
           {text}
           {needsTruncation && <span className="ml-1 ellipsis-blue">...</span>}
         </div>
-      </GlobalTooltip>
+      </SafeTooltip>
     );
   }
   
   // For single-line mode with tooltip
   return (
-    <GlobalTooltip 
+    <SafeTooltip
       content={text}
       maxWidth={finalMaxWidth}
       position={finalPosition}
@@ -192,7 +354,7 @@ export function TruncateWithTooltip({
         {text.substring(0, maxLength)}
         <span className="ml-1 ellipsis-blue">...</span>
       </span>
-    </GlobalTooltip>
+    </SafeTooltip>
   );
 }
 

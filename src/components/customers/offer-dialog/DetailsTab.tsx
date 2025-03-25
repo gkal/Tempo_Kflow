@@ -3,6 +3,7 @@ import { OfferDialogContext } from '../OffersDialog';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { 
   fetchOfferDetails,
   deleteOfferDetail,
@@ -39,7 +40,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
-import { GlobalTooltip, TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
+import { GlobalTooltip, TruncateWithTooltip, SafeTooltip } from "@/components/ui/GlobalTooltip";
 import {
   Select,
   SelectContent,
@@ -62,6 +63,50 @@ import './OffersDialog.css';
  * until the dialog is closed or the form is submitted. No temporary storage or database
  * interaction happens until the main save button is clicked.
  */
+
+// Define TypeScript interface to extend Window
+declare global {
+  interface Window {
+    offerDetailsSaveFunctions: {
+      [key: string]: ((realOfferId: string) => Promise<boolean>) | null;
+    };
+    _lastSaveDetailsFn: ((realOfferId: string) => Promise<boolean>) | null;
+    _updateSaveDetailsFnBackup: (fn: ((realOfferId: string) => Promise<boolean>) | null) => boolean;
+    _getSaveDetailsFnBackup: () => ((realOfferId: string) => Promise<boolean>) | null;
+  }
+}
+
+// Create a global registry to persist the save function across tab switches
+// This will be a window-scoped object that won't be affected by React's state management
+if (typeof window !== 'undefined') {
+  // Initialize the global registry if it doesn't exist
+  if (!window.offerDetailsSaveFunctions) {
+    window.offerDetailsSaveFunctions = {};
+  }
+  
+  // Initialize backup mechanism if it doesn't exist
+  if (!window._lastSaveDetailsFn) {
+    window._lastSaveDetailsFn = null;
+  }
+  
+  // Add a small utility function to update the backup
+  if (!window._updateSaveDetailsFnBackup) {
+    window._updateSaveDetailsFnBackup = (fn) => {
+      if (fn && typeof fn === 'function') {
+        window._lastSaveDetailsFn = fn;
+        return true;
+      }
+      return false;
+    };
+  }
+  
+  // Add a way to retrieve the backup
+  if (!window._getSaveDetailsFnBackup) {
+    window._getSaveDetailsFnBackup = () => {
+      return window._lastSaveDetailsFn;
+    };
+  }
+}
 
 // Wrap the component with React.memo to prevent unnecessary re-renders
 const DetailsTab = React.memo(() => {
@@ -112,8 +157,21 @@ const DetailsTab = React.memo(() => {
   // Near the top of the component where other state is defined
   const [formValidationError, setFormValidationError] = useState("");
 
+  // Add a ref to control tooltip visibility during unmounting phase
+  const tooltipMountedRef = React.useRef(true);
+
   // Define tabId constant
   const tabId = 'details';
+
+  // Create a unique instance ID for this component
+  const instanceIdRef = React.useRef(`details-tab-${Math.random().toString(36).substring(2, 9)}`);
+
+  // Create a single ref to track if component is mounted
+  const isMountedRef = React.useRef(false);
+  const hasRegisteredRef = React.useRef(false);
+  
+  // Add a ref to store the previous handleFormSubmit function for comparison
+  const previousHandleFormSubmitRef = React.useRef<((realOfferId: string) => Promise<boolean>) | null>(null);
 
   // Reset function to clear all temporary state
   const resetState = useCallback(() => {
@@ -161,8 +219,8 @@ const DetailsTab = React.memo(() => {
         return false;
       }
       
-      // Get the current selectedDetails from state
-      const detailsToSave = selectedDetails;
+      // Get the current selectedDetails directly from state to avoid closure issues
+      const detailsToSave = [...selectedDetails];
       
       // Check if we have any details to save
       if (detailsToSave.length === 0) {
@@ -232,13 +290,6 @@ const DetailsTab = React.memo(() => {
     }
   }, [selectedDetails, user, fetchDetails]);
 
-  // Create a unique instance ID for this component
-  const instanceIdRef = React.useRef(`details-tab-${Math.random().toString(36).substring(2, 9)}`);
-
-  // Create a single ref to track if component is mounted
-  const isMountedRef = React.useRef(false);
-  const hasRegisteredRef = React.useRef(false);
-
   // Function to reset tab state
   const resetTab = useCallback(() => {
     // Reset the form state when tab is reset
@@ -251,6 +302,11 @@ const DetailsTab = React.memo(() => {
   // First useEffect to set mounted state - runs only once
   useEffect(() => {
     isMountedRef.current = true;
+    
+    // Register this component's instance
+    if (typeof window !== 'undefined' && window.offerDetailsSaveFunctions) {
+      window.offerDetailsSaveFunctions[instanceIdRef.current] = null;
+    }
     
     return () => {
       // On unmount, ensure we clean up properly
@@ -266,6 +322,11 @@ const DetailsTab = React.memo(() => {
         if (context?.unregisterTabReset) {
           context.unregisterTabReset('details');
         }
+        
+        // Also remove from the global registry
+        if (typeof window !== 'undefined' && window.offerDetailsSaveFunctions) {
+          delete window.offerDetailsSaveFunctions[instanceIdRef.current];
+        }
       }, 50); // Small delay to ensure proper sequence
     };
   }, []); // Empty dependency array ensures this only runs on mount/unmount
@@ -276,8 +337,11 @@ const DetailsTab = React.memo(() => {
       return true;
     }
     
+    // Access the latest selectedDetails directly from the component's state
+    const currentSelectedDetails = selectedDetails;
+    
     // Validation: If no details are selected, show validation error
-    if (selectedDetails.length === 0) {
+    if (currentSelectedDetails.length === 0) {
       setFormValidationError("Παρακαλώ επιλέξτε τουλάχιστον ένα είδος για την προσφορά");
       return false;
     }
@@ -287,6 +351,7 @@ const DetailsTab = React.memo(() => {
       setFormValidationError("");
       
       // Save details to database when form is submitted
+      // Pass the currentSelectedDetails as an argument to ensure we use the most up-to-date data
       const saveResult = await saveDetailsToDatabase(realOfferId);
       
       // Return result to inform the dialog if submission was successful
@@ -298,48 +363,30 @@ const DetailsTab = React.memo(() => {
     }
   }, [selectedDetails, saveDetailsToDatabase]);
 
-  // Effect to register/update the form submit handler when selectedDetails change
-  React.useEffect(() => {
-    // Only update if we're mounted and have already registered once
-    if (isMountedRef.current && hasRegisteredRef.current && context?.registerSaveDetailsToDatabase) {
-      context.registerSaveDetailsToDatabase(handleFormSubmit);
-    }
-  }, [context, handleFormSubmit, selectedDetails]);
-
-  // Register form submit handler with the dialog context on mount
-  React.useEffect(() => {
-    // Set mounted flag
-    isMountedRef.current = true;
-    
-    // Return cleanup function
-    return () => {
-      isMountedRef.current = false;
-      hasRegisteredRef.current = false;
-      
-      // Use setTimeout to ensure cleanup happens after component is fully unmounted
-      setTimeout(() => {
-        if (context?.registerSaveDetailsToDatabase) {
-          context.registerSaveDetailsToDatabase(null);
-        }
-        
-        if (context?.unregisterTabReset) {
-          context.unregisterTabReset('details');
-        }
-      }, 50);
-    };
-  }, [context]);
-
   // Register handlers with context only once on initial mount
   React.useEffect(() => {
-    // Only register if component is mounted, hasn't registered yet, and context is available
+    // Only register if component is mounted, context is available, and we haven't registered yet
     if (
       isMountedRef.current && 
-      !hasRegisteredRef.current && 
+      !hasRegisteredRef.current &&
       context?.registerSaveDetailsToDatabase && 
       context?.registerTabReset
     ) {
       // Register form submit handler
       context.registerSaveDetailsToDatabase(handleFormSubmit);
+      
+      // Save the reference to the function we just registered
+      previousHandleFormSubmitRef.current = handleFormSubmit;
+      
+      // Also store in global registry
+      if (typeof window !== 'undefined' && window.offerDetailsSaveFunctions) {
+        window.offerDetailsSaveFunctions[instanceIdRef.current] = handleFormSubmit;
+      }
+      
+      // Update global backup function
+      if (typeof window !== 'undefined' && window._updateSaveDetailsFnBackup) {
+        window._updateSaveDetailsFnBackup(handleFormSubmit);
+      }
       
       // Register reset function
       context.registerTabReset('details', () => {
@@ -352,13 +399,70 @@ const DetailsTab = React.memo(() => {
         setFormValidationError("");
         
         // Return true to indicate successful reset
-        return true;
       });
       
-      // Mark as registered
+      // Mark as registered - we only do this initial registration once
       hasRegisteredRef.current = true;
     }
-  }, [context, handleFormSubmit, selectedDetails.length]);
+  }, [context, handleFormSubmit]);
+
+  // This effect runs only when handleFormSubmit changes
+  React.useEffect(() => {
+    // Skip registration if component is not mounted or context is unavailable
+    if (
+      !isMountedRef.current || 
+      !context?.registerSaveDetailsToDatabase
+    ) {
+      return;
+    }
+    
+    // Register with the context
+    context.registerSaveDetailsToDatabase(handleFormSubmit);
+    
+    // Update our reference
+    previousHandleFormSubmitRef.current = handleFormSubmit;
+    
+    // Also update global registry
+    if (typeof window !== 'undefined' && window.offerDetailsSaveFunctions) {
+      window.offerDetailsSaveFunctions[instanceIdRef.current] = handleFormSubmit;
+    }
+    
+    // Update global backup function
+    if (typeof window !== 'undefined' && window._updateSaveDetailsFnBackup) {
+      window._updateSaveDetailsFnBackup(handleFormSubmit);
+    }
+  }, [context, handleFormSubmit]);
+
+  // Add a special failsafe cleanup that only runs on dialog close
+  useEffect(() => {
+    const dialogContent = document.querySelector('.dialog-content');
+    if (!dialogContent) return;
+
+    // Create a new mutation observer
+    const observer = new MutationObserver((mutations) => {
+      // Check if dialog is being removed
+      if (mutations.some(m => 
+        m.type === 'attributes' && 
+        m.attributeName === 'data-state' && 
+        (m.target as HTMLElement).getAttribute('data-state') === 'closed')) {
+        
+        // When dialog is closing, ensure save function is cleared
+        if (typeof window !== 'undefined' && window.offerDetailsSaveFunctions) {
+          delete window.offerDetailsSaveFunctions[instanceIdRef.current];
+        }
+      }
+    });
+
+    // Start observing
+    observer.observe(dialogContent, { 
+      attributes: true,
+      attributeFilter: ['data-state']
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   // Fetch offer details when the component mounts or offerId changes
   useEffect(() => {
@@ -681,7 +785,8 @@ const DetailsTab = React.memo(() => {
       });
       
       // Add new items to the beginning of the list
-      setSelectedDetails(prev => [...newSelectedDetails, ...prev]);
+      const updatedSelectedDetails = [...newSelectedDetails, ...selectedDetails];
+      setSelectedDetails(updatedSelectedDetails);
       
       // Reset selection state
       setSelectedItems([]);
@@ -791,11 +896,13 @@ const DetailsTab = React.memo(() => {
     if (!text) return "";
     if (text.length <= maxLength) return text;
     
+    // Only show tooltip if component is mounted
     return <TruncateWithTooltip 
       text={text} 
       maxLength={maxLength} 
       maxWidth={800}
       position="top" // Always use top position to avoid being cut off at the edges
+      disabled={!tooltipMountedRef.current} // Disable tooltips when unmounting
     />;
   };
 
@@ -831,8 +938,122 @@ const DetailsTab = React.memo(() => {
     return unit ? unit.name : id;
   };
 
+  // Add useEffect to track component mounting state for tooltips
+  useEffect(() => {
+    tooltipMountedRef.current = true;
+    
+    return () => {
+      // When the component is about to unmount, disable tooltips
+      tooltipMountedRef.current = false;
+    };
+  }, []);
+
+  // Before the return statement, add a cleanup function to ensure tooltips are disabled before unmount
+  React.useEffect(() => {
+    return () => {
+      // Disable tooltips right before unmounting
+      tooltipMountedRef.current = false;
+      
+      // Add a small delay to let React process unmounting
+      setTimeout(() => {
+        try {
+          // Find any tooltip portals left in the DOM and remove them manually
+          const tooltipPortals = document.querySelectorAll('[data-radix-tooltip-portal]');
+          tooltipPortals.forEach(portal => {
+            try {
+              if (portal && portal.parentNode) {
+                portal.parentNode.removeChild(portal);
+              }
+            } catch (e) {
+              // Silent cleanup error
+            }
+          });
+        } catch (e) {
+          // Ignore any errors in cleanup
+        }
+      }, 0);
+    };
+  }, []);
+
+  // Function to clean up orphaned dialog portals
+  const cleanupDialogPortals = useCallback(() => {
+    setTimeout(() => {
+      try {
+        // Find any orphaned dialog portals and remove them
+        const dialogPortals = document.querySelectorAll('[role="dialog"]');
+        dialogPortals.forEach(portal => {
+          // Check if the dialog is actually visible in the DOM but orphaned
+          const rect = portal.getBoundingClientRect();
+          const isOrphaned = 
+            rect.width === 0 || 
+            rect.height === 0 || 
+            !document.body.contains(portal) ||
+            portal.getAttribute('data-state') === 'closed';
+          
+          if (isOrphaned && portal.parentNode) {
+            // Only remove if it's truly orphaned
+            try {
+              portal.parentNode.removeChild(portal);
+            } catch (e) {
+              // Silent cleanup error
+            }
+          }
+        });
+      } catch (e) {
+        // Ignore any errors in cleanup
+      }
+    }, 100);
+  }, []);
+
+  // Add cleanup to the showSelectionDialog state change
+  useEffect(() => {
+    if (!showSelectionDialog) {
+      cleanupDialogPortals();
+    }
+  }, [showSelectionDialog, cleanupDialogPortals]);
+
+  // Also run cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      cleanupDialogPortals();
+    };
+  }, [cleanupDialogPortals]);
+
+  // Add the cleanup call to the dialog onOpenChange handler
+  const handleDialogOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      // Add a small delay before state updates to allow React to properly unmount components
+      setTimeout(() => {
+        if (!confirmingSelection) {
+          // Always clear selections when closing without confirming
+          setSelectedItems([]);
+          setCurrentCategoryId(null);
+          setError(null);
+          setConfirmingSelection(false);
+          localStorage.removeItem('offerDetailsSelectedItems');
+        } else {
+          // If dialog is closing by the confirm button, just reset the flag
+          // The selectedItems will be cleared in handleSelectionConfirm after saving
+          setConfirmingSelection(false);
+        }
+        setShowSelectionDialog(false);
+        
+        // Clean up portals after dialog is closed
+        cleanupDialogPortals();
+      }, 50);
+    }
+  }, [confirmingSelection, cleanupDialogPortals]);
+
   return (
-    <div className="h-full flex flex-col">
+    <div 
+      className="h-full flex flex-col"
+      data-tooltip-mounted={tooltipMountedRef.current ? "true" : "false"}
+      ref={(el) => {
+        if (el) {
+          (el as any).tooltipMountedRef = tooltipMountedRef;
+        }
+      }}
+    >
       {showDeleteDialog && (
         <AlertDialog open={showDeleteDialog} onOpenChange={handleDeleteDialogClose}>
           <AlertDialogContent>
@@ -880,160 +1101,181 @@ const DetailsTab = React.memo(() => {
 
         {/* Category selection dialog */}
         {showSelectionDialog && (
-          <Dialog open={showSelectionDialog} onOpenChange={(open) => {
-          if (open) {
-            // If dialog is opening, just update the state
-            setShowSelectionDialog(true);
-          } else {
-            // If dialog is closing
-            if (!confirmingSelection) {
-              // Always clear selections when closing without confirming
-              setSelectedItems([]);
-              setCurrentCategoryId(null);
-              setError(null);
-              setConfirmingSelection(false);
-              localStorage.removeItem('offerDetailsSelectedItems');
-            } else {
-              // If dialog is closing by the confirm button, just reset the flag
-              // The selectedItems will be cleared in handleSelectionConfirm after saving
-              setConfirmingSelection(false);
-            }
-            setShowSelectionDialog(false);
-          }
-          }}>
-        <DialogContent className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] max-w-4xl w-[800px] h-[550px] flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="text-[#a8c5b5]">Επιλογή Λεπτομερειών</DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex flex-col space-y-4 py-4 flex-grow overflow-hidden">
-            <div className="flex space-x-4 h-[450px] flex-shrink-0">
-              {/* Categories List */}
-              <div className="w-1/3 border border-[#52796f] rounded-md overflow-hidden flex-shrink-0">
-                <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
-                  <h3 className="text-[#a8c5b5] text-base font-medium">Κατηγορίες</h3>
-                </div>
-                <div className="overflow-y-auto h-[calc(100%-36px)]">
-                  {categories.length > 0 ? (
-                    <div className="divide-y divide-[#52796f]/30">
-                      {categories.map((category) => (
-                        <div 
-                          key={category.id}
-                          className={`px-3 py-1 cursor-pointer hover:bg-[#354f52]/50 ${
-                            currentCategoryId === category.id ? 'bg-[#354f52]/70' : ''
-                          }`}
-                          onClick={() => handleCategoryClick(category.id)}
-                        >
-                          <GlobalTooltip content={category.category_name} position="top">
-                            <span className="block truncate text-xs font-medium">
-                              {category.category_name.length > 30 
-                                ? `${category.category_name.substring(0, 30)}...` 
-                                : category.category_name}
-                            </span>
-                          </GlobalTooltip>
+          <Dialog 
+            open={showSelectionDialog} 
+            onOpenChange={handleDialogOpenChange}
+          >
+            <DialogContent 
+              className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] max-w-4xl w-[800px] h-[550px] flex flex-col"
+              onEscapeKeyDown={(e) => {
+                // Prevent default escape key behavior and handle manually
+                e.preventDefault();
+                if (!confirmingSelection) {
+                  setSelectedItems([]);
+                  setCurrentCategoryId(null);
+                  setError(null);
+                  setConfirmingSelection(false);
+                  localStorage.removeItem('offerDetailsSelectedItems');
+                  setShowSelectionDialog(false);
+                }
+              }}
+              onInteractOutside={(e) => {
+                // Prevent closing on outside click by default
+                e.preventDefault();
+              }}
+            >
+              <DialogHeader className="flex-shrink-0">
+                <DialogTitle className="text-[#a8c5b5]">Επιλογή Λεπτομερειών</DialogTitle>
+              </DialogHeader>
+              
+              <div className="flex flex-col space-y-4 py-4 flex-grow overflow-hidden">
+                <div className="flex space-x-4 h-[450px] flex-shrink-0">
+                  {/* Categories List */}
+                  <div className="w-1/3 border border-[#52796f] rounded-md overflow-hidden flex-shrink-0">
+                    <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
+                      <h3 className="text-[#a8c5b5] text-base font-medium">Κατηγορίες</h3>
+                    </div>
+                    <div className="overflow-y-auto h-[calc(100%-36px)]">
+                      {categories.length > 0 ? (
+                        <div className="divide-y divide-[#52796f]/30">
+                          {categories.map((category) => (
+                            <div 
+                              key={category.id}
+                              className={`px-3 py-1 cursor-pointer hover:bg-[#354f52]/50 ${
+                                currentCategoryId === category.id ? 'bg-[#354f52]/70' : ''
+                              }`}
+                              onClick={() => handleCategoryClick(category.id)}
+                            >
+                              <SafeTooltip content={category.category_name} position="top">
+                                <span className="block truncate text-xs font-medium">
+                                  {category.category_name.length > 30 
+                                    ? `${category.category_name.substring(0, 30)}...` 
+                                    : category.category_name}
+                                </span>
+                              </SafeTooltip>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="p-3 text-center text-[#cad2c5]/70 text-sm">
+                          Δεν βρέθηκαν κατηγορίες
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="p-3 text-center text-[#cad2c5]/70 text-sm">
-                      Δεν βρέθηκαν κατηγορίες
+                  </div>
+                  
+                  {/* Subcategories List */}
+                  <div className="w-2/3 border border-[#52796f] rounded-md overflow-hidden flex-shrink-0">
+                    <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
+                      <h3 className="text-[#a8c5b5] text-base font-medium">
+                        {currentCategoryId 
+                          ? `Περιγραφές: ${truncateText(categories.find(c => c.id === currentCategoryId)?.category_name || "", 20)}`
+                          : "Περιγραφές"
+                        }
+                      </h3>
                     </div>
-                  )}
+                    <div className="overflow-y-auto h-[calc(100%-36px)]">
+                      {currentCategoryId ? (
+                        dialogLoading ? (
+                          <div className="p-3 text-center">
+                            <div className="animate-pulse text-[#cad2c5]/70 text-sm">Φόρτωση περιγραφών...</div>
+                          </div>
+                        ) : subcategories.filter(sub => sub.category_id === currentCategoryId).length > 0 ? (
+                          <div className="divide-y divide-[#52796f]/30">
+                            {subcategories
+                              .filter(sub => sub.category_id === currentCategoryId)
+                              .map((subcategory) => {
+                                const isSelected = selectedItems.some(
+                                  item => item.categoryId === currentCategoryId && item.subcategoryId === subcategory.id
+                                );
+                                
+                                return (
+                                  <div 
+                                    key={subcategory.id}
+                                    className={`px-3 py-1 cursor-pointer hover:bg-[#354f52]/50 ${
+                                      isSelected ? 'bg-[#354f52]/70' : ''
+                                    }`}
+                                    onClick={() => handleSubcategorySelect(subcategory.id)}
+                                  >
+                                    <div className="flex items-center">
+                                      <div className={`w-4 h-4 mr-2 border ${isSelected ? 'bg-[#84a98c] border-[#84a98c]' : 'border-[#52796f]'} rounded flex items-center justify-center`}>
+                                        {isSelected && <span className="text-white text-xs">✓</span>}
+                                      </div>
+                                      <span className="text-xs">
+                                        {subcategory.subcategory_name.length > 60 ? (
+                                          tooltipMountedRef.current ? (
+                                            <ErrorBoundary
+                                              fallback={
+                                                <span>
+                                                  {subcategory.subcategory_name.substring(0, 60)}
+                                                  <span className="ml-1 ellipsis-blue">...</span>
+                                                </span>
+                                              }
+                                            >
+                                              <SafeTooltip 
+                                                content={subcategory.subcategory_name} 
+                                                position="top"
+                                                disabled={!tooltipMountedRef.current}
+                                              >
+                                                <span>
+                                                  {subcategory.subcategory_name.substring(0, 60)}
+                                                  <span className="ml-1 ellipsis-blue">...</span>
+                                                </span>
+                                              </SafeTooltip>
+                                            </ErrorBoundary>
+                                          ) : (
+                                            <span>
+                                              {subcategory.subcategory_name.substring(0, 60)}
+                                              <span className="ml-1 ellipsis-blue">...</span>
+                                            </span>
+                                          )
+                                        ) : (
+                                          subcategory.subcategory_name
+                                        )}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        ) : (
+                          <div className="p-3 text-center text-[#cad2c5]/70 text-sm">
+                            Δεν βρέθηκαν περιγραφές για αυτή την κατηγορία
+                          </div>
+                        )
+                      ) : (
+                        <div className="p-3 text-center text-[#cad2c5]/70 text-sm">
+                          Επιλέξτε μια κατηγορία για να δείτε τις περιγραφές
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Selection Counter */}
+                <div className="text-center text-sm text-[#84a98c] flex-shrink-0">
+                  {selectedItems.length > 0 
+                    ? `${selectedItems.length} επιλεγμένα στοιχεία` 
+                    : "Δεν έχετε επιλέξει κανένα στοιχείο"}
                 </div>
               </div>
               
-              {/* Subcategories List */}
-              <div className="w-2/3 border border-[#52796f] rounded-md overflow-hidden flex-shrink-0">
-                <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
-                  <h3 className="text-[#a8c5b5] text-base font-medium">
-                    {currentCategoryId 
-                      ? `Περιγραφές: ${truncateText(categories.find(c => c.id === currentCategoryId)?.category_name || "", 20)}`
-                      : "Περιγραφές"
-                    }
-                  </h3>
-                </div>
-                <div className="overflow-y-auto h-[calc(100%-36px)]">
-                  {currentCategoryId ? (
-                    dialogLoading ? (
-                      <div className="p-3 text-center">
-                        <div className="animate-pulse text-[#cad2c5]/70 text-sm">Φόρτωση περιγραφών...</div>
-                      </div>
-                    ) : subcategories.filter(sub => sub.category_id === currentCategoryId).length > 0 ? (
-                      <div className="divide-y divide-[#52796f]/30">
-                        {subcategories
-                          .filter(sub => sub.category_id === currentCategoryId)
-                          .map((subcategory) => {
-                            const isSelected = selectedItems.some(
-                              item => item.categoryId === currentCategoryId && item.subcategoryId === subcategory.id
-                            );
-                            
-                            return (
-                              <div 
-                                key={subcategory.id}
-                                className={`px-3 py-1 cursor-pointer hover:bg-[#354f52]/50 ${
-                                  isSelected ? 'bg-[#354f52]/70' : ''
-                                }`}
-                                onClick={() => handleSubcategorySelect(subcategory.id)}
-                              >
-                                <div className="flex items-center">
-                                  <div className={`w-4 h-4 mr-2 border ${isSelected ? 'bg-[#84a98c] border-[#84a98c]' : 'border-[#52796f]'} rounded flex items-center justify-center`}>
-                                    {isSelected && <span className="text-white text-xs">✓</span>}
-                                  </div>
-                                  <span className="text-xs">
-                                    {subcategory.subcategory_name.length > 60 ? (
-                                      <GlobalTooltip content={subcategory.subcategory_name} position="top">
-                                        <span>
-                                          {subcategory.subcategory_name.substring(0, 60)}
-                                          <span className="ml-1 ellipsis-blue">...</span>
-                                        </span>
-                                      </GlobalTooltip>
-                                    ) : (
-                                      subcategory.subcategory_name
-                                    )}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    ) : (
-                      <div className="p-3 text-center text-[#cad2c5]/70 text-sm">
-                        Δεν βρέθηκαν περιγραφές για αυτή την κατηγορία
-                      </div>
-                    )
-                  ) : (
-                    <div className="p-3 text-center text-[#cad2c5]/70 text-sm">
-                      Επιλέξτε μια κατηγορία για να δείτε τις περιγραφές
-                    </div>
-                  )}
-                </div>
+              <div className="flex justify-end p-4 border-t border-[#52796f] mt-2">
+                <button
+                  onClick={handleSelectionConfirm}
+                  disabled={selectedItems.length === 0}
+                  className={`flex items-center gap-2 h-10 px-4 text-sm font-medium rounded-md ${
+                    selectedItems.length === 0 
+                      ? 'bg-[#52796f]/50 text-white/70 cursor-not-allowed' 
+                      : 'bg-[#52796f] text-white hover:bg-[#52796f]/90 border-2 border-[#84a98c]'
+                  }`}
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Προσθήκη στην Προσφορά</span>
+                </button>
               </div>
-            </div>
-            
-            {/* Selection Counter */}
-            <div className="text-center text-sm text-[#84a98c] flex-shrink-0">
-              {selectedItems.length > 0 
-                ? `${selectedItems.length} επιλεγμένα στοιχεία` 
-                : "Δεν έχετε επιλέξει κανένα στοιχείο"}
-            </div>
-          </div>
-          
-          <div className="flex justify-end p-4 border-t border-[#52796f] mt-2">
-            <button
-              onClick={handleSelectionConfirm}
-              disabled={selectedItems.length === 0}
-              className={`flex items-center gap-2 h-10 px-4 text-sm font-medium rounded-md ${
-                selectedItems.length === 0 
-                  ? 'bg-[#52796f]/50 text-white/70 cursor-not-allowed' 
-                  : 'bg-[#52796f] text-white hover:bg-[#52796f]/90 border-2 border-[#84a98c]'
-              }`}
-            >
-              <Plus className="h-4 w-4" />
-              <span>Προσθήκη στην Προσφορά</span>
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </DialogContent>
+          </Dialog>
         )}
 
         {/* Details list - Original implementation with table */}
@@ -1092,12 +1334,28 @@ const DetailsTab = React.memo(() => {
                               <tr className="bg-[#354f52]/70 category-row">
                                 <td colSpan={isEditing ? 5 : 4} className="py-2 px-3 font-medium">
                                   {categoryName.length > 40 ? (
-                                    <GlobalTooltip content={categoryName} position="top">
+                                    tooltipMountedRef.current ? (
+                                      <ErrorBoundary
+                                        fallback={
+                                          <span>
+                                            {categoryName.substring(0, 40)}
+                                            <span className="ml-1 ellipsis-blue">...</span>
+                                          </span>
+                                        }
+                                      >
+                                        <SafeTooltip content={categoryName} position="top" disabled={!tooltipMountedRef.current}>
+                                          <span>
+                                            {categoryName.substring(0, 40)}
+                                            <span className="ml-1 ellipsis-blue">...</span>
+                                          </span>
+                                        </SafeTooltip>
+                                      </ErrorBoundary>
+                                    ) : (
                                       <span>
                                         {categoryName.substring(0, 40)}
                                         <span className="ml-1 ellipsis-blue">...</span>
                                       </span>
-                                    </GlobalTooltip>
+                                    )
                                   ) : (
                                     categoryName
                                   )}
@@ -1120,12 +1378,32 @@ const DetailsTab = React.memo(() => {
                                     <td className="py-2 px-3">
                                       <span className="text-[#84a98c]">
                                         {detail.subcategory?.subcategory_name && detail.subcategory.subcategory_name.length > 30 ? (
-                                          <GlobalTooltip content={detail.subcategory.subcategory_name} position="top">
+                                          tooltipMountedRef.current ? (
+                                            <ErrorBoundary
+                                              fallback={
+                                                <span>
+                                                  {detail.subcategory.subcategory_name.substring(0, 30)}
+                                                  <span className="ml-1 ellipsis-blue">...</span>
+                                                </span>
+                                              }
+                                            >
+                                              <SafeTooltip 
+                                                content={detail.subcategory.subcategory_name} 
+                                                position="top"
+                                                disabled={!tooltipMountedRef.current}
+                                              >
+                                                <span>
+                                                  {detail.subcategory.subcategory_name.substring(0, 30)}
+                                                  <span className="ml-1 ellipsis-blue">...</span>
+                                                </span>
+                                              </SafeTooltip>
+                                            </ErrorBoundary>
+                                          ) : (
                                             <span>
                                               {detail.subcategory.subcategory_name.substring(0, 30)}
                                               <span className="ml-1 ellipsis-blue">...</span>
                                             </span>
-                                          </GlobalTooltip>
+                                          )
                                         ) : (
                                           detail.subcategory?.subcategory_name || '-'
                                         )}
@@ -1150,12 +1428,32 @@ const DetailsTab = React.memo(() => {
                                         </div>
                                       ) : (
                                         detail.unit?.name && detail.unit.name.length > 10 ? (
-                                          <GlobalTooltip content={detail.unit.name} position="top">
+                                          tooltipMountedRef.current ? (
+                                            <ErrorBoundary
+                                              fallback={
+                                                <span>
+                                                  {detail.unit.name.substring(0, 10)}
+                                                  <span className="ml-1 ellipsis-blue">...</span>
+                                                </span>
+                                              }
+                                            >
+                                              <SafeTooltip 
+                                                content={detail.unit.name} 
+                                                position="top"
+                                                disabled={!tooltipMountedRef.current}
+                                              >
+                                                <span>
+                                                  {detail.unit.name.substring(0, 10)}
+                                                  <span className="ml-1 ellipsis-blue">...</span>
+                                                </span>
+                                              </SafeTooltip>
+                                            </ErrorBoundary>
+                                          ) : (
                                             <span>
                                               {detail.unit.name.substring(0, 10)}
                                               <span className="ml-1 ellipsis-blue">...</span>
                                             </span>
-                                          </GlobalTooltip>
+                                          )
                                         ) : (
                                           detail.unit?.name || '-'
                                         )

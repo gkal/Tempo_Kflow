@@ -150,7 +150,8 @@ const DialogContent = React.forwardRef<
         style={{
           ...style,
           zIndex: Z_INDICES.content, // Higher than overlay for nested dialogs
-          height: style?.height || 'auto'
+          height: style?.height || 'auto',
+          margin: 'auto'
         }}
         aria-describedby={ariaDescribedBy}
         aria-modal="true"
@@ -163,7 +164,7 @@ const DialogContent = React.forwardRef<
         </div>
         {showCloseButton && (
           <DialogPrimitive.Close asChild>
-            <div className="absolute right-4 top-4">
+            <div className="absolute right-4 top-4" style={{ zIndex: 9999, pointerEvents: 'auto' }}>
               <CloseButton onClick={onCloseClick || (() => {})} />
             </div>
           </DialogPrimitive.Close>

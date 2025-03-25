@@ -17,9 +17,9 @@ export function CloseButton({
 }: CloseButtonProps) {
   // Define sizes directly in the component
   const sizes = {
-    sm: { height: "h-8", width: "w-8", iconSize: "h-5 w-5" },
-    md: { height: "h-10", width: "w-10", iconSize: "h-6 w-6" },
-    lg: { height: "h-12", width: "w-12", iconSize: "h-7 w-7" },
+    sm: { height: "h-7", width: "w-7", iconSize: "h-4 w-4" },
+    md: { height: "h-9", width: "w-9", iconSize: "h-5 w-5" },
+    lg: { height: "h-11", width: "w-11", iconSize: "h-6 w-6" },
   };
 
   const sizeClasses = sizes[size];
@@ -48,13 +48,19 @@ export function CloseButton({
         sizeClasses.width,
         className,
       )}
-      style={style}
+      style={{
+        ...style,
+        zIndex: 9999,
+        position: 'relative',
+        pointerEvents: 'auto',
+      }}
       onMouseOver={(e) => {
         e.currentTarget.style.backgroundColor = hoverStyle.backgroundColor;
       }}
       onMouseOut={(e) => {
         e.currentTarget.style.backgroundColor = style.backgroundColor;
       }}
+      tabIndex={0}
     >
       <div
         className="flex items-center justify-center"
