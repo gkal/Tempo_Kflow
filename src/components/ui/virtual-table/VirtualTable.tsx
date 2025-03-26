@@ -3,7 +3,20 @@ import { flexRender, getCoreRowModel, getSortedRowModel, ColumnDef, useReactTabl
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { TableHead, TableRow, TableHeader, TableBody, TableCell, Table } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { ArrowUpDown, ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
+
+// Add debug logging only in development
+const debugLog = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[VirtualTable] ${message}`, data);
+  }
+};
+
+// Define the column metadata type
+interface ColumnMeta<TData, TValue> {
+  className?: string;
+  [key: string]: any;
+}
 
 interface VirtualTableProps<TData extends object, TValue = any> {
   data: TData[];
@@ -19,6 +32,7 @@ interface VirtualTableProps<TData extends object, TValue = any> {
   rowActions?: (row: TData) => React.ReactNode;
   loadingMessage?: string;
   enableVirtualization?: boolean;
+  initialSortingState?: SortingState;
 }
 
 export function VirtualTable<TData extends object, TValue = any>({
@@ -35,9 +49,10 @@ export function VirtualTable<TData extends object, TValue = any>({
   rowActions,
   loadingMessage = 'Loading more data...',
   enableVirtualization = true,
+  initialSortingState,
 }: VirtualTableProps<TData, TValue>) {
   // All state hooks must be defined at the top and in the same order every render
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>(initialSortingState || []);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   
   // Setup our table
@@ -50,8 +65,18 @@ export function VirtualTable<TData extends object, TValue = any>({
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    debugTable: true,
+    debugTable: process.env.NODE_ENV === 'development',
   });
+
+  // Update sorting when initialSortingState changes
+  useEffect(() => {
+    if (initialSortingState) {
+      setSorting(initialSortingState);
+    }
+  }, [initialSortingState]);
+
+  // Debug the table creation
+  debugLog("Creating Table Instance...");
 
   // Check for empty data
   const isDataEmpty = !data || data.length === 0;
@@ -60,59 +85,69 @@ export function VirtualTable<TData extends object, TValue = any>({
   // Load more data when scrolling near the end
   const loadMoreRows = useCallback(() => {
     if (!isLoading && hasNextPage && loadMore) {
-      console.log("[VirtualTable] Loading more rows");
+      debugLog("Loading more rows");
       loadMore();
     }
   }, [isLoading, hasNextPage, loadMore]);
 
   // Calculate row heights to handle expanded rows
   const getRowHeight = useCallback((index: number): number => {
-    // Skip for non-virtualized tables
+    // Skip for non-virtualized tables or if rows aren't available
     if (!rows || !rows[index]) return 60;
     
     // If using keyExtractor for expanded state management
     if (keyExtractor && isRowExpanded && renderExpanded) {
-      const rowId = keyExtractor(rows[index].original);
-      if (isRowExpanded(rowId)) {
-        // Expanded rows get more height
-        return 200;
+      try {
+        const rowId = keyExtractor(rows[index].original);
+        if (isRowExpanded(rowId)) {
+          // Expanded rows get more height
+          return 200;
+        }
+      } catch (e) {
+        console.error("Error in getRowHeight:", e);
+        return 60;
       }
     }
     
     return 60; // Default row height
   }, [rows, keyExtractor, isRowExpanded, renderExpanded]);
   
-  // Create the virtualizer
-  const rowVirtualizer = enableVirtualization && tableContainerRef.current && rows && rows.length > 0
-    ? useVirtualizer({
-        count: hasNextPage ? rows.length + 1 : rows.length,
-        getScrollElement: () => tableContainerRef.current,
-        estimateSize: () => 60,
-        overscan: 10,
-        onChange: (instance) => {
-          const lastVisibleRowIndex = instance.range.endIndex - 1;
-          if (
-            hasNextPage &&
-            !isLoading &&
-            lastVisibleRowIndex >= rows.length - 5
-          ) {
-            loadMoreRows();
-          }
-        }
-      })
-    : null;
+  // Always create the virtualizer but only use it when conditions are met
+  // This ensures hook order is consistent between renders
+  const shouldUseVirtualizer = enableVirtualization && tableContainerRef.current && rows && rows.length > 0;
+  
+  const rowVirtualizer = useVirtualizer({
+    count: shouldUseVirtualizer ? (hasNextPage ? rows.length + 1 : rows.length) : 0,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 60,
+    overscan: 10,
+    onChange: (instance) => {
+      if (!shouldUseVirtualizer) return;
+      
+      const lastVisibleRowIndex = instance.range.endIndex - 1;
+      if (
+        hasNextPage &&
+        !isLoading &&
+        lastVisibleRowIndex >= rows.length - 5
+      ) {
+        loadMoreRows();
+      }
+    }
+  });
 
-  // Effect logging for debugging
+  // Effect logging for debugging - only in development
   useEffect(() => {
-    console.log(`[VirtualTable] Data updated: ${data?.length || 0} rows`, { 
-      firstRow: data?.length > 0 ? keyExtractor ? keyExtractor(data[0]) : 'no keyExtractor' : 'empty',
-      columns: columns.map(col => col.id || 'unnamed column')
-    });
+    if (process.env.NODE_ENV === 'development') {
+      debugLog(`Data updated: ${data?.length || 0} rows`, { 
+        firstRow: data?.length > 0 ? keyExtractor ? keyExtractor(data[0]) : 'no keyExtractor' : 'empty',
+        columns: columns.map(col => col.id || 'unnamed column')
+      });
+    }
   }, [data, keyExtractor, columns]);
 
-  // Debug output if data is available but rows are empty
+  // Debug output if data is available but rows are empty - only in development
   useEffect(() => {
-    if (data?.length > 0 && (!rows || rows.length === 0)) {
+    if (process.env.NODE_ENV === 'development' && data?.length > 0 && (!rows || rows.length === 0)) {
       console.warn("[VirtualTable] Data is available but no rows are rendered", {
         dataLength: data.length,
         rowsLength: rows?.length || 0
@@ -120,9 +155,9 @@ export function VirtualTable<TData extends object, TValue = any>({
     }
   }, [data, rows]);
 
-  // Debug output for empty data but having columns
+  // Debug output for empty data but having columns - only in development
   useEffect(() => {
-    if (isDataEmpty && columns.length > 0) {
+    if (process.env.NODE_ENV === 'development' && isDataEmpty && columns.length > 0) {
       console.warn('[VirtualTable] Data is empty but columns are defined', {
         columns: columns.map(col => col.id || 'unnamed column'),
         isLoading
@@ -130,18 +165,10 @@ export function VirtualTable<TData extends object, TValue = any>({
     }
   }, [isDataEmpty, columns, isLoading]);
 
-  // For debugging purposes
-  console.log("[VirtualTable] Rendering with", {
-    dataLength: data?.length || 0,
-    rowsLength: rows?.length || 0,
-    isLoading,
-    hasNextPage
-  });
-
   // Early return for empty state
   if (isDataEmpty && !isLoading) {
     return (
-      <div className="text-center p-8 text-[#84a98c]">
+      <div className="text-center p-8 text-[#cad2c5]">
         <p>No data available</p>
       </div>
     );
@@ -150,17 +177,17 @@ export function VirtualTable<TData extends object, TValue = any>({
   return (
     <div
       ref={tableContainerRef}
-      className="relative overflow-auto max-h-[80vh] border border-[#52796f]/20 rounded-md"
-      style={{ contain: 'strict' }}
+      className="relative overflow-auto h-full min-h-[400px] border border-[#52796f] rounded-md bg-[#2f3e46]"
+      style={{ contain: 'size layout' }}
     >
       <Table className="w-full border-collapse">
         <TableHeader className="bg-[#354f52] sticky top-0 z-10">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow 
               key={headerGroup.id}
-              className="border-b border-[#52796f]/30"
+              className="border-b border-[#52796f]"
             >
-              {headerGroup.headers.map((header) => {
+              {headerGroup.headers.map((header, headerIndex) => {
                 const isSortable = header.column.getCanSort();
                 
                 return (
@@ -172,30 +199,37 @@ export function VirtualTable<TData extends object, TValue = any>({
                       minWidth: header.getSize() !== 150 ? header.getSize() : undefined 
                     }}
                     className={cn(
-                      "text-[#84a98c] text-xs font-medium p-3",
+                      "text-[#cad2c5] text-xs font-medium p-3 relative",
                       isSortable && "cursor-pointer select-none"
                     )}
                     onClick={isSortable ? header.column.getToggleSortingHandler() : undefined}
                   >
                     <div className="flex items-center justify-between">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                      {isSortable && (
-                        <div className="ml-1 flex items-center">
-                          {header.column.getIsSorted() === "asc" ? (
-                            <ArrowUp className="h-3 w-3 text-[#cad2c5]" />
-                          ) : header.column.getIsSorted() === "desc" ? (
-                            <ArrowDown className="h-3 w-3 text-[#cad2c5]" />
-                          ) : (
-                            <ArrowUpDown className="h-3 w-3 text-[#84a98c]/50" />
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                        {/* Single white arrow for sorting */}
+                        {isSortable && (
+                          <div className="ml-1 flex items-center">
+                            {header.column.getIsSorted() ? (
+                              header.column.getIsSorted() === "asc" ? (
+                                <ArrowUp className="h-3 w-3 text-white" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3 text-white" />
+                              )
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    {/* Add a thin vertical separator at the end of each column except the last one */}
+                    {headerIndex < headerGroup.headers.length - 1 && (
+                      <div className="absolute right-0 top-1/2 transform -translate-y-1/2 h-4 w-px bg-[#52796f]"></div>
+                    )}
                   </TableHead>
                 );
               })}
@@ -203,12 +237,12 @@ export function VirtualTable<TData extends object, TValue = any>({
           ))}
         </TableHeader>
         
-        {/* Debug information */}
-        {isDataEmpty && (
+        {/* Debug information - only in development */}
+        {process.env.NODE_ENV === 'development' && (
           <TableBody>
             <TableRow>
-              <TableCell colSpan={columns.length} className="p-3 text-center bg-yellow-200 text-black">
-                <div className="text-xs">Debug: No data available to render (length: {data?.length || 0})</div>
+              <TableCell colSpan={columns.length} className="p-3 text-center bg-blue-900/20 text-[#84a98c] text-xs">
+                <div>Debug: Data length {data?.length || 0}, isLoading: {isLoading ? 'Yes' : 'No'}</div>
               </TableCell>
             </TableRow>
           </TableBody>
@@ -216,7 +250,7 @@ export function VirtualTable<TData extends object, TValue = any>({
         
         <TableBody className="relative text-[#cad2c5]">
           {(!isDataEmpty && rows && rows.length > 0) ? (
-            enableVirtualization && rowVirtualizer ? (
+            shouldUseVirtualizer ? (
               // Virtualized rows
               <tr>
                 <td colSpan={columns.length} className="p-0">
@@ -230,64 +264,62 @@ export function VirtualTable<TData extends object, TValue = any>({
                         return (
                           <div
                             key="loading-row"
-                            className="absolute top-0 left-0 w-full flex items-center justify-center py-4"
+                            className="absolute top-0 left-0 w-full flex items-center justify-center py-4 bg-[#354f52]/50"
                             style={{
-                              height: virtualRow.size,
+                              height: 60,
                               transform: `translateY(${virtualRow.start}px)`,
                             }}
                           >
                             <Loader2 className="h-5 w-5 animate-spin mr-2 text-[#84a98c]" />
-                            <span className="text-[#84a98c]">{loadingMessage}</span>
+                            <span>{loadingMessage}</span>
                           </div>
                         );
                       }
                       
-                      // Get the actual row
-                      const row = rows[virtualRow.index] as Row<TData>;
+                      const row = rows[virtualRow.index];
                       if (!row) return null;
                       
-                      const rowId = keyExtractor 
-                        ? keyExtractor(row.original) 
-                        : `row-${virtualRow.index}`;
-                        
+                      const rowId = keyExtractor ? keyExtractor(row.original) : row.id;
                       const isExpanded = isRowExpanded ? isRowExpanded(rowId) : false;
                       
                       return (
                         <div
-                          key={row.id}
+                          key={rowId || virtualRow.key}
+                          data-index={virtualRow.index}
                           className="absolute top-0 left-0 w-full"
                           style={{
-                            height: virtualRow.size,
+                            height: getRowHeight(virtualRow.index),
                             transform: `translateY(${virtualRow.start}px)`,
                           }}
                         >
-                          {/* Main Row */}
-                          <div 
-                            className={`flex w-full border-b border-[#52796f]/20 h-12 ${
-                              onRowClick ? 'cursor-pointer hover:bg-[#354f52]' : ''
-                            } ${isExpanded ? 'bg-[#354f52]/40' : ''}`}
-                            onClick={() => onRowClick && onRowClick(row.original)}
+                          <TableRow
+                            key={rowId || row.id}
+                            data-state={row.getIsSelected() ? "selected" : undefined}
+                            className={cn(
+                              "border-b border-[#52796f]/30 hover:bg-[#354f52]/50 cursor-pointer bg-transparent",
+                              isExpanded && "bg-[#354f52]/30"
+                            )}
+                            onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                           >
-                            {row.getVisibleCells().map(cell => (
-                              <div
+                            {row.getVisibleCells().map((cell, cellIndex) => (
+                              <TableCell 
                                 key={cell.id}
-                                className="flex-1 p-3 flex items-center"
-                                style={{ 
-                                  flexBasis: cell.column.getSize(),
-                                  maxWidth: cell.column.getSize() !== 0 ? cell.column.getSize() : undefined
-                                }}
-                              >
-                                {flexRender(
-                                  cell.column.columnDef.cell,
-                                  cell.getContext()
+                                className={cn(
+                                  "p-3 relative",
+                                  (cell.column.columnDef.meta as ColumnMeta<TData, TValue>)?.className
                                 )}
-                              </div>
+                              >
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                {/* Add a thin vertical separator after each cell except the last one */}
+                                {cellIndex < row.getVisibleCells().length - 1 && (
+                                  <div className="absolute right-0 top-1/2 transform -translate-y-1/2 h-4 w-px bg-[#52796f]/30"></div>
+                                )}
+                              </TableCell>
                             ))}
-                          </div>
+                          </TableRow>
                           
-                          {/* Expanded Content */}
                           {isExpanded && renderExpanded && (
-                            <div className="w-full bg-[#2f3e46] p-4 border-b border-[#52796f]/20">
+                            <div className="px-3">
                               {renderExpanded(row.original)}
                             </div>
                           )}
@@ -298,45 +330,41 @@ export function VirtualTable<TData extends object, TValue = any>({
                 </td>
               </tr>
             ) : (
-              // Non-virtualized rows for better accessibility when virtualization is disabled
-              rows.map((row, i) => {
-                const rowId = keyExtractor 
-                  ? keyExtractor(row.original) 
-                  : `row-${i}`;
-                  
-                const isExpanded = isRowExpanded && isRowExpanded(rowId);
+              // Non-virtualized rows for simpler rendering - limit to 8 rows
+              rows.slice(0, 8).map(row => {
+                const rowId = keyExtractor ? keyExtractor(row.original) : row.id;
+                const isExpanded = isRowExpanded ? isRowExpanded(rowId) : false;
                 
                 return (
-                  <React.Fragment key={row.id}>
-                    <TableRow 
-                      className={`border-b border-[#52796f]/20 h-12 ${
-                        onRowClick ? 'cursor-pointer hover:bg-[#354f52]' : ''
-                      } ${isExpanded ? 'bg-[#354f52]/40' : ''}`}
-                      onClick={() => onRowClick && onRowClick(row.original)}
+                  <React.Fragment key={rowId || row.id}>
+                    <TableRow
+                      data-state={row.getIsSelected() ? "selected" : undefined}
+                      className={cn(
+                        "border-b border-[#52796f]/30 hover:bg-[#354f52]/50 cursor-pointer bg-transparent",
+                        isExpanded && "bg-[#354f52]/30"
+                      )}
+                      onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                     >
-                      {row.getVisibleCells().map(cell => (
-                        <TableCell
+                      {row.getVisibleCells().map((cell, cellIndex) => (
+                        <TableCell 
                           key={cell.id}
-                          className="p-3"
-                          style={{ 
-                            width: cell.column.getSize() !== 0 ? cell.column.getSize() : 'auto'
-                          }}
+                          className={cn(
+                            "p-3 relative",
+                            (cell.column.columnDef.meta as ColumnMeta<TData, TValue>)?.className
+                          )}
                         >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          {/* Add a thin vertical separator after each cell except the last one */}
+                          {cellIndex < row.getVisibleCells().length - 1 && (
+                            <div className="absolute right-0 top-1/2 transform -translate-y-1/2 h-4 w-px bg-[#52796f]/30"></div>
                           )}
                         </TableCell>
                       ))}
                     </TableRow>
                     
-                    {/* Expanded content row */}
                     {isExpanded && renderExpanded && (
-                      <TableRow className="bg-[#2f3e46]">
-                        <TableCell
-                          colSpan={columns.length}
-                          className="p-4 border-b border-[#52796f]/20"
-                        >
+                      <TableRow>
+                        <TableCell colSpan={columns.length} className="p-0">
                           {renderExpanded(row.original)}
                         </TableCell>
                       </TableRow>
@@ -347,24 +375,21 @@ export function VirtualTable<TData extends object, TValue = any>({
             )
           ) : (
             <TableRow>
-              <TableCell 
-                colSpan={columns.length} 
-                className="text-center p-8 text-[#84a98c]"
-              >
+              <TableCell colSpan={columns.length} className="h-24 text-center">
                 {isLoading ? (
                   <div className="flex items-center justify-center">
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    <span>{loadingMessage}</span>
+                    <Loader2 className="h-5 w-5 animate-spin mr-2 text-[#84a98c]" />
+                    <span>Loading data...</span>
                   </div>
                 ) : (
-                  <p>No data available</p>
+                  <span>No results found</span>
                 )}
               </TableCell>
             </TableRow>
           )}
           
           {/* Loading more indicator */}
-          {hasNextPage && !rowVirtualizer && (
+          {hasNextPage && !shouldUseVirtualizer && (
             <TableRow id="load-more-trigger">
               <TableCell colSpan={columns.length} className="p-3 text-center">
                 {isLoading && (
@@ -380,7 +405,7 @@ export function VirtualTable<TData extends object, TValue = any>({
       </Table>
       
       {/* Set the proper height for the table to account for virtualization */}
-      {rowVirtualizer && (
+      {shouldUseVirtualizer && (
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,

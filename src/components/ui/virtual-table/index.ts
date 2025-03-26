@@ -1,6 +1,7 @@
-export { DataFetchError } from './DataFetchError';
-export { NoDataDisplay } from './NoDataDisplay';
-export { TablePagination } from './TablePagination';
-export { TableWrapper } from './TableWrapper';
-export { VirtualTable } from './VirtualTable';
-export { default as SimpleTable } from './SimpleTable'; 
+export { default as DataFetchError } from './DataFetchError';
+export { default as NoDataDisplay } from './NoDataDisplay';
+export { default as TablePagination } from './TablePagination';
+export { default as TableWrapper } from './TableWrapper';
+export { default as VirtualTable } from './VirtualTable';
+export { default as SimpleTable } from './SimpleTable';
+export * from './TanStackTable'; 

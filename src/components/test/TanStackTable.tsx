@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import SimpleTable from "../ui/virtual-table/SimpleTable";
-import { TableWrapper } from "../ui/virtual-table/TableWrapper";
+import { SimpleTable, TableWrapper } from "../ui/virtual-table/TanStackTable";
 
 interface TestItem {
   id: string;
@@ -121,25 +120,32 @@ export default function TanStackTable() {
   const fetchData = async (options: any) => {
     console.log("Fetching data with options:", options);
     
-    // Simulate network latency
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const { pageIndex = 0, pageSize = 10 } = options;
-    const startIdx = pageIndex * pageSize;
-    const endIdx = startIdx + pageSize;
-    
-    // Generate data for the current page
-    const pageData = generateTestData(pageSize).map((item, idx) => ({
-      ...item,
-      id: `item-${startIdx + idx}`,
-      name: `Test Item ${startIdx + idx}`,
-      email: `test${startIdx + idx}@example.com`,
-    }));
-    
-    return {
-      data: pageData,
-      totalCount: 200 // Mock total count
-    };
+    try {
+      // Simulate network latency
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      const { pageIndex = 0, pageSize = 10 } = options;
+      const startIdx = pageIndex * pageSize;
+      
+      // Generate data for the current page
+      const pageData = generateTestData(pageSize).map((item, idx) => ({
+        ...item,
+        id: `item-${startIdx + idx}`,
+        name: `Test Item ${startIdx + idx}`,
+        email: `test${startIdx + idx}@example.com`,
+      }));
+      
+      return {
+        data: pageData,
+        totalCount: 200 // Mock total count
+      };
+    } catch (error) {
+      console.error("Error fetching mock data:", error);
+      return {
+        data: [],
+        totalCount: 0
+      };
+    }
   };
 
   return (

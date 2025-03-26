@@ -69,11 +69,20 @@ export function useVirtualTableData<TData>({
   const lastFetchId = useRef(0);
   const hasMoreDataRef = useRef(true);
 
+  // Track initial fetch to prevent multiple fetches
+  const initialFetchCompleted = useRef(false);
+
   // Debug logging
   const logDebug = useCallback((message: string, data: any = {}) => {
     console.log(`[useVirtualTableData] ${message}`, data);
   }, []);
 
+  // Track if we're already fetching data to prevent duplicate requests
+  const isFetchingRef = useRef(false);
+  
+  // Store previous filters to avoid redundant fetches
+  const prevFiltersRef = useRef<string>('');
+  
   // Function to fetch data
   const fetchData = useCallback(async (options: {
     reset?: boolean,
@@ -82,11 +91,20 @@ export function useVirtualTableData<TData>({
   } = {}) => {
     const { reset = false, loadMore = false, newFilters } = options;
     
+    // If already fetching and not forced, exit
+    if (isFetchingRef.current && !reset) {
+      logDebug('Already fetching data, skipping');
+      return;
+    }
+    
     // If loading more, and no more data, exit early
     if (loadMore && !hasMoreDataRef.current) {
       logDebug('No more data to load');
       return;
     }
+    
+    // Set fetching flag
+    isFetchingRef.current = true;
     
     // Set the appropriate loading state
     if (loadMore) {
@@ -125,7 +143,7 @@ export function useVirtualTableData<TData>({
       });
       
       // Check if this fetch request is the most recent one
-      if (fetchId !== lastFetchId.current || !mounted.current) {
+      if (fetchId !== lastFetchId.current) {
         logDebug('Ignoring stale fetch result', { fetchId, lastFetchId: lastFetchId.current });
         return;
       }
@@ -174,7 +192,7 @@ export function useVirtualTableData<TData>({
       }
     } catch (err) {
       // Skip if not the most recent fetch
-      if (fetchId !== lastFetchId.current || !mounted.current) return;
+      if (fetchId !== lastFetchId.current) return;
       
       console.error('Error fetching data:', err);
       logDebug('Error fetching data', err);
@@ -200,13 +218,16 @@ export function useVirtualTableData<TData>({
       }
     } finally {
       // Skip if not the most recent fetch
-      if (fetchId !== lastFetchId.current || !mounted.current) return;
+      if (fetchId !== lastFetchId.current) return;
       
       if (loadMore) {
         setIsLoadingMore(false);
       } else {
         setIsLoading(false);
       }
+      
+      // Clear fetching flag
+      isFetchingRef.current = false;
     }
   }, [fetchFn, pageIndex, pageSize, debouncedFilters, data, onError, logDebug]);
 
@@ -222,33 +243,35 @@ export function useVirtualTableData<TData>({
     setFilters(prevFilters => ({ ...prevFilters, ...newFilters }));
   }, [logDebug]);
 
-  // Handle page index changes
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      mounted.current = false;
+      logDebug('Component unmounted, cleaning up');
+    };
+  }, [logDebug]); // Only depend on logDebug
+  
+  // Core API functions
+  
+  // Function to set the page index
   const handleSetPageIndex = useCallback((index: number) => {
-    logDebug('Setting page index', { index });
+    if (index === pageIndex) return;
     
-    if (index < 0) {
-      index = 0;
-    }
-    
-    const maxPageIndex = Math.max(0, Math.ceil(totalCount / pageSize) - 1);
-    if (index > maxPageIndex) {
-      index = maxPageIndex;
-    }
-    
+    logDebug('Setting page index', { oldIndex: pageIndex, newIndex: index });
     setPageIndex(index);
-  }, [totalCount, pageSize, logDebug]);
-
-  // Handle page size changes
+    fetchData({ reset: true });
+  }, [pageIndex, fetchData, logDebug]);
+  
+  // Function to set the page size
   const handleSetPageSize = useCallback((size: number) => {
-    logDebug('Setting page size', { size });
+    if (size === pageSize) return;
     
-    // When changing page size, keep current position in dataset
-    const firstItemIndex = pageIndex * pageSize;
-    const newPageIndex = Math.floor(firstItemIndex / size);
-    
+    logDebug('Setting page size', { oldSize: pageSize, newSize: size });
     setPageSize(size);
-    setPageIndex(newPageIndex);
-  }, [pageIndex, pageSize, logDebug]);
+    // Reset to page 0 when changing page size
+    setPageIndex(0);
+    fetchData({ reset: true });
+  }, [pageSize, fetchData, logDebug]);
 
   // Load more data
   const loadMore = useCallback(async () => {
@@ -273,33 +296,87 @@ export function useVirtualTableData<TData>({
     await fetchData();
   }, [fetchData, logDebug]);
 
-  // Fetch data on initial mount and when dependencies change
+  // Effect to fetch initial data
   useEffect(() => {
-    logDebug('Effect triggered, fetching data', { pageIndex, pageSize, filters: debouncedFilters });
-    fetchData();
-  }, [pageIndex, pageSize, debouncedFilters, fetchData, logDebug]);
+    if (initialFetchCompleted.current) {
+      logDebug('Initial fetch already completed, skipping');
+      return;
+    }
+    
+    logDebug('Initial mount, fetching data', { 
+      pageIndex, pageSize, filters: debouncedFilters 
+    });
+    
+    // Mark as completed before the fetch to prevent race conditions
+    initialFetchCompleted.current = true;
+    
+    // Fetch initial data with reset to ensure clean state
+    fetchData({ reset: true });
+    
+    // Cleanup function
+    return () => {
+      logDebug('Component unmounted, cleaning up');
+      mounted.current = false;
+    };
+  }, []); // Empty dependency array to run only on mount
+  
+  // Effect to handle filter changes
+  useEffect(() => {
+    // Skip initial render, unmounted components, and if initialFetch is not completed yet
+    if (!initialFetchCompleted.current || !mounted.current) {
+      return;
+    }
+    
+    // Skip if filters haven't actually changed (compare stringified versions)
+    const currentFiltersStr = JSON.stringify(debouncedFilters);
+    if (currentFiltersStr === prevFiltersRef.current) {
+      logDebug('Filters unchanged, skipping fetch');
+      return;
+    }
+    
+    // Initialize prev filters on first run to prevent redundant fetches
+    if (prevFiltersRef.current === '') {
+      prevFiltersRef.current = currentFiltersStr;
+      return;
+    }
+    
+    // Store current filters for next comparison
+    prevFiltersRef.current = currentFiltersStr;
+    
+    logDebug('Filters changed, fetching data', { 
+      filters: debouncedFilters 
+    });
+    
+    // Fetch with reset to ensure we start from page 0 with new filters
+    fetchData({ reset: true, newFilters: debouncedFilters });
+  }, [debouncedFilters, fetchData, logDebug]);
 
   // Set up interval for auto-refresh
   useEffect(() => {
-    if (!refreshInterval || !enableAutoRefresh) return;
+    if (!enableAutoRefresh || !refreshInterval || refreshInterval <= 0) {
+      return;
+    }
+    
+    // Use ref to track if we're currently in a loading state
+    const isCurrentlyLoading = () => isLoading || isLoadingMore;
+    
+    logDebug('Setting up refresh interval', { refreshInterval });
     
     const intervalId = setInterval(() => {
-      if (mounted.current && !isLoading && !isLoadingMore) {
-        fetchData();
+      // Skip refresh if we're already loading
+      if (isCurrentlyLoading()) {
+        logDebug('Skipping auto-refresh because we are already loading');
+        return;
       }
+      
+      logDebug('Auto-refreshing data');
+      fetchData({ reset: true });
     }, refreshInterval);
     
-    return () => clearInterval(intervalId);
-  }, [refreshInterval, fetchData, enableAutoRefresh, isLoading, isLoadingMore, logDebug]);
-
-  // Clean up on unmount
-  useEffect(() => {
-    mounted.current = true;
-    
     return () => {
-      mounted.current = false;
+      clearInterval(intervalId);
     };
-  }, []);
+  }, [refreshInterval, enableAutoRefresh, fetchData, logDebug]); // Don't include isLoading or isLoadingMore here
 
   // Check if there might be more data to load
   const hasNextPage = (pageIndex + 1) * pageSize < totalCount;
