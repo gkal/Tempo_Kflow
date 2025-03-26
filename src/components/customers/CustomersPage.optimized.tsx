@@ -4,7 +4,7 @@ import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, Pencil, Trash2, ArrowLeft, Edit, Filter, EyeOff, ChevronRight, ChevronDown, Check } from "lucide-react";
 import { CloseButton } from "@/components/ui/close-button";
-import { DataTableWrapper } from '../DataTableWrapper';
+import { DataTableBase } from "@/components/ui/data-table-base";
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
 import { formatDateTime } from "@/utils/formatUtils";
@@ -328,12 +328,7 @@ const CustomerRow = React.memo(({
                   {offers.map((offer) => (
                     <tr 
                       key={offer.id} 
-                      className={`
-                        border-t border-[#52796f]/30 
-                        bg-[#2f3e46]
-                        hover:bg-[#354f52] cursor-pointer
-                        transition-colors duration-150
-                      `}
+                      className="border-t border-[#52796f]/30 hover:bg-[#354f52]/30 cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleEditOffer(row.id, offer.id);
@@ -647,114 +642,6 @@ export default function CustomersPage() {
   // Move debouncedSearchTerm declaration before the fetchCustomers function
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   
-  // Add these new state variables at the top of the component
-  const [sortColumn, setSortColumn] = useState<string>("company_name");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [columnWidths, setColumnWidths] = useState<Record<string, string>>({});
-  const [isResizing, setIsResizing] = useState<boolean>(false);
-  const [resizeColumnId, setResizeColumnId] = useState<string | null>(null);
-  const [startX, setStartX] = useState<number>(0);
-  const [startWidth, setStartWidth] = useState<number>(0);
-  
-  // Add these functions to handle sorting and column resizing
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      // Toggle direction if same column
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      // Set new column and default to ascending
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
-  };
-
-  const startResize = (e: React.MouseEvent, columnId: string, currentWidth: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizing(true);
-    setResizeColumnId(columnId);
-    setStartX(e.clientX);
-    
-    // Parse the width properly, regardless of px suffix
-    let numWidth = 100;
-    if (typeof currentWidth === 'string') {
-      numWidth = parseInt(currentWidth.replace(/px$/, ''), 10);
-      if (isNaN(numWidth)) numWidth = 100;
-    } else if (typeof currentWidth === 'number') {
-      numWidth = currentWidth;
-    }
-    
-    setStartWidth(numWidth);
-    
-    // Add event listeners to document to catch all mouse events
-    document.addEventListener('mousemove', resize);
-    document.addEventListener('mouseup', stopResize);
-    
-    // Set cursor for entire document during resize
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  };
-
-  const resize = (e: MouseEvent) => {
-    if (!isResizing || !resizeColumnId) return;
-    
-    // Calculate new width with minimum size constraint
-    const width = Math.max(50, startWidth + (e.clientX - startX));
-    
-    // Update columnWidths state with the new width
-    setColumnWidths(prev => ({
-      ...prev,
-      [resizeColumnId]: `${width}px`
-    }));
-  };
-
-  const stopResize = () => {
-    setIsResizing(false);
-    setResizeColumnId(null);
-    
-    // Clean up event listeners
-    document.removeEventListener('mousemove', resize);
-    document.removeEventListener('mouseup', stopResize);
-    
-    // Reset cursor
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  };
-
-  // Add a memoized sorted customers array
-  const sortedCustomers = useMemo(() => {
-    if (!sortColumn) return filteredCustomers;
-    
-    return [...filteredCustomers].sort((a, b) => {
-      const aValue = a[sortColumn];
-      const bValue = b[sortColumn];
-      
-      // Handle special case for created_at to ensure proper date comparison
-      if (sortColumn === 'created_at') {
-        const aDate = new Date(aValue).getTime();
-        const bDate = new Date(bValue).getTime();
-        return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
-      }
-      
-      // Handle null or undefined values
-      if (aValue == null && bValue == null) return 0;
-      if (aValue == null) return sortDirection === 'asc' ? -1 : 1;
-      if (bValue == null) return sortDirection === 'asc' ? 1 : -1;
-      
-      // Compare strings in a case-insensitive manner
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === 'asc' 
-          ? aValue.localeCompare(bValue, 'el')
-          : bValue.localeCompare(aValue, 'el');
-      }
-      
-      // Basic comparison for other types
-      return sortDirection === 'asc'
-        ? aValue < bValue ? -1 : aValue > bValue ? 1 : 0
-        : aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
-    });
-  }, [filteredCustomers, sortColumn, sortDirection]);
-  
   // Add a function to set up real-time subscriptions
   const setupRealtimeSubscriptions = useCallback(() => {
     if (!realtimeEnabled) return;
@@ -979,15 +866,14 @@ export default function CustomersPage() {
       setLoadingOffers(prev => ({ ...prev, [customerId]: false }));
     }
   }, [customerOffers]);
+
+  // Remove duplicate declarations - already defined at the top of the component
   
   // Update fetchCustomers to be more efficient and prevent double rendering
   const fetchCustomers = useCallback(async () => {
     try {
-      const startTime = performance.now();
-      console.log('🔍 Starting customer fetch...');
       setLoading(true);
-      
-      // Simply fetch without using request ID tracking that's causing issues
+      const requestId = ++requestIdCounter.current;
       
       // Build the initial query
       let query = supabase
@@ -1012,7 +898,11 @@ export default function CustomersPage() {
       
       // Execute the query
       const response = await query.order('company_name');
-      console.log('📊 Query response:', response);
+      
+      // Check if this is still the most recent request
+      if (requestId !== requestIdCounter.current) {
+        return;
+      }
       
       if (response.error) {
         throw response.error;
@@ -1020,7 +910,6 @@ export default function CustomersPage() {
       
       // Process data
       const responseData = response.data || [];
-      console.log(`📋 Found ${responseData.length} customers`);
       
       // Fetch offer counts for all customers
       const customerIds = responseData.map(customer => customer.id);
@@ -1051,18 +940,17 @@ export default function CustomersPage() {
         });
       }
       
-      // Update state
+      // Update state directly
       setCustomers(responseData);
       setFilteredCustomers(responseData);
-      setTotalCount(responseData.length);
       
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-      console.log(`⏱️ ${measurePerformance('Customer fetch', startTime)}`);
-      console.log('✅ Customer rendering complete: ' + responseData.length + ' customers ready to display');
+      // Set a minimal query time for UI feedback
+      setQueryTime("0.00");
       
-      // Immediately set loading to false
+      // Use a small delay before removing loading state to ensure consistent UX
+      setTimeout(() => {
         setLoading(false);
+      }, 500);
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast({
@@ -1070,21 +958,12 @@ export default function CustomersPage() {
         description: "Δεν ήταν δυνατή η φόρτωση των πελατών.",
         variant: "destructive",
       });
-      // Ensure loading state is removed
+      // Still ensure loading state is removed after a delay
+      setTimeout(() => {
         setLoading(false);
+      }, 500);
     }
   }, [searchTerm, searchColumn, selectedCustomerTypes, availableCustomerTypes, statusFilter]);
-
-  // Add useEffect to fetch customers on mount
-  useEffect(() => {
-    console.log('🔄 Initial customer data fetch');
-    fetchCustomers();
-  }, [fetchCustomers]);
-
-  // Add a useEffect to run fetch when search, filters or status changes
-  useEffect(() => {
-    fetchCustomers();
-  }, [debouncedSearchTerm, searchColumn, debouncedCustomerTypes, statusFilter, fetchCustomers]);
 
   // Define refreshCustomers early to avoid reference issues
   const refreshCustomers = useCallback(() => {
@@ -1354,394 +1233,94 @@ export default function CustomersPage() {
     }
   };
 
-  // Add scrollbar styles at the component level, not inside renderDirectTable
-  useEffect(() => {
-    // Create style for explicit scrollbar
-    const style = document.createElement('style');
-    style.textContent = `
-      .custom-table-scrollbar::-webkit-scrollbar {
-        width: 10px !important;
-        height: 10px !important;
-        display: block !important;
-      }
-      .custom-table-scrollbar::-webkit-scrollbar-track {
-        background: #2f3e46 !important;
-        border-radius: 10px !important;
-      }
-      .custom-table-scrollbar::-webkit-scrollbar-thumb {
-        background-color: #52796f !important;
-        border-radius: 10px !important;
-        border: 2px solid #2f3e46 !important;
-      }
-      .custom-table-scrollbar::-webkit-scrollbar-thumb:hover {
-        background-color: #84a98c !important;
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
-  // Update the renderDirectTable function to use the scrollbar styles without using hooks inside it
-  const renderDirectTable = () => {
-    // Render loading state
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center py-16 bg-[#2f3e46] rounded-lg border border-[#52796f]">
-          <LoadingSpinner fullScreen={false} />
-          <span className="ml-3 text-[#cad2c5]">Φόρτωση πελατών...</span>
-        </div>
-      );
-    }
-    
-    // Fallback to original direct table implementation to preserve all functionality
-        return (
-      <div className="rounded-lg border border-[#52796f]">
-        <div 
-          className="custom-table-scrollbar" 
-          style={{ 
-            height: "550px", 
-            overflowY: "auto",
-            overflowX: "auto",
-            msOverflowStyle: "scrollbar",
-            scrollbarWidth: "thin",
-            scrollbarColor: "#52796f #2f3e46"
-          }}
-        >
-          <table className="border-collapse bg-transparent" style={{ minWidth: "100%" }}>
-            <thead className="bg-[#2f3e46] sticky top-0 z-10" style={{ boxShadow: '0 1px 0 #52796f' }}>
-              <tr>
-                {columns.map((col, idx) => (
-                  <th 
-                    key={idx} 
-                    className={`
-                      text-center text-[#84a98c] py-2 px-3 text-sm font-medium select-none
-                      ${col.accessor !== "expand" && col.accessor !== "actions" ? "cursor-pointer hover:text-white" : ""}
-                      relative
-                    `}
-                    style={{ 
-                      width: columnWidths[col.accessor] || col.width || 'auto',
-                      minWidth: columnWidths[col.accessor] || col.width || 'auto',
-                      position: 'relative',
-                    }}
-            onClick={(e) => {
-                      // Only handle sort click if we're not resizing
-                      if (!isResizing) {
-                        col.accessor !== "expand" && col.accessor !== "actions" && handleSort(col.accessor);
-                      }
-                    }}
-                  >
-                    <div className="flex items-center justify-center">
-                      <span>{col.header}</span>
-                      {col.accessor === sortColumn && col.accessor !== "expand" && col.accessor !== "actions" && (
-                        <span className="text-white ml-1">
-                          {sortDirection === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </div>
-                    {col.accessor !== "expand" && col.accessor !== "actions" && (
-                      <div
-                        className="absolute top-0 right-0 h-full w-4 cursor-col-resize flex items-center justify-center z-10"
-                        onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-                          const startX = e.clientX;
-                          const startWidth = parseInt(columnWidths[col.accessor] || col.width || '100px', 10);
-                          
-                          const onMouseMove = (moveEvent) => {
-                            moveEvent.preventDefault();
-                            moveEvent.stopPropagation();
-                            const width = Math.max(80, startWidth + (moveEvent.clientX - startX));
-                            setColumnWidths(prev => ({
-                              ...prev,
-                              [col.accessor]: `${width}px`
-                            }));
-                          };
-                          
-                          const onMouseUp = () => {
-                            document.removeEventListener('mousemove', onMouseMove);
-                            document.removeEventListener('mouseup', onMouseUp);
-                            document.body.style.cursor = '';
-                            
-                            // Small delay to prevent click event from triggering sort
-                            setTimeout(() => {
-                              setIsResizing(false);
-                            }, 100);
-                          };
-                          
-                          setIsResizing(true);
-                          document.addEventListener('mousemove', onMouseMove);
-                          document.addEventListener('mouseup', onMouseUp);
-                          document.body.style.cursor = 'col-resize';
-                        }}
-                      >
-                        <div className="w-[1px] h-2/5 bg-[#52796f] hover:bg-[#84a98c] rounded-full"></div>
-                      </div>
-                    )}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#52796f]/30">
-              {sortedCustomers.map((customer, index) => (
-                <CustomerContextMenu
-                  key={`context-${customer.id || index}`} 
-                  customerId={customer.id}
-                  onCreateOffer={handleCreateOffer}
-                >
-                  <React.Fragment key={customer.id || index}>
-                    <tr 
-                      className={`
-                        bg-transparent
-                        hover:bg-[#3d5a5e] cursor-pointer 
-                        transition-colors duration-150 border-b border-[#52796f]/30
-                        ${lastUpdatedCustomerId === customer.id ? 'bg-[#52796f]/40 hover:bg-[#52796f]/50' : ''}
-                      `}
-                      onClick={() => navigate(`/customers/${customer.id}`)}
-                      data-customer-id={customer.id}
-                    >
-                      {columns.map((col, colIdx) => (
-                        <td 
-                          key={colIdx} 
-                          className="p-2 text-[#cad2c5] text-sm font-normal whitespace-nowrap"
-                          style={{
-                            width: columnWidths[col.accessor] || col.width || 'auto',
-                            minWidth: columnWidths[col.accessor] || col.width || 'auto',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}
-                        >
-                          <div className="overflow-hidden text-ellipsis">
-                            {col.accessor === "expand" && col.cell 
-                              ? col.cell(null, customer) 
-                              : col.cell 
-                                ? col.cell(customer[col.accessor], customer)
-                                : customer[col.accessor] || "-"}
-                          </div>
-                        </td>
-                      ))}
-                    </tr>
-                    
-                    {/* Handle expanded rows */}
-                    {(expandedCustomers[customer.id] || false) && (
-                      <tr className="bg-[#2f3e46] border-t border-b border-[#52796f]">
-                        <td colSpan={columns.length}>
-                          <div className="pl-[70px] pr-4 py-3">
-                            {loadingOffers[customer.id] ? (
-                              <div className="flex justify-center items-center py-4">
-                                <LoadingSpinner fullScreen={false} />
-                              </div>
-                            ) : (customerOffers[customer.id]?.length || 0) === 0 ? (
-                              <div className="py-4 text-[#84a98c] flex flex-col items-center justify-center gap-3">
-                                <div className="text-center">
-                                  Δεν υπάρχουν προσφορές για αυτόν τον πελάτη
-                                </div>
-                              </div>
-                            ) : (
-                              <div>
-                                <table className="w-full border-collapse rounded-md overflow-hidden">
-                                  <thead>
-                                    <tr className="bg-[#3a5258] text-[#a8c5b5]">
-                                      <th className="px-2 py-2 text-left text-xs font-semibold w-[160px]">Ημερομηνία</th>
-                                      <th className="px-3 py-2 text-left text-xs font-semibold w-[100px]">Ζήτηση Πελάτη</th>
-                                      <th className="px-3 py-2 text-left text-xs font-semibold w-[100px]">Ποσό</th>
-                                      <th className="px-3 py-2 text-left text-xs font-semibold w-[140px]">Κατάσταση</th>
-                                      <th className="px-3 py-2 text-left text-xs font-semibold w-[100px]">Αποτέλεσμα</th>
-                                      <th className="px-3 py-2 text-center text-xs font-semibold w-[50px]"></th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {customerOffers[customer.id]?.map((offer, offerIdx) => (
-                                      <tr 
-                                        key={offer.id} 
-                                        className={`
-                                          border-t border-[#52796f]/30 
-                                          bg-transparent
-                                          hover:bg-[#354f52] cursor-pointer
-                                          transition-colors duration-150
-                                        `}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleEditOffer(customer.id, offer.id);
-                                        }}
-                                      >
-                                        <td className="px-2 py-1.5 text-xs text-[#cad2c5] w-[160px] font-medium">
-                                          <div className="overflow-hidden text-ellipsis">
-                                            {formatDateTime(offer.created_at)}
-                                          </div>
-                                        </td>
-                                        <td className="px-3 py-1.5 text-xs text-[#cad2c5] w-[100px]">
-                                          {offer.requirements 
-                                            ? <TruncateWithTooltip 
-                                                text={offer.requirements} 
-                                                maxLength={50} 
-                                                maxWidth={800}
-                                                multiLine={false}
-                                                maxLines={2}
-                                              /> 
-                                            : "-"}
-                                        </td>
-                                        <td className="px-3 py-1.5 text-xs text-[#cad2c5] w-[100px] font-medium">
-                                          {offer.amount 
-                                            ? <TruncateWithTooltip 
-                                                text={offer.amount} 
-                                                maxLength={50} 
-                                                maxWidth={800}
-                                                multiLine={false}
-                                                maxLines={2}
-                                              /> 
-                                            : "-"}
-                                        </td>
-                                        <td className="px-3 py-2 text-xs w-[140px]">
-                                          <span className={`
-                                            ${offer.offer_result === "wait_for_our_answer" ? "text-yellow-400" : 
-                                              offer.offer_result === "wait_for_customer_answer" ? "text-blue-400" : 
-                                              offer.offer_result === "ready" ? "text-green-400" : "text-gray-400"}
-                                            font-medium
-                                          `}>
-                                            {formatStatus(offer.offer_result)}
-                                          </span>
-                                        </td>
-                                        <td className="px-3 py-2 text-xs w-[100px]">
-                                          <span className={`
-                                            ${offer.result === "success" ? "text-green-400" : 
-                                              offer.result === "failed" ? "text-red-400" : 
-                                              offer.result === "cancel" ? "text-yellow-400" :
-                                              offer.result === "waiting" ? "text-purple-400" : "text-gray-400"}
-                                            font-medium
-                                          `}>
-                                            {formatResult(offer.result)}
-                                          </span>
-                                        </td>
-                                        <td className="px-3 py-2 text-xs text-center w-[50px]">
-                                          {isAdminOrSuperUser && (
-                                            <GlobalTooltip content="Διαγραφή προσφοράς">
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleDeleteOffer(customer.id, offer.id);
-                                                }}
-                                                className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
-                                              >
-                                                <Trash2 className="h-3 w-3" />
-                                              </Button>
-                                            </GlobalTooltip>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                </CustomerContextMenu>
-              ))}
-            </tbody>
-          </table>
-            </div>
-          </div>
-    );
-  };
-
-  // Define columns for table rendering
+  // Now define columns after the toggleCustomerStatus function
+  // Memoize the columns to prevent unnecessary re-renders
   const columns = useMemo(() => [
     {
-      header: "",
+      header: "ΠΡ",
       accessor: "expand",
-      width: "50px",
-      cell: (_, row) => {
-        // Only show expand button if customer has offers
-        if (!row.offersCount || row.offersCount === 0) {
-          return <div className="w-8 h-8"></div>;
+      width: "30px",
+      cell: (value, row) => {
+        if (!row) return null;
+        
+        const isExpanded = row.isExpanded || false;
+        const offersCount = row.offersCount || 0;
+        
+        // Don't show anything if there are no offers
+        if (offersCount === 0) {
+          return <div className="w-full h-full"></div>;
         }
         
-        const isExpanded = expandedCustomers[row.id] || false;
-        
         return (
-          <Button
-            variant="ghost"
-            size="icon"
+          <div 
+            className="flex items-center justify-center w-full h-full"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               toggleCustomerExpanded(row.id);
             }}
-            className={`h-8 w-8 rounded-full transition-colors ${
-              isExpanded 
-                ? "bg-[#52796f] text-white" 
-                : "bg-transparent text-[#84a98c] hover:bg-[#52796f] hover:text-white"
-            }`}
-            aria-label={isExpanded ? "Collapse" : "Expand"}
           >
-            {isExpanded ? (
-              <ChevronDown className="h-5 w-5" />
-            ) : (
-              <div className="flex items-center">
-                <ChevronRight className="h-5 w-5" />
-                <span className="text-sm">{row.offersCount}</span>
+            <div className="flex items-center justify-center relative group cursor-pointer hover:bg-[#52796f]/60 rounded-full w-10 h-7 transition-colors duration-200">
+              <span className="absolute inset-0 rounded-full bg-[#52796f]/0 group-hover:bg-[#52796f]/30 transition-colors duration-200"></span>
+              <div className="flex items-center justify-center">
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-[#84a98c] group-hover:text-white relative z-10" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-[#84a98c] group-hover:text-white relative z-10" />
+                )}
+                <span className="ml-0.5 text-xs text-[#84a98c] group-hover:text-white relative z-10">{offersCount}</span>
               </div>
-            )}
-          </Button>
+            </div>
+          </div>
         );
       }
     },
     { 
       header: "Επωνυμία", 
       accessor: "company_name",
-      width: "250px",
-      cell: (value, row) => {
-        // If first_name and last_name exists but not company_name, show them instead
-        if ((!value || value === "") && row.first_name && row.last_name) {
-          return <span>{row.first_name} {row.last_name}</span>;
-        }
-        return <span>{value || "—"}</span>;
-      }
+      width: "22%"
     },
     { 
       header: "Τύπος", 
       accessor: "customer_type",
-      width: "150px"
+      width: "10%"
     },
     { 
       header: "ΑΦΜ", 
       accessor: "afm",
-      width: "100px"
+      width: "10%"
     },
     { 
       header: "Email", 
       accessor: "email",
-      width: "150px"
+      width: "15%"
     },
     { 
       header: "Τηλέφωνο", 
       accessor: "telephone",
-      width: "150px"
+      width: "13%"
     },
     { 
       header: "Διεύθυνση", 
       accessor: "address",
-      width: "200px"
+      width: "20%"
     },
     {
-      header: "Ημερομηνία",
+      header: "Ημ/νία Δημιουργίας",
       accessor: "created_at",
-      width: "150px",
-      cell: (value) => value ? formatDateTime(value) : "—"
+      cell: (value) => formatDateTime(value),
+      width: "13%"
     },
     {
-      header: "Ενέργειες",
-      accessor: "actions",
+      header: "Κατάσταση",
+      accessor: "status",
+      sortable: true,
       width: "100px",
-      cell: (_, row) => (
-        <div className="flex items-center gap-1 justify-end">
-          <GlobalTooltip content={`${row.status === 'active' ? 'Απενεργοποίηση' : 'Ενεργοποίηση'} Πελάτη`}>
+      cell: (value, row) => {
+        if (!row) return null;
+        
+        return (
+          <div className="flex justify-center" title={value === "active" ? "Ενεργός" : "Ανενεργός"}>
             <Button
               variant="ghost"
               size="icon"
@@ -1749,57 +1328,603 @@ export default function CustomersPage() {
                 e.stopPropagation();
                 toggleCustomerStatus(row);
               }}
-              className={`h-6 w-6 hover:bg-[#354f52] ${
-                row.status === 'active' ? 'text-green-500 hover:text-green-400' : 'text-red-500 hover:text-red-400'
-              }`}
+              className={`h-8 w-8 hover:bg-[#354f52] ${value === "active" ? "text-green-400" : "text-red-400"}`}
+              disabled={!isAdminOrSuperUser}
             >
-              {row.status === 'active' ? (
+              {value === "active" ? (
                 <Eye className="h-4 w-4" />
               ) : (
                 <EyeOff className="h-4 w-4" />
               )}
             </Button>
-          </GlobalTooltip>
-          
-          {isAdminOrSuperUser && (
-            <GlobalTooltip content="Διαγραφή Πελάτη">
+          </div>
+        );
+      },
+    },
+    {
+      header: "",
+      accessor: "actions",
+      width: "60px",
+      cell: (value, row) => {
+        if (!row || !isAdminOrSuperUser) return null;
+        
+        return (
+          <div className="flex justify-center">
+            <GlobalTooltip content={isAdminUser ? "Διαγραφή πελάτη" : "Απενεργοποίηση πελάτη"}>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
+                  // Set the customer to delete and show the confirmation dialog
                   setCustomerToDelete(row);
+                  // Ensure the dialog is shown after customerToDelete is set
+                  setTimeout(() => {
                     setShowDeleteAlert(true);
+                  }, 50);
                 }}
-                className="h-6 w-6 hover:bg-[#354f52] text-red-500 hover:text-red-400"
+                className="h-8 w-8 hover:bg-[#354f52] text-red-500 hover:text-red-400"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </GlobalTooltip>
-          )}
           </div>
-      )
+        );
+      },
     },
-  ], [expandedCustomers, isAdminOrSuperUser, navigate, setSelectedCustomer, setShowDialog, toggleCustomerExpanded, toggleCustomerStatus]);
+  ], [isAdminOrSuperUser, toggleCustomerExpanded, toggleCustomerStatus]);
 
-  // Initialize columnWidths after columns are defined
-  useEffect(() => {
-    if (columns.length > 0 && Object.keys(columnWidths).length === 0) {
-      // Initialize column widths
-      const initialWidths = {};
-      columns.forEach(column => {
-        initialWidths[column.accessor] = column.width || '100px';
-      });
-      setColumnWidths(initialWidths);
-    }
-  }, [columns, columnWidths]);
-
-  // Handle column selection
-  const handleColumnChange = useCallback((column) => {
+  // Update the handleColumnChange function to be more efficient
+  const handleColumnChange = useCallback((column: string) => {
+    setSelectedColumn(column);
     setSearchColumn(column);
-    setSearchTerm(""); // Reset search term when column changes
   }, []);
+
+  // Custom row renderer to add expandable offers section
+  const renderCustomRow = useCallback((props) => {
+    if (!props.row) return props.defaultRow; // Early return with defaultRow instead of null
+    
+    // Use the row's isExpanded property directly instead of looking it up
+    const isExpanded = props.row.isExpanded || false;
+    const offers = customerOffers[props.row.id] || [];
+    const isLoading = loadingOffers[props.row.id] || false;
+    
+    // Create the CustomerRow component
+    const customerRowComponent = (
+      <CustomerRow
+        key={props.row.id}
+        row={props.row}
+        index={props.index}
+        defaultRow={props.defaultRow}
+        isExpanded={isExpanded}
+        offers={offers}
+        isLoading={isLoading}
+        columns={columns}
+        isAdminOrSuperUser={isAdminOrSuperUser}
+        formatDateTime={formatDateTime}
+        formatSource={formatSource}
+        formatStatus={formatStatus}
+        formatResult={formatResult}
+        handleEditOffer={props.handleEditOffer}
+        handleDeleteOffer={props.handleDeleteOffer}
+        onCreateOffer={props.onCreateOffer}
+      />
+    );
+    
+    // Always wrap with context menu
+    return (
+      <CustomerContextMenu 
+        key={`context-${props.row.id}`} 
+        customerId={props.row.id}
+        onCreateOffer={props.onCreateOffer}
+      >
+        {customerRowComponent}
+      </CustomerContextMenu>
+    );
+  }, [customerOffers, loadingOffers, columns, isAdminOrSuperUser, handleEditOffer, handleDeleteOffer, handleCreateOffer]);
+
+  // Initialize dropdown options once on component mount
+  useEffect(() => {
+    // Convert searchColumns to the format expected by the GlobalDropdown
+    const dropdownOptions = searchColumns.map(col => ({
+      value: col.accessor,
+      label: col.header
+    }));
+    setOptions(dropdownOptions);
+    
+    // Initialize selectedColumn only once when the component mounts
+    if (!selectedColumn && searchColumn) {
+      setSelectedColumn(searchColumn);
+    }
+  }, []); // Empty dependency array means this runs only once when component mounts
+
+  const handleEditCustomer = (customer) => {
+    setSelectedCustomer(customer);
+    setShowDialog(true);
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!customerToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("customers")
+        .update({
+          status: "inactive",
+          modified_by: user?.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", customerToDelete.id);
+
+      if (error) throw error;
+      await fetchCustomers();
+    } catch (error) {
+      console.error("Error deactivating customer:", error);
+    } finally {
+      setShowDeleteDialog(false);
+      setCustomerToDelete(null);
+    }
+  };
+
+  // Function to track and prevent duplicate delete operations
+  const preventDuplicateDelete = (customerId) => {
+    if (deletionInProgressRef.current) {
+      return false;
+    }
+    
+    // Set deletion in progress flag
+    deletionInProgressRef.current = true;
+    
+    // Auto-reset after 3 seconds as a safety measure
+    setTimeout(() => {
+      deletionInProgressRef.current = false;
+    }, 3000);
+    
+    return true;
+  };
   
+  // Function to clear deletion in progress flag
+  const clearDeletionInProgress = () => {
+    deletionInProgressRef.current = false;
+  };
+
+  // Simple direct customer delete function
+  const deleteCustomer = async (
+    customerId, 
+    setOpFn = null, 
+    setCompletedFn = null,
+    setErrorFn = null
+  ) => {
+    if (!customerId || isDeletingCustomer) return;
+    
+    // Set the deletion in progress flag before any async operations
+    setIsDeletingCustomer(true);
+    
+    // Function to update current operation
+    const updateOperation = (operation) => {
+      if (setOpFn) setOpFn(operation);
+    };
+    
+    // Function to add completed operation
+    const addCompletedOperation = (operation) => {
+      if (setCompletedFn) setCompletedFn(prev => [...prev, operation]);
+    };
+    
+    try {
+      const isAdmin = 
+        user?.role?.toLowerCase() === 'admin' || 
+        user?.role?.toLowerCase() === 'super user';
+      
+      if (isAdmin) {
+        // Delete offers and their details first
+        updateOperation("Διαγραφή προσφορών...");
+        const deletedAt = new Date().toISOString();
+        
+        // First delete sequence: Offers
+          const { error: offersError } = await supabase
+            .from('offers')
+            .update({ deleted_at: deletedAt } as any)
+            .eq('customer_id', customerId);
+          
+          if (offersError) {
+          console.error("Error deleting offers:", offersError);
+          throw new Error(`Σφάλμα κατά τη διαγραφή προσφορών: ${offersError.message}`);
+        }
+        
+        addCompletedOperation("Οι προσφορές διαγράφηκαν με επιτυχία");
+        
+        // Get offer IDs
+        updateOperation("Εύρεση στοιχείων προσφορών...");
+        const { data: offerIds, error: offerIdsError } = await supabase
+            .from('offers')
+            .select('id')
+            .eq('customer_id', customerId);
+            
+        if (offerIdsError) {
+          console.error("Error fetching offer IDs:", offerIdsError);
+          throw new Error(`Σφάλμα κατά την εύρεση προσφορών: ${offerIdsError.message}`);
+        }
+        
+        // Mark offer details as deleted if we have offers
+        if (offerIds && offerIds.length > 0) {
+          updateOperation(`Διαγραφή λεπτομερειών προσφορών (${offerIds.length})...`);
+          for (const offer of offerIds) {
+            const { error: offerDetailsError } = await supabase
+                .from('offer_details')
+                .update({ deleted_at: deletedAt } as any)
+              .eq('offer_id', offer.id);
+                
+            if (offerDetailsError) {
+              console.error(`Error deleting details for offer ${offer.id}:`, offerDetailsError);
+              throw new Error(`Σφάλμα κατά τη διαγραφή λεπτομερειών προσφοράς: ${offerDetailsError.message}`);
+              }
+            }
+          addCompletedOperation(`Λεπτομέρειες προσφορών (${offerIds.length}) διαγράφηκαν με επιτυχία`);
+        }
+        
+        // Second delete sequence: Primary Contact
+        updateOperation("Κατάργηση αναφοράς κύριας επαφής...");
+        const { error: primaryContactError } = await supabase
+          .from('customers')
+          .update({ primary_contact_id: null })
+          .eq('id', customerId);
+        
+        if (primaryContactError) {
+          console.error("Error removing primary contact reference:", primaryContactError);
+          throw new Error(`Σφάλμα κατά την κατάργηση κύριας επαφής: ${primaryContactError.message}`);
+        }
+        
+        addCompletedOperation("Η αναφορά κύριας επαφής καταργήθηκε με επιτυχία");
+        
+        // Third delete sequence: Contacts
+        updateOperation("Διαγραφή επαφών...");
+          const { error: contactsError } = await supabase
+            .from('contacts')
+            .update({ deleted_at: deletedAt } as any)
+            .eq('customer_id', customerId);
+          
+          if (contactsError) {
+          console.error("Error deleting contacts:", contactsError);
+          throw new Error(`Σφάλμα κατά τη διαγραφή επαφών: ${contactsError.message}`);
+        }
+        
+        addCompletedOperation("Οι επαφές διαγράφηκαν με επιτυχία");
+        
+        // Fourth delete sequence: Customer
+        updateOperation("Διαγραφή πελάτη...");
+        const { error: customerError } = await supabase.rpc('soft_delete_record', {
+            table_name: 'customers',
+            record_id: customerId
+          });
+            
+            if (customerError) {
+          console.error("Error deleting customer:", customerError);
+          throw new Error(`Σφάλμα κατά τη διαγραφή πελάτη: ${customerError.message}`);
+        }
+        
+        addCompletedOperation("Ο πελάτης διαγράφηκε με επιτυχία");
+        updateOperation("");
+        
+        // Update UI
+        setCustomers(prev => prev.filter(c => c.id !== customerId));
+        setFilteredCustomers(prev => prev.filter(c => c.id !== customerId));
+      } else {
+        // For non-admin, just deactivate
+        updateOperation("Απενεργοποίηση πελάτη...");
+        const { error: deactivateError } = await supabase
+          .from('customers')
+          .update({ 
+            status: 'inactive',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', customerId);
+        
+        if (deactivateError) {
+          console.error("Error deactivating customer:", deactivateError);
+          throw new Error(`Σφάλμα κατά την απενεργοποίηση πελάτη: ${deactivateError.message}`);
+        }
+        
+        addCompletedOperation("Ο πελάτης απενεργοποιήθηκε με επιτυχία");
+        updateOperation("");
+        
+        // Update UI
+        if (statusFilter === 'active') {
+          setCustomers(prev => prev.filter(c => c.id !== customerId));
+          setFilteredCustomers(prev => prev.filter(c => c.id !== customerId));
+    } else {
+      setCustomers(prev => 
+            prev.map(c => c.id === customerId ? {...c, status: 'inactive'} : c)
+          );
+      setFilteredCustomers(prev => 
+            prev.map(c => c.id === customerId ? {...c, status: 'inactive'} : c)
+          );
+        }
+      }
+      
+      // Set success state
+      setDeleteSuccess(true);
+      
+      // We no longer auto-close - user must click the button
+      setIsDeletingCustomer(false);
+      
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      
+      // Pass the error to the error handler if provided
+      if (setErrorFn) {
+        setErrorFn(error.message || 'Άγνωστο σφάλμα κατά τη διαγραφή του πελάτη');
+      }
+      
+      // Reset deletion state but don't hide the modal
+      setIsDeletingCustomer(false);
+    }
+  };
+
+  // Create a rock-solid delete confirmation component
+  const SimpleDeleteModal = () => {
+    if (!customerToDelete) return null;
+
+    // State for tracking operations
+    const [currentOperation, setCurrentOperation] = useState("");
+    const [completedOperations, setCompletedOperations] = useState([]);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    
+    const isAdmin = 
+      user?.role?.toLowerCase() === 'admin' || 
+      user?.role?.toLowerCase() === 'super user';
+
+    // Simple function to close the modal and reset state
+    const closeModal = () => {
+      if (isDeletingCustomer) return; // Don't close if deleting
+      setShowDeleteAlert(false);
+      setTimeout(() => {
+        setCustomerToDelete(null);
+        setDeleteSuccess(false);
+        setCompletedOperations([]);
+        setCurrentOperation("");
+        setErrorMessage(null);
+      }, 300);
+    };
+    
+    // Handle delete action
+    const handleDelete = () => {
+      // Reset error message when starting a new deletion
+      setErrorMessage(null);
+      deleteCustomer(customerToDelete.id, setCurrentOperation, setCompletedOperations, setErrorMessage);
+    };
+    
+    // Modal content based on state
+    let modalContent;
+    
+    if (errorMessage) {
+      // Error state
+      modalContent = (
+        <>
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold text-white mb-2">Σφάλμα Διαγραφής</h2>
+            <div className="h-16 w-16 mx-auto rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <p className="text-red-400 font-medium text-lg mb-3">Η διαδικασία διακόπηκε λόγω σφάλματος</p>
+            
+            <div className="mt-2 text-left border border-red-500/30 rounded p-3 bg-red-500/10 max-h-48 overflow-y-auto">
+              <p className="text-sm text-red-300 font-medium mb-1">Λεπτομέρειες σφάλματος:</p>
+              <p className="text-sm text-red-200 break-words">{errorMessage}</p>
+            </div>
+            
+            {completedOperations.length > 0 && (
+              <div className="mt-4 text-left border border-[#354f52] rounded p-3 bg-[#2a3b42] max-h-36 overflow-y-auto">
+                <p className="text-sm text-[#84a98c] font-medium mb-2">Ολοκληρωμένες ενέργειες πριν το σφάλμα:</p>
+                <ul className="text-sm text-[#84a98c] space-y-1">
+                  {completedOperations.map((op, idx) => (
+                    <li key={idx} className="flex items-start">
+                      <svg className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>{op}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-center mt-4">
+            <Button 
+              onClick={closeModal}
+              className="bg-[#52796f] hover:bg-[#52796f]/90 text-white"
+            >
+              Κλείσιμο
+            </Button>
+          </div>
+        </>
+      );
+    } else if (isDeletingCustomer) {
+      // Loading state with current operation display
+      modalContent = (
+        <>
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold text-white mb-2">Διαγραφή σε Εξέλιξη</h2>
+            <div className="h-16 w-16 mx-auto animate-spin rounded-full border-4 border-[#52796f] border-t-transparent mb-4"></div>
+            <p className="text-[#cad2c5] font-medium">
+              {currentOperation || "Επεξεργασία..."}
+            </p>
+            
+            {completedOperations.length > 0 && (
+              <div className="mt-4 text-left border border-[#354f52] rounded p-3 bg-[#2a3b42] max-h-36 overflow-y-auto">
+                <p className="text-sm text-[#84a98c] font-medium mb-2">Ολοκληρωμένες ενέργειες:</p>
+                <ul className="text-sm text-[#84a98c] space-y-1">
+                  {completedOperations.map((op, idx) => (
+                    <li key={idx} className="flex items-start">
+                      <svg className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>{op}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            <div className="w-full bg-[#354f52] h-1.5 rounded-full mt-4 overflow-hidden">
+              <div className="h-full bg-[#84a98c] rounded-full animate-progress"></div>
+            </div>
+          </div>
+        </>
+      );
+    } else if (deleteSuccess) {
+      // Success state with all completed operations
+      modalContent = (
+        <>
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold text-white mb-2">Επιτυχής Διαγραφή</h2>
+            <div className="h-16 w-16 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <p className="text-green-400 font-medium text-lg mb-1">
+              {isAdmin 
+                        ? "Ο πελάτης διαγράφηκε με επιτυχία!"
+                : "Ο πελάτης απενεργοποιήθηκε με επιτυχία!"}
+            </p>
+            <p className="text-sm text-[#84a98c]">
+              Η λίστα πελατών έχει ενημερωθεί.
+            </p>
+            
+            {completedOperations.length > 0 && (
+              <div className="mt-4 text-left border border-[#354f52] rounded p-3 bg-[#2a3b42] max-h-36 overflow-y-auto">
+                <p className="text-sm text-[#84a98c] font-medium mb-2">Ολοκληρωμένες ενέργειες:</p>
+                <ul className="text-sm text-[#84a98c] space-y-1">
+                  {completedOperations.map((op, idx) => (
+                    <li key={idx} className="flex items-start">
+                      <svg className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>{op}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-center mt-4">
+              <Button 
+              onClick={closeModal}
+                className="bg-[#52796f] hover:bg-[#52796f]/90 text-white"
+              >
+              Κλείσιμο
+              </Button>
+          </div>
+        </>
+      );
+    } else {
+      // Confirmation state
+      modalContent = (
+        <>
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-white mb-2">
+              {isAdmin ? "Επιβεβαίωση Διαγραφής" : "Επιβεβαίωση Απενεργοποίησης"}
+            </h2>
+            <p className="text-[#84a98c]">
+              {isAdmin 
+                ? 'Είστε σίγουροι ότι θέλετε να διαγράψετε αυτόν τον πελάτη; Η ενέργεια αυτή θα διαγράψει επίσης όλες τις επαφές και προσφορές του πελάτη.'
+                : 'Είστε σίγουροι ότι θέλετε να απενεργοποιήσετε αυτόν τον πελάτη;'
+              }
+            </p>
+          </div>
+          <div className="flex justify-end space-x-3 mt-4">
+            <Button 
+              variant="outline"
+                  className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white" 
+              onClick={closeModal}
+                >
+                  Άκυρο
+            </Button>
+            <Button 
+              onClick={handleDelete}
+              className={isAdmin 
+                    ? "bg-red-600 hover:bg-red-700 text-white" 
+                    : "bg-[#52796f] hover:bg-[#3a5a44] text-white"}
+            >
+              {isAdmin ? 'Διαγραφή' : 'Απενεργοποίηση'}
+            </Button>
+          </div>
+        </>
+      );
+    }
+    
+    // Create modal backdrop and content that won't close unexpectedly
+    return (
+      <div className="fixed inset-0 z-[9999] overflow-y-auto" style={{pointerEvents: 'all'}}>
+        <div 
+          className="fixed inset-0 bg-black/80" 
+          onClick={isDeletingCustomer ? undefined : closeModal}
+          style={{pointerEvents: isDeletingCustomer ? 'none' : 'auto'}}
+        ></div>
+        <div className="flex min-h-full items-center justify-center p-4">
+          <div 
+            className="w-full max-w-lg rounded-lg bg-[#2f3e46] border-2 border-[#52796f] p-8 shadow-2xl relative z-[10000] modal-appear"
+            onClick={(e) => e.stopPropagation()}
+            style={{transform: 'translateZ(0)'}}
+          >
+            {modalContent}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Create a memoized version of the DataTable component to prevent unnecessary re-renders
+  const MemoizedDataTable = React.useMemo(() => (
+    <DataTableBase
+      key={`customers-table-${statusFilter}`}
+      columns={columns}
+      data={filteredCustomers}
+      isLoading={loading}
+      defaultSortColumn="company_name"
+      searchTerm={searchTerm}
+      searchColumn={searchColumn}
+      onRowClick={(row) => navigate(`/customers/${row.id}`)}
+      containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
+      rowClassName="hover:bg-[#354f52]/50 cursor-pointer group"
+      highlightedRowId={lastUpdatedCustomerId}
+      renderRow={renderCustomRow}
+      showOfferMessage={true}
+      emptyStateMessage="Δεν βρέθηκαν πελάτες που να αντιστοιχούν στα κριτήρια αναζήτησης"
+      loadingStateMessage="Φόρτωση πελατών..."
+    />
+  ), [columns, filteredCustomers, loading, statusFilter, searchTerm, searchColumn, navigate, lastUpdatedCustomerId, renderCustomRow]);
+
+  // Move the useEffect from the JSX to the proper place in the component body
+
+  // Add prefetching for customers with offers
+  useEffect(() => {
+    if (customers.length > 0) {
+      // Find the 5 first customers with offers to prefetch data
+      const customersWithOffers = customers
+        .filter(customer => (customer.offersCount || 0) > 0)
+        .slice(0, 5);
+      
+      // Stagger the prefetches to avoid overwhelming the network
+      customersWithOffers.forEach((customer, index) => {
+        setTimeout(() => {
+          // Only fetch if not already loaded
+          if (!customerOffers[customer.id]) {
+            fetchCustomerOffers(customer.id);
+          }
+        }, index * 300); // Stagger each request by 300ms
+      });
+    }
+  }, [customers, customerOffers, fetchCustomerOffers]);
+
+  // Remove the useEffect for search term changes since it's handled in fetchCustomers
+  useEffect(() => {
+    fetchCustomers();
+  }, [debouncedSearchTerm, searchColumn, debouncedCustomerTypes, statusFilter]);
+
+  // If showing the form, render it instead of the customer list
   return (
     <div className="p-4">
       <div className="mb-2">
@@ -1820,7 +1945,7 @@ export default function CustomersPage() {
 
       <div className="flex justify-between items-center mb-4">
         <div className="w-1/4">
-          {/* Keep area empty as per original */}
+          {/* Removed query time display */}
         </div>
         
         <div className="flex-1 flex justify-center items-center gap-2">
@@ -1828,8 +1953,8 @@ export default function CustomersPage() {
             placeholder="Αναζήτηση..."
             value={searchTerm}
             onChange={setSearchTerm}
-            options={searchColumns.map(col => ({ value: col.accessor, label: col.header }))}
-            selectedColumn={searchColumn}
+            options={options}
+            selectedColumn={selectedColumn}
             onColumnChange={handleColumnChange}
           />
           <CustomerTypeFilter
@@ -1893,14 +2018,9 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {renderDirectTable()}
-      
-      {!loading && (
-        <div className="mt-4 text-sm text-[#84a98c] text-right">
-          Βρέθηκαν <span className="text-white font-medium">{totalCount}</span> εγγραφές.
-        </div>
-      )}
-      
+      {MemoizedDataTable}
+
+      {/* Add CustomerDialog component */}
       <CustomerDialog
         open={showDialog}
         onOpenChange={(open) => setShowDialog(open)}
@@ -1914,82 +2034,7 @@ export default function CustomersPage() {
       />
 
       {/* Delete Customer Confirmation */}
-      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-        <AlertDialogContent 
-          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
-          aria-describedby="delete-customer-description"
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#cad2c5]">Διαγραφή Πελάτη</AlertDialogTitle>
-            <AlertDialogDescription id="delete-customer-description" className="text-[#84a98c]">
-              Είστε σίγουροι ότι θέλετε να διαγράψετε αυτόν τον πελάτη; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-[#354f52] text-[#cad2c5] hover:bg-[#354f52]/90">
-              Άκυρο
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700 text-white"
-              onClick={async () => {
-                if (!customerToDelete || isDeletingCustomer) return;
-                
-                try {
-                  setIsDeletingCustomer(true);
-                  deletionInProgressRef.current = true;
-                  
-                  // Try soft delete first using RPC
-                  let error = null;
-                  try {
-                    const response = await supabase.rpc('soft_delete_record', {
-                      table_name: 'customers',
-                      record_id: customerToDelete.id
-                    });
-                    error = response.error;
-                  } catch (softDeleteError) {
-                    // If soft delete is not available, fallback to regular delete
-                    const response = await supabase
-                      .from('customers')
-                      .delete()
-                      .eq('id', customerToDelete.id);
-                    error = response.error;
-                  }
-                  
-                  if (error) throw error;
-                  
-                  // Update the UI to remove the deleted customer
-                  setCustomers(prev => prev.filter(c => c.id !== customerToDelete.id));
-                  setFilteredCustomers(prev => prev.filter(c => c.id !== customerToDelete.id));
-                  
-                  // Show success message
-                  toast({
-                    title: "Επιτυχία",
-                    description: "Ο πελάτης διαγράφηκε επιτυχώς",
-                    variant: "default",
-                  });
-                  
-                  setDeleteSuccess(true);
-                } catch (error) {
-                  console.error("Error deleting customer:", error);
-                  toast({
-                    title: "Σφάλμα",
-                    description: "Δεν ήταν δυνατή η διαγραφή του πελάτη",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setIsDeletingCustomer(false);
-                  deletionInProgressRef.current = false;
-                  setShowDeleteAlert(false);
-                  setCustomerToDelete(null);
-                }
-              }}
-              disabled={isDeletingCustomer}
-            >
-              {isDeletingCustomer ? "Διαγραφή..." : "Διαγραφή"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <SimpleDeleteModal />
 
       {/* Delete Offer Confirmation */}
       <AlertDialog open={showDeleteOfferDialog} onOpenChange={setShowDeleteOfferDialog}>
