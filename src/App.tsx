@@ -1,18 +1,21 @@
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Home from "./components/home";
 import LoginForm from "./components/auth/LoginForm";
-import ProtectedRoute from "./components/ProtectedRoute";
+import { Toaster } from "@/components/ui/toaster";
+import CustomersPage from "@/components/customers/CustomersPage";
+import EnhancedCustomersPage from "@/components/customers/EnhancedCustomersPage";
+import CustomerDetailPage from "@/components/customers/CustomerDetailPage";
+import TestTable from "@/components/test/TestTable";
+import TanStackTable from "@/components/test/TanStackTable";
+import { AuthProvider, useAuth } from "./lib/AuthContext";
+import LoadingSpinner from './components/ui/LoadingSpinner';
+import MuiThemeProvider from './theme/MuiThemeProvider';
+import { LoadingProvider } from './lib/LoadingContext';
 import { FormProvider } from './lib/FormContext';
 import { RealtimeProvider } from './lib/RealtimeProvider';
-import { Toaster } from './components/ui/toaster';
-import { useAuth, AuthProvider } from "./lib/AuthContext";
-import "./components/ui/dropdown.css";
+import ProtectedRoute from "./components/ProtectedRoute";
 import { OfferDialogContainer } from './components/customers/OfferDialogManager';
-import LoadingSpinner from './components/ui/LoadingSpinner';
-import { LoadingProvider } from './lib/LoadingContext';
-import RecoveryPage from "./components/admin/RecoveryPage";
-import MuiThemeProvider from './theme/MuiThemeProvider';
 
 /**
  * Main application component that handles routing and global providers
@@ -74,6 +77,13 @@ function App() {
                   {import.meta.env.VITE_TEMPO === "true" && (
                     <Route path="/tempobook/*" element={<div />} />
                   )}
+                  
+                  {/* New routes */}
+                  <Route path="/customers" element={<CustomersPage />} />
+                  <Route path="/enhanced-customers" element={<EnhancedCustomersPage />} />
+                  <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                  <Route path="/test-table" element={<TestTable />} />
+                  <Route path="/tanstack-table" element={<TanStackTable />} />
                   
                   {/* Fallback route */}
                   <Route path="*" element={<Navigate to="/" replace />} />
