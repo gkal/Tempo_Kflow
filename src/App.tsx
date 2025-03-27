@@ -16,6 +16,7 @@ import { FormProvider } from './lib/FormContext';
 import { RealtimeProvider } from './lib/RealtimeProvider';
 import ProtectedRoute from "./components/ProtectedRoute";
 import { OfferDialogContainer } from './components/customers/OfferDialogManager';
+import ReusableCustomersPage from "@/components/customers/ReusableCustomersPage";
 
 /**
  * Main application component that handles routing and global providers
@@ -79,9 +80,8 @@ function App() {
                   )}
                   
                   {/* New routes */}
-                  <Route path="/customers" element={<CustomersPage />} />
-                  <Route path="/enhanced-customers" element={<EnhancedCustomersPage />} />
-                  <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                  <Route path="/enhanced-customers" element={<ProtectedRoute><EnhancedCustomersPage /></ProtectedRoute>} />
+                  <Route path="/reusable-customers" element={<ProtectedRoute><ReusableCustomersPage /></ProtectedRoute>} />
                   <Route path="/test-table" element={<TestTable />} />
                   <Route path="/tanstack-table" element={<TanStackTable />} />
                   

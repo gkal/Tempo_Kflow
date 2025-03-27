@@ -19,9 +19,12 @@ export function DialogUtilities() {
           const dialogBackdrops = document.querySelectorAll('[data-radix-popper-content-wrapper]');
           
           if (dialogBackdrops.length > 1) {
-            // Remove all but the last one
+            // Remove all but the last one, but only if they're still in the document
             for (let i = 0; i < dialogBackdrops.length - 1; i++) {
-              dialogBackdrops[i].remove();
+              const backdrop = dialogBackdrops[i];
+              if (backdrop && backdrop.parentNode) {
+                backdrop.parentNode.removeChild(backdrop);
+              }
             }
           }
         }
@@ -71,8 +74,10 @@ export function DialogUtilities() {
       // Disconnect the observer
       observer.disconnect();
       
-      // Remove the style element
-      document.head.removeChild(style);
+      // Remove the style element only if it's still in the document
+      if (style && style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
       
       // Restore original console.warn
       console.warn = originalWarn;

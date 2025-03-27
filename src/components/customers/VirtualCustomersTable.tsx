@@ -48,6 +48,15 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { VirtualTable } from '@/components/ui/virtual-table/VirtualTable';
+import { SearchBar } from "@/components/ui/search-bar";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Define types
 interface CustomerOffer {
@@ -56,16 +65,31 @@ interface CustomerOffer {
   value: number;
   date: string;
   status: string;
+  requirements?: string;
+  result?: string;
 }
 
 interface Customer {
   id: string;
-  name: string;
-  email: string;
-  phone: string;
-  totalValue: number;
-  isActive: boolean;
+  company_name?: string;
+  first_name?: string;
+  last_name?: string;
+  afm?: string;
+  telephone?: string;
+  email?: string;
+  address?: string;
+  postal_code?: string;
+  city?: string;
+  customer_type?: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+  notes?: string;
+  offers_count?: number;
+  offersCount?: number;
+  isExpanded?: boolean;
   offers?: CustomerOffer[];
+  [key: string]: any;
 }
 
 interface VirtualCustomersTableProps {
@@ -124,14 +148,13 @@ const formatDate = (dateString: string | null): string => {
 
 // Generate mock data for testing purposes
 const generateMockCustomerData = (count: number): Customer[] => {
-  console.log(`Generating ${count} mock customers`);
   return Array(count).fill(null).map((_, index) => ({
     id: `mock-${index}`,
     company_name: `Test Company ${index}`,
     first_name: `John`,
     last_name: `Doe ${index}`,
-    tax_id: `12345${index}`,
-    phone: `210-1234${index}`,
+    afm: `12345${index}`,
+    telephone: `210-1234${index}`,
     email: `test${index}@example.com`,
     address: `Fake Street ${index}`,
     postal_code: `1234${index}`,
@@ -142,9 +165,9 @@ const generateMockCustomerData = (count: number): Customer[] => {
     updated_at: new Date().toISOString(),
     notes: `Some notes for customer ${index}`,
     offers_count: index % 5,
-    isActive: index % 3 !== 0,
+    isExpanded: index % 3 !== 0,
     name: `John Doe ${index}`,
-    totalValue: index * 100
+    offersCount: index * 100
   }));
 };
 
@@ -156,125 +179,139 @@ const VirtualCustomersTable = ({
   const [expandedCustomerId, setExpandedCustomerId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [searchColumn, setSearchColumn] = useState<keyof Customer>('name');
+  const [searchColumn, setSearchColumn] = useState('company_name');
 
-  // Calculate total value from offers for each customer
-  const customersWithCalculatedValues = useMemo(() => {
-    return customers.map(customer => {
-      // Calculate total value from offers if available
-      if (customer.offers && customer.offers.length > 0 && customer.totalValue === 0) {
-        const calculatedTotal = customer.offers.reduce((sum, offer) => sum + (offer.value || 0), 0);
-        return {
-          ...customer,
-          totalValue: calculatedTotal
-        };
-      }
-      return customer;
-    });
-  }, [customers]);
+  // Search columns definition
+  const searchColumns = [
+    { accessor: 'company_name', header: 'Επωνυμία' },
+    { accessor: 'first_name', header: 'Όνομα' },
+    { accessor: 'last_name', header: 'Επώνυμο' },
+    { accessor: 'afm', header: 'ΑΦΜ' },
+    { accessor: 'email', header: 'Email' },
+    { accessor: 'telephone', header: 'Τηλέφωνο' }
+  ];
 
   // Filter the customers based on search term and active filter
   const filteredCustomers = useMemo(() => {
-    return customersWithCalculatedValues.filter(customer => {
+    return customers.filter(customer => {
       // Filter by status
-      if (activeFilter === 'active' && !customer.isActive) return false;
-      if (activeFilter === 'inactive' && customer.isActive) return false;
+      if (activeFilter === 'active' && customer.status !== 'active') return false;
+      if (activeFilter === 'inactive' && customer.status !== 'inactive') return false;
       
       // Filter by search term
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
-        return (
-          String(customer[searchColumn] || '').toLowerCase().includes(searchLower)
-        );
+        const value = customer[searchColumn];
+        return value ? String(value).toLowerCase().includes(searchLower) : false;
       }
       
       return true;
     });
-  }, [customersWithCalculatedValues, searchTerm, activeFilter, searchColumn]);
+  }, [customers, searchTerm, activeFilter, searchColumn]);
 
   // Column definitions
   const columnHelper = createColumnHelper<Customer>();
   
   const columns = useMemo(() => [
     columnHelper.display({
-      id: 'expander',
-      header: '',
+      id: 'expand',
+      header: 'ΠΡ',
       cell: ({ row }) => {
         const customer = row.original;
-        const hasOffers = customer.offers && customer.offers.length > 0;
-        const offersCount = customer.offers?.length || 0;
+        const offersCount = customer.offers_count || 0;
+        
+        // Don't show anything if there are no offers
+        if (offersCount === 0) {
+          return <div className="w-full h-full"></div>;
+        }
         
         return (
           <div 
-            className="flex items-center cursor-pointer group"
+            className="flex items-center justify-center w-full h-full"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               setExpandedCustomerId(expandedCustomerId === customer.id ? null : customer.id);
             }}
           >
-            <div className="group-hover:bg-[#52796f]/30 rounded-full p-1 flex items-center">
-              <ChevronRight 
-                className={cn(
-                  "h-4 w-4 text-[#84a98c] transition-transform duration-200",
-                  expandedCustomerId === customer.id && "transform rotate-90"
+            <div className="flex items-center justify-center relative group cursor-pointer hover:bg-[#52796f]/60 rounded-full w-10 h-7 transition-colors duration-200">
+              <span className="absolute inset-0 rounded-full bg-[#52796f]/0 group-hover:bg-[#52796f]/30 transition-colors duration-200"></span>
+              <div className="flex items-center justify-center">
+                {expandedCustomerId === customer.id ? (
+                  <ChevronDown className="h-4 w-4 text-[#84a98c] group-hover:text-white relative z-10" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-[#84a98c] group-hover:text-white relative z-10" />
                 )}
-              />
-              {hasOffers && (
-                <span className="text-xs ml-1 text-[#84a98c]">{offersCount}</span>
-              )}
+                <span className="ml-0.5 text-xs text-[#84a98c] group-hover:text-white relative z-10">{offersCount}</span>
+              </div>
             </div>
           </div>
         );
       },
       meta: {
-        className: 'w-10'
+        className: 'w-[30px]'
       },
     }),
     
-    columnHelper.accessor('name', {
-      header: 'Όνομα Πελάτη',
-      cell: info => <div className="font-medium">{info.getValue()}</div>,
+    columnHelper.accessor('company_name', {
+      header: 'Επωνυμία',
+      cell: info => {
+        const customer = info.row.original;
+        // If first_name and last_name exists but not company_name, show them instead
+        if ((!info.getValue() || info.getValue() === "") && customer.first_name && customer.last_name) {
+          return <span>{customer.first_name} {customer.last_name}</span>;
+        }
+        return <span>{info.getValue() || "—"}</span>;
+      },
       meta: {
-        className: 'min-w-[200px]'
+        className: 'w-[22%]'
+      },
+      enableSorting: true,
+    }),
+    
+    columnHelper.accessor('customer_type', {
+      header: 'Τύπος',
+      cell: info => info.getValue() || "—",
+      meta: {
+        className: 'w-[10%]'
+      },
+      enableSorting: true,
+    }),
+    
+    columnHelper.accessor('afm', {
+      header: 'ΑΦΜ',
+      cell: info => info.getValue() || "—",
+      meta: {
+        className: 'w-[10%]'
+      },
+      enableSorting: true,
+    }),
+    
+    columnHelper.accessor('telephone', {
+      header: 'Τηλέφωνο',
+      cell: info => info.getValue() || "—",
+      meta: {
+        className: 'w-[10%]'
       },
       enableSorting: true,
     }),
     
     columnHelper.accessor('email', {
       header: 'Email',
-      cell: info => info.getValue(),
+      cell: info => info.getValue() || "—",
       meta: {
-        className: 'min-w-[200px]'
+        className: 'w-[20%]'
       },
       enableSorting: true,
     }),
     
-    columnHelper.accessor('phone', {
-      header: 'Τηλέφωνο',
-      cell: info => info.getValue(),
-      meta: {
-        className: 'min-w-[150px]'
-      },
-      enableSorting: true,
-    }),
-    
-    columnHelper.accessor('totalValue', {
-      header: 'Συνολική Αξία',
-      cell: info => formatCurrency(info.getValue()),
-      meta: {
-        className: 'text-right'
-      },
-      enableSorting: true,
-    }),
-    
-    columnHelper.accessor('isActive', {
+    columnHelper.accessor('status', {
       header: 'Κατάσταση',
       cell: info => {
-        const isActive = info.getValue();
-        
+        const status = info.getValue();
         return (
           <div className="flex justify-end">
-            {isActive ? (
+            {status === 'active' ? (
               <Eye className="h-5 w-5 text-green-500" />
             ) : (
               <EyeOff className="h-5 w-5 text-red-500" />
@@ -283,14 +320,84 @@ const VirtualCustomersTable = ({
         );
       },
       meta: {
-        className: 'w-20 text-right'
+        className: 'w-[8%] text-right'
       },
       enableSorting: true,
     }),
   ], [expandedCustomerId]);
 
   const renderExpandedContent = (customer: Customer) => {
-    return <OffersTable offers={customer.offers || []} />;
+    const offers = customer.offers || [];
+    
+    return (
+      <div className="pl-[70px] pr-4 py-3">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-4">
+            <LoadingSpinner fullScreen={false} />
+          </div>
+        ) : offers.length === 0 ? (
+          <div className="py-4 text-[#84a98c] flex flex-col items-center justify-center gap-3">
+            <div className="text-center">
+              Δεν υπάρχουν προσφορές για αυτόν τον πελάτη
+            </div>
+          </div>
+        ) : (
+          <div>
+            <table className="w-full border-collapse rounded-md overflow-hidden">
+              <thead>
+                <tr className="bg-[#3a5258] text-[#a8c5b5]">
+                  <th className="px-2 py-2 text-left text-xs font-semibold w-[160px]">Ημερομηνία</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold w-[100px]">Ζήτηση Πελάτη</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold w-[100px]">Ποσό</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold w-[140px]">Κατάσταση</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold w-[100px]">Αποτέλεσμα</th>
+                  <th className="px-3 py-2 text-center text-xs font-semibold w-[50px]"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {offers.slice(0, 20).map((offer) => (
+                  <tr 
+                    key={offer.id} 
+                    className="border-t border-[#52796f]/30 hover:bg-[#354f52]/30 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Handle offer click
+                    }}
+                  >
+                    <td className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">
+                      {formatDate(offer.date)}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
+                      {offer.requirements || "-"}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
+                      {formatCurrency(offer.value)}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[140px]">
+                      {offer.status}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
+                      {offer.result || "-"}
+                    </td>
+                    <td className="px-3 py-2 text-center w-[50px]">
+                      {/* Add action buttons if needed */}
+                    </td>
+                  </tr>
+                ))}
+                
+                {offers.length > 20 && (
+                  <tr className="bg-[#354f52]/30">
+                    <td colSpan={6} className="px-4 py-2 text-xs text-center text-[#84a98c]">
+                      + {offers.length - 20} ακόμα προσφορές...
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleFilter = (filter: 'all' | 'active' | 'inactive') => {
@@ -301,7 +408,7 @@ const VirtualCustomersTable = ({
     setSearchTerm(e.target.value);
   };
 
-  const handleColumnChange = (column: keyof Customer) => {
+  const handleColumnChange = (column: string) => {
     setSearchColumn(column);
   };
 
@@ -312,62 +419,64 @@ const VirtualCustomersTable = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div className="w-full sm:w-64">
-          <div className="flex items-center gap-2">
-            <select
-              value={searchColumn}
-              onChange={(e) => handleColumnChange(e.target.value as keyof Customer)}
-              className="px-2 py-2 border border-[#52796f] rounded-md bg-[#2f3e46] text-[#cad2c5] focus:outline-none focus:ring-2 focus:ring-[#84a98c] text-sm"
-            >
-              <option value="name">Όνομα</option>
-              <option value="email">Email</option>
-              <option value="phone">Τηλέφωνο</option>
-            </select>
-            <input
-              type="text"
-              placeholder="Αναζήτηση..."
-              className="w-full px-3 py-2 border border-[#52796f] rounded-md bg-[#2f3e46] text-[#cad2c5] placeholder-[#84a98c]/50 focus:outline-none focus:ring-2 focus:ring-[#84a98c]"
-              value={searchTerm}
-              onChange={handleSearch}
-            />
-          </div>
+      <div className="flex justify-between items-center mb-4">
+        <div className="w-1/4">
+          {/* Keep area empty as per original */}
         </div>
         
-        <div className="flex gap-2">
-          <button
-            className={cn(
-              "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-              activeFilter === 'all' 
-                ? "bg-[#84a98c] text-[#2f3e46]" 
-                : "bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] hover:bg-[#354f52]"
-            )}
-            onClick={() => handleFilter('all')}
-          >
-            Όλοι
-          </button>
-          <button
-            className={cn(
-              "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-              activeFilter === 'active' 
-                ? "bg-[#84a98c] text-[#2f3e46]" 
-                : "bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] hover:bg-[#354f52]"
-            )}
-            onClick={() => handleFilter('active')}
-          >
-            Ενεργοί
-          </button>
-          <button
-            className={cn(
-              "px-4 py-2 rounded-md text-sm font-medium transition-colors",
-              activeFilter === 'inactive' 
-                ? "bg-[#84a98c] text-[#2f3e46]" 
-                : "bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] hover:bg-[#354f52]"
-            )}
-            onClick={() => handleFilter('inactive')}
-          >
-            Ανενεργοί
-          </button>
+        <div className="flex-1 flex justify-center items-center gap-2">
+          <SearchBar
+            placeholder="Αναζήτηση..."
+            value={searchTerm}
+            onChange={setSearchTerm}
+            options={searchColumns.map(col => ({ value: col.accessor, label: col.header }))}
+            selectedColumn={searchColumn}
+            onColumnChange={setSearchColumn}
+          />
+        </div>
+        
+        <div className="flex items-center gap-2 w-1/4 justify-end">
+          {/* Status filters styled as in the DataTableBase */}
+          <div className="flex items-center gap-2">
+            <div 
+              onClick={() => handleFilter('all')}
+              className="relative inline-block min-w-[70px]"
+            >
+              <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+                ${activeFilter === "all" 
+                  ? "bg-blue-500/20 text-blue-400 font-medium shadow-[0_0_8px_2px_rgba(59,130,246,0.3)] ring-blue-400/50" 
+                  : "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 ring-transparent"}`}
+              >
+                Όλοι
+              </span>
+            </div>
+            
+            <div 
+              onClick={() => handleFilter('active')}
+              className="relative inline-block min-w-[70px]"
+            >
+              <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+                ${activeFilter === "active" 
+                  ? "bg-green-500/20 text-green-400 font-medium shadow-[0_0_8px_2px_rgba(74,222,128,0.3)] ring-green-400/50" 
+                  : "bg-green-500/10 text-green-400 hover:bg-green-500/20 ring-transparent"}`}
+              >
+                Ενεργός
+              </span>
+            </div>
+            
+            <div 
+              onClick={() => handleFilter('inactive')}
+              className="relative inline-block min-w-[70px]"
+            >
+              <span className={`cursor-pointer text-xs px-2 py-1 rounded-full transition-all ring-1 block text-center
+                ${activeFilter === "inactive" 
+                  ? "bg-red-500/20 text-red-400 font-medium shadow-[0_0_8px_2px_rgba(248,113,113,0.3)] ring-red-400/50" 
+                  : "bg-red-500/10 text-red-400 hover:bg-red-500/20 ring-transparent"}`}
+              >
+                Ανενεργός
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 

@@ -433,7 +433,7 @@ const CustomerForm = ({
     }
   };
 
-  // Also add a log when the hidden save button is clicked
+  // Update the cleanup logic in the useEffect for the save button
   useEffect(() => {
     const saveButton = document.getElementById('save-customer-form');
     if (saveButton) {
@@ -446,10 +446,8 @@ const CustomerForm = ({
     }
     
     return () => {
-      const saveButton = document.getElementById('save-customer-form');
-      if (saveButton) {
-        // Cleanup if needed
-      }
+      // No need to manually remove the save button as it's part of the form
+      // The form will be cleaned up by React's virtual DOM
     };
   }, []);
 
@@ -508,7 +506,7 @@ const CustomerForm = ({
     }
   };
   
-  // Function to handle dialog close
+  // Update the cleanup logic in the handleDeleteDialogClose function
   const handleDeleteDialogClose = (open: boolean) => {
     // Only close if the dialog is being closed
     if (!open) {
