@@ -739,7 +739,7 @@ export default function CustomerOffersPage() {
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-[#3a5258] text-[#a8c5b5]">
-              <th key="date-header" className="px-2 py-2 text-left text-xs font-medium w-[160px]">Ημερομηνία</th>
+              <th key="date-header" className="px-2 py-2 text-left text-xs font-medium w-[120px]">Ημερομηνία</th>
               <th key="request-header" className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ζήτηση Πελάτη</th>
               <th key="amount-header" className="px-3 py-2 text-left text-xs font-medium w-[100px]">Ποσό</th>
               <th key="status-header" className="px-3 py-2 text-left text-xs font-medium w-[140px]">Κατάσταση</th>
@@ -757,7 +757,7 @@ export default function CustomerOffersPage() {
                   handleEditOffer(row.id, offer.id);
                 }}
               >
-                <td key={`date-${offer.id}`} className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
+                <td key={`date-${offer.id}`} className="px-2 py-2 text-xs text-[#cad2c5] w-[120px]">{formatDateTime(offer.created_at)}</td>
                 <td key={`request-${offer.id}`} className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
                   {offer.requirements 
                     ? <TruncateWithTooltip 

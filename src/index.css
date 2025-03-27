@@ -517,6 +517,14 @@ span[title] {
   color: #60a5fa !important;
 }
 
+/* Blue ellipsis class for DetailsTab.tsx */
+.ellipsis-blue {
+  color: #60a5fa !important;
+  font-weight: bold !important;
+  font-size: inherit !important;
+  display: inline !important;
+}
+
 /* Tooltip styles for truncated text */
 .custom-tooltip {
   display: none; /* Hide this since we now use the global tooltip styles */

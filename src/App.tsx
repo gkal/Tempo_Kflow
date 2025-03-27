@@ -1,13 +1,6 @@
-import { Suspense } from "react";
+import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import Home from "./components/home";
-import LoginForm from "./components/auth/LoginForm";
 import { Toaster } from "@/components/ui/toaster";
-import CustomersPage from "@/components/customers/CustomersPage";
-import EnhancedCustomersPage from "@/components/customers/EnhancedCustomersPage";
-import CustomerDetailPage from "@/components/customers/CustomerDetailPage";
-import TestTable from "@/components/test/TestTable";
-import TanStackTable from "@/components/test/TanStackTable";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import MuiThemeProvider from './theme/MuiThemeProvider';
@@ -16,7 +9,16 @@ import { FormProvider } from './lib/FormContext';
 import { RealtimeProvider } from './lib/RealtimeProvider';
 import ProtectedRoute from "./components/ProtectedRoute";
 import { OfferDialogContainer } from './components/customers/OfferDialogManager';
-import ReusableCustomersPage from "@/components/customers/ReusableCustomersPage";
+
+// Lazy load components
+const Home = lazy(() => import("./components/home"));
+const LoginForm = lazy(() => import("./components/auth/LoginForm"));
+const CustomersPage = lazy(() => import("@/components/customers/CustomersPage"));
+const EnhancedCustomersPage = lazy(() => import("@/components/customers/EnhancedCustomersPage"));
+const CustomerDetailPage = lazy(() => import("@/components/customers/CustomerDetailPage"));
+const TestTable = lazy(() => import("@/components/test/TestTable"));
+const TanStackTable = lazy(() => import("@/components/test/TanStackTable"));
+const ReusableCustomersPage = lazy(() => import("@/components/customers/ReusableCustomersPage"));
 
 /**
  * Main application component that handles routing and global providers

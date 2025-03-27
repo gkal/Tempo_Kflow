@@ -4,14 +4,29 @@ export interface CustomerOffer {
   value: number;
   date: string;
   status: string;
+  requirements?: string;
+  result?: string;
 }
 
 export interface Customer {
   id: string;
-  name: string;
-  email: string;
-  phone: string;
-  totalValue: number;
-  isActive: boolean;
+  company_name?: string;
+  first_name?: string;
+  last_name?: string;
+  afm?: string;
+  telephone?: string;
+  email?: string;
+  address?: string;
+  postal_code?: string;
+  city?: string;
+  customer_type?: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+  notes?: string;
+  offers_count?: number;
+  offersCount?: number;
+  isExpanded?: boolean;
   offers?: CustomerOffer[];
+  [key: string]: any;
 } 

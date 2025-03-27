@@ -4,12 +4,12 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TruncateWithTooltip, TooltipProvider } from "@/components/ui/GlobalTooltip";
 import { VirtualDataTable, Column } from "@/components/ui/virtual-table/VirtualDataTable";
 import { Plus, Eye, EyeOff, Loader2, Trash2, ChevronRight, ChevronDown } from "lucide-react";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { format } from "date-fns";
-import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
+import { createColumnHelper, ColumnDef } from "@tanstack/react-table";
 
 // Define Customer type
 interface CustomerOffer {
@@ -52,7 +52,14 @@ const formatDate = (dateString: string | null): string => {
   
   try {
     const date = new Date(dateString);
-    return format(date, 'dd MMM yyyy');
+    return new Intl.DateTimeFormat('el-GR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(date);
   } catch (error) {
     return '-';
   }
@@ -195,7 +202,7 @@ const ReusableCustomersPage: React.FC = () => {
         value: offer.amount ? String(offer.amount) : '',
         date: offer.created_at,
         status: offer.offer_result || 'pending',
-        requirements: offer.customer_comments || '',
+        requirements: offer.requirements || '',
         result: offer.result || ''
       })) || []
     }));
@@ -228,6 +235,7 @@ const ReusableCustomersPage: React.FC = () => {
               amount, 
               offer_result, 
               result,
+              requirements,
               customer_comments, 
               our_comments, 
               deleted_at
@@ -277,7 +285,7 @@ const ReusableCustomersPage: React.FC = () => {
         value: offer.amount ? String(offer.amount) : '',
         date: offer.created_at,
         status: offer.offer_result || 'pending',
-        requirements: offer.customer_comments || '',
+        requirements: offer.requirements || '',
         result: offer.result || ''
       }));
       
@@ -314,6 +322,8 @@ const ReusableCustomersPage: React.FC = () => {
       header: 'Επωνυμία',
       enableSorting: true,
       sortDescFirst: false,
+      enableResizing: true,
+      size: 300,
       cell: ({ row }) => {
         const customer = row;
         const offersCount = customer.offers_count || 0;
@@ -346,7 +356,7 @@ const ReusableCustomersPage: React.FC = () => {
                         strokeLinejoin="round" 
                         className="h-5 w-5 text-[#84a98c] relative z-10"
                       >
-                        <path d="m18 15-6-6-6 6"/>
+                        <path d="m6 9 6 6 6-6"/>
                       </svg>
                     ) : (
                       <svg 
@@ -375,7 +385,7 @@ const ReusableCustomersPage: React.FC = () => {
         );
       },
       meta: {
-        className: 'w-[300px] min-w-[300px] max-w-[300px] text-left',
+        className: 'text-left',
         headerClassName: 'relative flex justify-center'
       },
     },
@@ -384,9 +394,11 @@ const ReusableCustomersPage: React.FC = () => {
       header: 'Τύπος',
       enableSorting: true,
       sortDescFirst: false,
+      enableResizing: true,
+      size: 150,
       cell: ({ row }) => row.customer_type || "—",
       meta: {
-        className: 'w-[150px] min-w-[150px] max-w-[150px] text-left whitespace-nowrap overflow-hidden text-ellipsis',
+        className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
         headerClassName: 'relative flex justify-center'
       },
     },
@@ -395,9 +407,11 @@ const ReusableCustomersPage: React.FC = () => {
       header: 'Τηλέφωνο',
       enableSorting: true,
       sortDescFirst: false,
+      enableResizing: true,
+      size: 150,
       cell: ({ row }) => row.telephone || "—",
       meta: {
-        className: 'w-[150px] min-w-[150px] max-w-[150px] text-left whitespace-nowrap overflow-hidden text-ellipsis',
+        className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
         headerClassName: 'relative flex justify-center'
       },
     },
@@ -406,9 +420,11 @@ const ReusableCustomersPage: React.FC = () => {
       header: 'Email',
       enableSorting: true,
       sortDescFirst: false,
+      enableResizing: true,
+      size: 200,
       cell: ({ row }) => row.email || "—",
       meta: {
-        className: 'w-[200px] min-w-[200px] max-w-[200px] text-left whitespace-nowrap overflow-hidden text-ellipsis',
+        className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
         headerClassName: 'relative flex justify-center'
       },
     },
@@ -417,9 +433,11 @@ const ReusableCustomersPage: React.FC = () => {
       header: 'ΑΦΜ',
       enableSorting: true,
       sortDescFirst: false,
+      enableResizing: true,
+      size: 120,
       cell: ({ row }) => row.afm || "—",
       meta: {
-        className: 'w-[120px] min-w-[120px] max-w-[120px] text-left whitespace-nowrap overflow-hidden text-ellipsis',
+        className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
         headerClassName: 'relative flex justify-center'
       },
     },
@@ -428,12 +446,13 @@ const ReusableCustomersPage: React.FC = () => {
       header: 'Διεύθυνση',
       enableSorting: true,
       sortDescFirst: false,
+      enableResizing: true,
+      size: 250,
       cell: ({ row }) => {
-        // Simplify address display since we don't have city and postal_code
         return row.address || "—";
       },
       meta: {
-        className: 'w-[250px] min-w-[250px] max-w-[250px] text-left whitespace-nowrap overflow-hidden text-ellipsis',
+        className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
         headerClassName: 'relative flex justify-center'
       },
     },
@@ -442,17 +461,21 @@ const ReusableCustomersPage: React.FC = () => {
       header: 'Ημερομηνία Δημιουργίας',
       enableSorting: true,
       sortDescFirst: false,
+      enableResizing: true,
+      size: 200,
       cell: ({ row }) => formatDateTime(row.created_at),
       meta: {
-        className: 'w-[200px] min-w-[200px] max-w-[200px] text-left whitespace-nowrap overflow-hidden text-ellipsis',
+        className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
         headerClassName: 'relative flex justify-center'
       },
     },
     {
       accessorKey: 'status',
-      header: 'Κατάσταση Πελάτη',
+      header: 'Ενεργείες',
       enableSorting: true,
       sortDescFirst: false,
+      enableResizing: true,
+      size: 150,
       cell: ({ row }) => {
         const status = row.status;
         return (
@@ -480,7 +503,7 @@ const ReusableCustomersPage: React.FC = () => {
         );
       },
       meta: {
-        className: 'w-[150px] min-w-[150px] max-w-[150px] text-right',
+        className: 'text-right',
         headerClassName: 'relative flex justify-center'
       },
     },
@@ -546,50 +569,67 @@ const ReusableCustomersPage: React.FC = () => {
     
     // Render offers table
     return (
-      <div className="overflow-hidden pl-[70px] pr-4 py-2">
-        <div className="bg-[#2f3e46] rounded-md overflow-hidden">
-          <table className="w-full border-collapse">
-            <thead className="bg-[#354f52]">
+      <div className="overflow-visible pl-[70px] pr-4 py-4 relative">
+        <div className="bg-[#2f3e46] rounded-md overflow-auto max-h-[500px] border border-[#52796f] shadow-sm w-[1000px]">
+          <table className="w-full border-collapse table-fixed">
+            <colgroup>
+              <col className="w-[150px]" />
+              <col className="w-[200px]" />
+              <col className="w-[200px]" />
+              <col className="w-[150px]" />
+              <col className="w-[100px]" />
+            </colgroup>
+            <thead className="bg-[#2f3e46] relative z-10 after:absolute after:content-[''] after:left-0 after:right-0 after:bottom-0 after:h-[1px] after:bg-[#52796f]">
               <tr>
-                <th className="px-2 py-1 text-left text-[#cad2c5] text-xs font-medium w-[160px]">Ημερομηνία</th>
-                <th className="px-3 py-1 text-left text-[#cad2c5] text-xs font-medium w-[180px]">Ζήτηση Πελάτη</th>
-                <th className="px-3 py-1 text-left text-[#cad2c5] text-xs font-medium w-[100px]">Ποσό</th>
-                <th className="px-3 py-1 text-left text-[#cad2c5] text-xs font-medium w-[160px]">Κατάσταση</th>
-                <th className="px-3 py-1 text-left text-[#cad2c5] text-xs font-medium w-[100px]">Αποτέλεσμα</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-[#84a98c] border-r border-[#52796f]">Ημερομηνία</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-[#84a98c] border-r border-[#52796f]">Ζήτηση Πελάτη</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-[#84a98c] border-r border-[#52796f]">Ποσό</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-[#84a98c] border-r border-[#52796f]">Κατάσταση</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-[#84a98c]">Αποτέλεσμα</th>
               </tr>
             </thead>
             <tbody>
               {offers.map((offer) => (
                 <tr 
                   key={offer.id} 
-                  className="border-t border-[#52796f]/30 bg-[#2f3e46] hover:bg-[#354f52] cursor-pointer transition-colors duration-150"
+                  className="border-t border-[#52796f]/30 bg-[#2f3e46] hover:bg-[#354f52]/50 cursor-pointer transition-colors duration-150"
                   onClick={() => navigate(`/offers/${offer.id}`)}
                 >
-                  <td className="px-2 py-0.5 text-xs text-[#cad2c5] w-[160px]">{formatDate(offer.date)}</td>
-                  <td className="px-3 py-0.5 text-xs text-[#cad2c5] w-[180px]">
+                  <td className="px-2 py-2 text-xs text-[#cad2c5] border-r border-[#52796f]">{formatDate(offer.date)}</td>
+                  <td className="px-2 py-2 text-xs text-[#cad2c5] border-r border-[#52796f]">
                     {offer.requirements ? (
                       <TruncateWithTooltip 
                         text={offer.requirements} 
-                        maxLength={50} 
+                        maxLength={30}
                         maxWidth={800}
                         multiLine={false}
                         maxLines={1}
+                        position="top"
+                        className="cursor-pointer"
                       />
-                    ) : "-"}
+                    ) : <span className="text-xs text-[#52796f]">-</span>}
                   </td>
-                  <td className="px-3 py-0.5 text-xs text-[#cad2c5] w-[100px]">
-                    <div className="bg-[#354f52]/50 rounded px-1.5 py-0.5 border border-[#52796f]/30 max-w-[90px] overflow-hidden text-ellipsis">
-                      {offer.value || "-"}
-                    </div>
+                  <td className="px-2 py-2 text-xs text-[#cad2c5] border-r border-[#52796f]">
+                    {offer.value ? (
+                      <TruncateWithTooltip 
+                        text={offer.value} 
+                        maxLength={30}
+                        maxWidth={800}
+                        multiLine={false}
+                        maxLines={1}
+                        position="top"
+                        className="cursor-pointer"
+                      />
+                    ) : <span className="text-xs text-[#52796f]">-</span>}
                   </td>
-                  <td className="px-3 py-0.5 text-xs w-[160px]">
+                  <td className="px-2 py-2 text-xs text-[#cad2c5] border-r border-[#52796f]">
                     <span className={getStatusClass(offer.status)}>
-                      {formatStatus(offer.status)}
+                      {formatStatus(offer.status) || <span className="text-xs text-[#52796f]">-</span>}
                     </span>
                   </td>
-                  <td className="px-3 py-0.5 text-xs w-[100px]">
+                  <td className="px-2 py-2 text-xs text-[#cad2c5]">
                     <span className={getResultClass(offer.result)}>
-                      {formatResult(offer.result || '')}
+                      {formatResult(offer.result || '') || <span className="text-xs text-[#52796f]">-</span>}
                     </span>
                   </td>
                 </tr>
@@ -617,7 +657,7 @@ const ReusableCustomersPage: React.FC = () => {
   }, []);
   
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={0}>
       <div className="container mx-auto px-4 py-8">
         <div className="bg-[#2f3e46] rounded-lg p-6 shadow-md">
           <div className="mb-6">
@@ -652,6 +692,7 @@ const ReusableCustomersPage: React.FC = () => {
             customerTypes={customerTypes}
             selectedCustomerTypes={selectedCustomerTypes}
             onCustomerTypeChange={handleCustomerTypeChange}
+            stabilizeExpandedRows={true}
           />
         </div>
       </div>

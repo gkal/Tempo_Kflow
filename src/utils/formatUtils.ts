@@ -89,7 +89,7 @@ export function formatDateTime(date: string | Date | null | undefined): string {
     const timeString = d.toLocaleTimeString("el-GR", {
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
+      hour12: false
     });
     
     return `${dateString} ${timeString}`;

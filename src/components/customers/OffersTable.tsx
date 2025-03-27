@@ -478,7 +478,7 @@ const OffersTable = forwardRef<OffersTableRef, OffersTableProps>(({
       header: "Ημ/νία Δημιουργίας",
       accessor: "created_at",
       cell: (value) => formatDateTime(value),
-      width: "140px"
+      width: "120px"
     },
     {
       header: "Πηγή",

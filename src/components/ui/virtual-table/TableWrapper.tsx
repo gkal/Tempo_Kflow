@@ -6,7 +6,13 @@ interface TableWrapperProps extends React.HTMLAttributes<HTMLDivElement> {
   subtitle?: string;
   description?: string;
   className?: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  columns?: any[];
+  fetchData?: (options: any) => Promise<any>;
+  initialPageSize?: number;
+  renderExpanded?: (item: any) => React.ReactNode;
+  keyExtractor?: (item: any) => string;
+  noDataMessage?: string;
 }
 
 export function TableWrapper({
@@ -15,6 +21,12 @@ export function TableWrapper({
   description,
   className,
   children,
+  columns,
+  fetchData,
+  initialPageSize,
+  renderExpanded,
+  keyExtractor,
+  noDataMessage,
   ...props
 }: TableWrapperProps) {
   return (

@@ -76,21 +76,22 @@ const formatResult = (result: string) => {
 const mapDatabaseCustomers = (dbCustomers: any[]): Customer[] => {
   return dbCustomers.map(dbCustomer => ({
     id: dbCustomer.id,
-    name: dbCustomer.company_name || `${dbCustomer.first_name || ''} ${dbCustomer.last_name || ''}` || 'Χωρίς Όνομα',
+    company_name: dbCustomer.company_name,
+    first_name: dbCustomer.first_name,
+    last_name: dbCustomer.last_name,
     email: dbCustomer.email || '',
-    phone: dbCustomer.phone || dbCustomer.telephone || '',
-    // Parse amount as a number since it's stored as TEXT in database
-    totalValue: dbCustomer.offers?.reduce((sum, offer) => {
-      const amount = parseFloat(offer.amount) || 0;
-      return sum + amount;
-    }, 0) || 0,
-    isActive: dbCustomer.status === 'active',
+    telephone: dbCustomer.telephone || '',
+    status: dbCustomer.status || 'inactive',
+    created_at: dbCustomer.created_at,
+    offers_count: dbCustomer.offers?.length || 0,
     offers: dbCustomer.offers?.map(offer => ({
       id: offer.id,
       name: `Προσφορά ${offer.id.substring(0, 4)}`,
       value: parseFloat(offer.amount) || 0,
       date: offer.created_at,
-      status: offer.offer_result || 'pending'
+      status: offer.offer_result || 'pending',
+      requirements: offer.customer_comments,
+      result: offer.result
     })) || []
   }));
 };

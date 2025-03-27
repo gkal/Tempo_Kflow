@@ -472,7 +472,7 @@ export default function OffersPage() {
       header: "Ημ/νία Δημιουργίας",
       accessor: "created_at",
       id: "created_at",
-      width: "15%",
+      width: "120px",
       cell: (value) => formatDateTime(value),
     },
     {

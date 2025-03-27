@@ -1,17 +1,17 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import Sidebar from "./layout/Sidebar";
-import TopBar from "./layout/TopBar";
-import MetricCards from "./dashboard/MetricCards";
-import SettingsPage from "./settings/SettingsPage";
-import LoadingSpinner from './ui/LoadingSpinner';
-import { DialogUtilities } from "@/components/ui/DialogUtilities";
-import ErrorBoundary from './ErrorBoundary';
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
-// Lazy loaded components
+// Lazy load all components
+const Sidebar = lazy(() => import("./layout/Sidebar"));
+const TopBar = lazy(() => import("./layout/TopBar"));
+const MetricCards = lazy(() => import("./dashboard/MetricCards"));
+const SettingsPage = lazy(() => import("./settings/SettingsPage"));
+const LoadingSpinner = lazy(() => import('./ui/LoadingSpinner'));
+const DialogUtilities = lazy(() => import("@/components/ui/DialogUtilities").then(module => ({ default: module.DialogUtilities })));
+const ErrorBoundary = lazy(() => import('./ErrorBoundary'));
 const RecoveryPage = lazy(() => import("./admin/RecoveryPage"));
 const BackupPage = lazy(() => import("./admin/BackupPage"));
 const ServiceTypesPage = lazy(() => import("./admin/ServiceTypesPage"));

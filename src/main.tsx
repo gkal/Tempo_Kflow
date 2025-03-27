@@ -10,7 +10,6 @@ import { AuthProvider } from "./lib/AuthContext";
 
 // Styles
 import "./index.css";
-import "./styles/tooltip.css";
 
 // Utilities
 import { setupUtilities } from "./utils";

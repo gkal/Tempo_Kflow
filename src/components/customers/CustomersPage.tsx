@@ -541,7 +541,7 @@ export default function CustomersPage() {
                           handleEditOffer(row.id, offer.id);
                         }}
                       >
-                        <td className="px-2 py-2 text-xs text-[#cad2c5] w-[160px]">{formatDateTime(offer.created_at)}</td>
+                        <td className="px-2 py-2 text-xs text-[#cad2c5] w-[120px]">{formatDateTime(offer.created_at)}</td>
                         <td className="px-3 py-2 text-xs text-[#cad2c5] w-[100px]">
                           {offer.requirements 
                             ? <TruncateWithTooltip 
