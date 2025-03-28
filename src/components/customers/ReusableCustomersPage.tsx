@@ -10,6 +10,16 @@ import { Plus, Eye, EyeOff, Loader2, Trash2, ChevronRight, ChevronDown } from "l
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { format } from "date-fns";
 import { createColumnHelper, ColumnDef } from "@tanstack/react-table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Define Customer type
 interface CustomerOffer {
@@ -177,6 +187,17 @@ const ReusableCustomersPage: React.FC = () => {
   ]);
   const [selectedCustomerTypes, setSelectedCustomerTypes] = useState<string[]>([]);
   
+  // Delete offer dialog state
+  const [showDeleteOfferDialog, setShowDeleteOfferDialog] = useState(false);
+  const [offerToDelete, setOfferToDelete] = useState<string | null>(null);
+  const [customerIdForDelete, setCustomerIdForDelete] = useState<string | null>(null);
+  const [isDeletingOffer, setIsDeletingOffer] = useState(false);
+  
+  // Delete customer dialog state
+  const [showDeleteCustomerDialog, setShowDeleteCustomerDialog] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
+  
   // Check user permissions
   const isAdminUser = user?.role?.toLowerCase() === 'admin';
   const isAdminOrSuperUser = isAdminUser || 
@@ -185,27 +206,55 @@ const ReusableCustomersPage: React.FC = () => {
   
   // Function to map database customers to our Customer type
   const mapDatabaseCustomers = (dbCustomers: any[]): Customer[] => {
-    return dbCustomers.map(dbCustomer => ({
-      id: dbCustomer.id,
-      company_name: dbCustomer.company_name || '',
-      email: dbCustomer.email || '',
-      telephone: dbCustomer.telephone || '',
-      status: dbCustomer.status || 'inactive',
-      created_at: dbCustomer.created_at,
-      customer_type: dbCustomer.customer_type || '',
-      address: dbCustomer.address || '',
-      afm: dbCustomer.afm || '',
-      offers_count: dbCustomer.offers?.length || 0,
-      offers: dbCustomer.offers?.map((offer: any) => ({
-        id: offer.id,
-        name: `Προσφορά ${typeof offer.id === 'number' || typeof offer.id === 'string' ? String(offer.id).slice(0, 4) : ''}`,
-        value: offer.amount ? String(offer.amount) : '',
-        date: offer.created_at,
-        status: offer.offer_result || 'pending',
-        requirements: offer.requirements || '',
-        result: offer.result || ''
-      })) || []
-    }));
+    return dbCustomers.map(dbCustomer => {
+      // Add debug logging for AAA customer
+      if (dbCustomer.company_name && dbCustomer.company_name.toLowerCase().includes('aaa')) {
+        console.log('Raw AAA Customer Data:', dbCustomer);
+        console.log('Total offers for AAA:', dbCustomer.offers?.length || 0);
+        
+        // Log details about each offer
+        if (dbCustomer.offers && dbCustomer.offers.length > 0) {
+          console.log('Offer details:');
+          dbCustomer.offers.forEach((offer: any, index: number) => {
+            console.log(`Offer ${index + 1}:`, {
+              id: offer.id, 
+              deleted_at: offer.deleted_at, 
+              result: offer.result
+            });
+          });
+          
+          // Count only non-deleted offers
+          const nonDeletedOffers = dbCustomer.offers.filter((offer: any) => !offer.deleted_at);
+          console.log('Non-deleted offers count:', nonDeletedOffers.length);
+          
+          // Count only open offers (non-deleted and no result)
+          const openOffers = dbCustomer.offers.filter((offer: any) => !offer.deleted_at && !offer.result);
+          console.log('Open offers count:', openOffers.length);
+        }
+      }
+      
+      return {
+        id: dbCustomer.id,
+        company_name: dbCustomer.company_name || '',
+        email: dbCustomer.email || '',
+        telephone: dbCustomer.telephone || '',
+        status: dbCustomer.status || 'inactive',
+        created_at: dbCustomer.created_at,
+        customer_type: dbCustomer.customer_type || '',
+        address: dbCustomer.address || '',
+        afm: dbCustomer.afm || '',
+        offers_count: dbCustomer.offers?.filter((offer: any) => !offer.result && !offer.deleted_at).length || 0,
+        offers: dbCustomer.offers?.filter((offer: any) => !offer.deleted_at).map((offer: any) => ({
+          id: offer.id,
+          name: `Προσφορά ${typeof offer.id === 'number' || typeof offer.id === 'string' ? String(offer.id).slice(0, 4) : ''}`,
+          value: offer.amount ? String(offer.amount) : '',
+          date: offer.created_at,
+          status: offer.offer_result || 'pending',
+          requirements: offer.requirements || '',
+          result: offer.result || ''
+        })) || []
+      };
+    });
   };
 
   // Fetch customers on component mount
@@ -330,57 +379,32 @@ const ReusableCustomersPage: React.FC = () => {
         const isExpanded = expandedCustomerIds[customer.id] || false;
         
         return (
-          <div className="flex items-center gap-3 justify-start">
-            {/* Expand/Offers count */}
-            {offersCount > 0 && (
-              <div 
-                className="flex items-center justify-center"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleExpandCustomer(customer.id);
-                }}
-              >
-                <div className="flex items-center justify-center relative group cursor-pointer hover:bg-[#52796f]/60 rounded-full w-10 h-8 transition-colors duration-200">
+          <div className="flex items-center gap-1 justify-start">
+            <div className="flex items-center min-w-[40px] pl-2">
+              {offersCount > 0 ? (
+                <div 
+                  className={`flex items-center justify-center relative group cursor-pointer hover:bg-[#52796f]/60 rounded-full w-10 h-8 transition-colors duration-200 ${isExpanded ? 'bg-[#52796f]/30' : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleExpandCustomer(customer.id);
+                  }}
+                >
                   <span className="absolute inset-0 rounded-full bg-[#52796f]/0 group-hover:bg-[#52796f]/30 transition-colors duration-200"></span>
                   <div className="flex items-center justify-center">
                     {isExpanded ? (
-                      <svg 
-                        width="18" 
-                        height="18" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        className="h-5 w-5 text-[#84a98c] relative z-10"
-                      >
-                        <path d="m6 9 6 6 6-6"/>
-                      </svg>
+                      <ChevronDown className="h-5 w-5 text-[#84a98c] relative z-10" />
                     ) : (
-                      <svg 
-                        width="18" 
-                        height="18" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        className="h-5 w-5 text-[#84a98c] relative z-10"
-                      >
-                        <path d="m9 18 6-6-6-6"/>
-                      </svg>
+                      <ChevronRight className="h-5 w-5 text-[#84a98c] relative z-10" />
                     )}
-                    <span className="ml-1 text-sm text-[#84a98c] group-hover:text-white relative z-10">{offersCount}</span>
+                    <span className="ml-1 text-sm text-[#84a98c] group-hover:text-white relative z-10 font-medium">{offersCount}</span>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            {/* Company name */}
-            <span>{customer.company_name || "—"}</span>
+              ) : (
+                <span className="invisible">0</span>
+              )}
+            </div>
+            <span className="text-[#cad2c5]">{customer.company_name}</span>
           </div>
         );
       },
@@ -492,13 +516,19 @@ const ReusableCustomersPage: React.FC = () => {
               </svg>
             )}
             
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 hover:bg-[#354f52] text-red-500 hover:text-red-400"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {isAdminOrSuperUser && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 hover:bg-[#354f52] text-red-500 hover:text-red-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteCustomer(row);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         );
       },
@@ -566,11 +596,21 @@ const ReusableCustomersPage: React.FC = () => {
         </div>
       );
     }
+
+    // Handle offer deletion click
+    const handleDeleteClick = (offerId: string, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      setOfferToDelete(offerId);
+      setCustomerIdForDelete(customerId);
+      setShowDeleteOfferDialog(true);
+    };
     
     // Render offers table
     return (
       <div className="overflow-visible pl-[70px] pr-4 py-4 relative">
-        <div className="bg-[#2f3e46] rounded-md overflow-auto max-h-[500px] border border-[#52796f] shadow-sm w-[1000px]">
+        <div className="bg-[#2f3e46] rounded-md border border-[#52796f] shadow-sm w-[1000px]">
           <table className="w-full border-collapse table-fixed">
             <colgroup>
               <col className="w-[150px]" />
@@ -578,6 +618,7 @@ const ReusableCustomersPage: React.FC = () => {
               <col className="w-[200px]" />
               <col className="w-[150px]" />
               <col className="w-[100px]" />
+              {isAdminOrSuperUser && <col className="w-[80px]" />}
             </colgroup>
             <thead className="bg-[#2f3e46] relative z-10 after:absolute after:content-[''] after:left-0 after:right-0 after:bottom-0 after:h-[1px] after:bg-[#52796f]">
               <tr>
@@ -585,7 +626,10 @@ const ReusableCustomersPage: React.FC = () => {
                 <th className="px-2 py-2 text-left text-xs font-medium text-[#84a98c] border-r border-[#52796f]">Ζήτηση Πελάτη</th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-[#84a98c] border-r border-[#52796f]">Ποσό</th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-[#84a98c] border-r border-[#52796f]">Κατάσταση</th>
-                <th className="px-2 py-2 text-left text-xs font-medium text-[#84a98c]">Αποτέλεσμα</th>
+                <th className={`px-2 py-2 text-left text-xs font-medium text-[#84a98c] ${isAdminOrSuperUser ? 'border-r border-[#52796f]' : ''}`}>Αποτέλεσμα</th>
+                {isAdminOrSuperUser && (
+                  <th className="px-2 py-2 text-center text-xs font-medium text-[#84a98c]">Ενέργειες</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -627,11 +671,22 @@ const ReusableCustomersPage: React.FC = () => {
                       {formatStatus(offer.status) || <span className="text-xs text-[#52796f]">-</span>}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-xs text-[#cad2c5]">
+                  <td className={`px-2 py-2 text-xs text-[#cad2c5] ${isAdminOrSuperUser ? 'border-r border-[#52796f]' : ''}`}>
                     <span className={getResultClass(offer.result)}>
                       {formatResult(offer.result || '') || <span className="text-xs text-[#52796f]">-</span>}
                     </span>
                   </td>
+                  {isAdminOrSuperUser && (
+                    <td className="px-2 py-2 text-xs text-center">
+                      <button
+                        onClick={(e) => handleDeleteClick(offer.id, e)}
+                        className="p-1 rounded-full hover:bg-[#354f52] text-red-500 hover:text-red-400 transition-colors"
+                        aria-label="Διαγραφή προσφοράς"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -639,7 +694,7 @@ const ReusableCustomersPage: React.FC = () => {
         </div>
       </div>
     );
-  }, [customerOffers, loadingOffers, navigate]);
+  }, [customerOffers, loadingOffers, navigate, isAdminOrSuperUser]);
   
   // Handle search
   const handleSearch = useCallback((value: string) => {
@@ -655,6 +710,290 @@ const ReusableCustomersPage: React.FC = () => {
   const handleCustomerTypeChange = useCallback((types: string[]) => {
     setSelectedCustomerTypes(types);
   }, []);
+  
+  // Handle offer delete confirmation
+  const confirmDeleteOffer = useCallback(async () => {
+    if (!offerToDelete || !customerIdForDelete || isDeletingOffer) return;
+    
+    try {
+      setIsDeletingOffer(true);
+      let hasErrors = false;
+      let offerDetails: any[] = [];
+      
+      // 1. FETCH PHASE - Gather all data we need to delete
+      
+      // First check if there are any offer details to delete
+      const { data: details, error: detailsError } = await supabase
+        .from('offer_details')
+        .select('id')
+        .eq('offer_id', offerToDelete)
+        .is('deleted_at', null);
+        
+      if (detailsError) {
+        console.error('Error checking offer details:', detailsError);
+        hasErrors = true;
+      } else if (details) {
+        offerDetails = details;
+      }
+      
+      // If there were any errors during the data fetching phase, abort
+      if (hasErrors) {
+        toast({
+          title: "Σφάλμα",
+          description: "Δεν ήταν δυνατή η ανάκτηση των απαραίτητων δεδομένων για διαγραφή",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // 2. DELETION PHASE - Delete in order (children first, then parents)
+      const now = new Date().toISOString();
+      
+      // First delete any associated offer details if they exist
+      if (offerDetails.length > 0) {
+        const { error: deleteDetailsError } = await supabase
+          .from('offer_details')
+          .update({ deleted_at: now } as any)
+          .in('id', offerDetails.map(d => d.id));
+          
+        if (deleteDetailsError) {
+          console.error('Error soft deleting offer details:', deleteDetailsError);
+          toast({
+            title: "Σφάλμα",
+            description: "Δεν ήταν δυνατή η διαγραφή των λεπτομερειών προσφοράς",
+            variant: "destructive"
+          });
+          return; // Abort if we can't delete offer details
+        }
+      }
+      
+      // Then soft delete the main offer
+      const { error: deleteOfferError } = await supabase
+        .from('offers')
+        .update({ deleted_at: now })
+        .eq('id', offerToDelete);
+        
+      if (deleteOfferError) {
+        console.error('Error soft deleting offer:', deleteOfferError);
+        toast({
+          title: "Σφάλμα",
+          description: "Δεν ήταν δυνατή η διαγραφή της προσφοράς",
+          variant: "destructive"
+        });
+        return; // Abort if we can't delete the offer
+      }
+      
+      // 3. UI UPDATE PHASE - Only if all operations succeeded
+      
+      // Update the local state to remove the deleted offer
+      setCustomerOffers(prevOffers => {
+        const updatedOffers = { ...prevOffers };
+        if (updatedOffers[customerIdForDelete]) {
+          updatedOffers[customerIdForDelete] = updatedOffers[customerIdForDelete].filter(offer => offer.id !== offerToDelete);
+        }
+        return updatedOffers;
+      });
+      
+      // Update the customer offers count
+      setCustomers(prevCustomers => {
+        return prevCustomers.map(c => {
+          if (c.id === customerIdForDelete) {
+            return {
+              ...c,
+              offers_count: Math.max(0, (c.offers_count || 1) - 1)
+            };
+          }
+          return c;
+        });
+      });
+      
+      toast({
+        title: "Επιτυχία",
+        description: "Η προσφορά διαγράφηκε με επιτυχία",
+        variant: "default"
+      });
+    } catch (err) {
+      console.error('Error handling offer deletion:', err);
+      toast({
+        title: "Σφάλμα",
+        description: "Προέκυψε σφάλμα κατά τη διαγραφή της προσφοράς",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeletingOffer(false);
+      setShowDeleteOfferDialog(false);
+      setOfferToDelete(null);
+      setCustomerIdForDelete(null);
+    }
+  }, [offerToDelete, customerIdForDelete, isDeletingOffer]);
+  
+  // Add handleDeleteCustomer function
+  const handleDeleteCustomer = useCallback((customer: Customer) => {
+    setCustomerToDelete(customer);
+    setShowDeleteCustomerDialog(true);
+  }, []);
+
+  // Add confirmDeleteCustomer function
+  const confirmDeleteCustomer = useCallback(async () => {
+    if (!customerToDelete || isDeletingCustomer) return;
+    
+    try {
+      setIsDeletingCustomer(true);
+      const customerId = customerToDelete.id;
+      const now = new Date().toISOString();
+      let hasErrors = false;
+      
+      // 1. First fetch all contacts for this customer
+      const { data: contacts, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('customer_id', customerId)
+        .is('deleted_at', null);
+        
+      if (contactsError) {
+        console.error('Error fetching contacts:', contactsError);
+        hasErrors = true;
+      }
+      
+      // 2. Fetch all offers for this customer
+      const { data: offers, error: offersError } = await supabase
+        .from('offers')
+        .select('id')
+        .eq('customer_id', customerId)
+        .is('deleted_at', null);
+        
+      if (offersError) {
+        console.error('Error fetching offers:', offersError);
+        hasErrors = true;
+      }
+      
+      let offerDetails: any[] = [];
+      
+      // 3. If we have offers, fetch all offer details
+      if (offers && offers.length > 0) {
+        // Get all offer IDs
+        const offerIds = offers.map(o => o.id);
+        
+        // Fetch offer details for those offers
+        const { data: details, error: detailsError } = await supabase
+          .from('offer_details')
+          .select('id')
+          .in('offer_id', offerIds)
+          .is('deleted_at', null);
+          
+        if (detailsError) {
+          console.error('Error fetching offer details:', detailsError);
+          hasErrors = true;
+        } else if (details) {
+          offerDetails = details;
+        }
+      }
+      
+      // If there were any errors during the data fetching phase, abort
+      if (hasErrors) {
+        toast({
+          title: "Σφάλμα",
+          description: "Δεν ήταν δυνατή η ανάκτηση των απαραίτητων δεδομένων για διαγραφή",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Now start deleting, in reverse order (children first, then parents)
+      
+      // 4. Delete offer details if any
+      if (offerDetails.length > 0) {
+        const { error: deleteDetailsError } = await supabase
+          .from('offer_details')
+          .update({ deleted_at: now } as any)
+          .in('id', offerDetails.map(d => d.id));
+          
+        if (deleteDetailsError) {
+          console.error('Error soft deleting offer details:', deleteDetailsError);
+          toast({
+            title: "Σφάλμα",
+            description: "Δεν ήταν δυνατή η διαγραφή των λεπτομερειών προσφορών",
+            variant: "destructive"
+          });
+          return; // Abort if we can't delete offer details
+        }
+      }
+      
+      // 5. Delete offers if any
+      if (offers && offers.length > 0) {
+        const { error: deleteOffersError } = await supabase
+          .from('offers')
+          .update({ deleted_at: now })
+          .in('id', offers.map(o => o.id));
+          
+        if (deleteOffersError) {
+          console.error('Error soft deleting offers:', deleteOffersError);
+          toast({
+            title: "Σφάλμα",
+            description: "Δεν ήταν δυνατή η διαγραφή των προσφορών",
+            variant: "destructive"
+          });
+          return; // Abort if we can't delete offers
+        }
+      }
+      
+      // 6. Delete contacts if any
+      if (contacts && contacts.length > 0) {
+        const { error: deleteContactsError } = await supabase
+          .from('contacts')
+          .update({ deleted_at: now } as any)
+          .in('id', contacts.map(c => c.id));
+          
+        if (deleteContactsError) {
+          console.error('Error soft deleting contacts:', deleteContactsError);
+          toast({
+            title: "Σφάλμα",
+            description: "Δεν ήταν δυνατή η διαγραφή των επαφών",
+            variant: "destructive"
+          });
+          return; // Abort if we can't delete contacts
+        }
+      }
+      
+      // 7. Finally, soft delete the customer
+      const { error: deleteCustomerError } = await supabase
+        .from('customers')
+        .update({ deleted_at: now })
+        .eq('id', customerId);
+        
+      if (deleteCustomerError) {
+        console.error('Error soft deleting customer:', deleteCustomerError);
+        toast({
+          title: "Σφάλμα",
+          description: "Δεν ήταν δυνατή η διαγραφή του πελάτη",
+          variant: "destructive"
+        });
+        return; // Abort if we can't delete the customer
+      }
+      
+      // Only update UI and show success if everything succeeded
+      
+      // 8. Update UI to remove the deleted customer
+      setCustomers(prev => prev.filter(c => c.id !== customerId));
+      
+      toast({
+        title: "Επιτυχία",
+        description: "Ο πελάτης διαγράφηκε με επιτυχία",
+        variant: "default"
+      });
+    } catch (err) {
+      console.error('Error handling customer deletion:', err);
+      toast({
+        title: "Σφάλμα",
+        description: "Προέκυψε σφάλμα κατά τη διαγραφή του πελάτη",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeletingCustomer(false);
+      setShowDeleteCustomerDialog(false);
+      setCustomerToDelete(null);
+    }
+  }, [customerToDelete, isDeletingCustomer]);
   
   return (
     <TooltipProvider delayDuration={0}>
@@ -696,6 +1035,61 @@ const ReusableCustomersPage: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Delete Offer Confirmation Dialog */}
+      <AlertDialog open={showDeleteOfferDialog} onOpenChange={setShowDeleteOfferDialog}>
+        <AlertDialogContent 
+          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
+          aria-describedby="delete-offer-description"
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#cad2c5]">Διαγραφή Προσφοράς</AlertDialogTitle>
+            <AlertDialogDescription id="delete-offer-description" className="text-[#84a98c]">
+              Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την προσφορά; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#354f52] text-[#cad2c5] hover:bg-[#354f52]/90">
+              Άκυρο
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmDeleteOffer}
+              disabled={isDeletingOffer}
+            >
+              {isDeletingOffer ? "Διαγραφή..." : "Διαγραφή"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Customer Confirmation Dialog */}
+      <AlertDialog open={showDeleteCustomerDialog} onOpenChange={setShowDeleteCustomerDialog}>
+        <AlertDialogContent 
+          className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
+          aria-describedby="delete-customer-description"
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#cad2c5]">Διαγραφή Πελάτη</AlertDialogTitle>
+            <AlertDialogDescription id="delete-customer-description" className="text-[#84a98c]">
+              Είστε σίγουροι ότι θέλετε να διαγράψετε τον πελάτη "{customerToDelete?.company_name}"; 
+              Αυτή η ενέργεια θα διαγράψει επίσης όλες τις επαφές και προσφορές. Δεν μπορεί να αναιρεθεί.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-[#354f52] text-[#cad2c5] hover:bg-[#354f52]/90">
+              Άκυρο
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={confirmDeleteCustomer}
+              disabled={isDeletingCustomer}
+            >
+              {isDeletingCustomer ? "Διαγραφή..." : "Διαγραφή"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   );
 };
