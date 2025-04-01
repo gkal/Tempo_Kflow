@@ -15,11 +15,10 @@ import { Loader2, Plus, FileText } from "lucide-react";
 import { ContactDialog } from "@/components/contacts/ContactDialog";
 import {
   AlertDialog,
-  AlertDialogContent,
   AlertDialogHeader,
-  AlertDialogTitle,
   AlertDialogDescription,
 } from "@/components/ui/alert-dialog";
+import { AccessibleAlertDialogContent } from "@/components/ui/DialogUtilities";
 import { supabase } from '@/lib/supabaseClient';
 import { PlusIcon } from "lucide-react";
 import { useFormRegistration } from '@/lib/FormContext';
@@ -213,10 +212,11 @@ export function CustomerDialog({
         <DialogContent 
           className="max-w-4xl bg-[#2f3e46] border-[#52796f] text-[#cad2c5]"
           aria-describedby="customer-dialog-description"
+          aria-labelledby="customer-dialog-title"
         >
           <div className="overflow-hidden">
             <DialogHeader className="pb-4">
-              <DialogTitle className="text-[#cad2c5] text-xl mb-2">
+              <DialogTitle id="customer-dialog-title" className="text-[#cad2c5] text-xl mb-2">
                 {viewOnly
                   ? "Προβολή Πελάτη"
                   : customer?.id
@@ -336,38 +336,16 @@ const DeleteConfirmation: React.FC<DeleteConfirmationProps> = ({ isOpen, onClose
   
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent aria-describedby={descriptionId}>
+      <AccessibleAlertDialogContent
+        title="Delete Customer"
+        aria-describedby={descriptionId}
+      >
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Customer</AlertDialogTitle>
           <AlertDialogDescription id={descriptionId}>
             Are you sure you want to delete this customer? This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="flex justify-end space-x-4 mt-6">
-          <Button
-            variant="destructive"
-            onClick={onConfirm}
-            disabled={isDeleting}
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            {isDeleting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {canDelete ? "Διαγραφή..." : "Απενεργοποίηση..."}
-              </>
-            ) : (
-              canDelete ? "Διαγραφή" : "Απενεργοποίηση"
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
-          >
-            Άκυρο
-          </Button>
-        </div>
-      </AlertDialogContent>
+      </AccessibleAlertDialogContent>
     </AlertDialog>
   );
 };

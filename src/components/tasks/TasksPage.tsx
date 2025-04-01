@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/lib/AuthContext";
-import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 import { toast } from "@/components/ui/use-toast";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { Search, Plus, CheckCircle, AlertCircle, Clock, ArrowUpRight, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
@@ -10,7 +9,7 @@ import { TaskDialog } from "./TaskDialog";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "@/components/ui/search-bar";
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
-import { openEditOfferDialog } from "@/components/customers/OfferDialogManager";
+import { openEditOfferDialog } from "@/components/offers/main_offers_form/OfferDialogManager";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -412,23 +411,37 @@ export default function TasksPage() {
     }
   }, [user]);
 
-  // Set up real-time subscription for tasks
-  useRealtimeSubscription(
-    { table: "tasks", filter: `assigned_to=eq.${user?.id}` },
-    (payload) => {
-      if (payload.eventType === "INSERT") {
-        fetchTasks();
-      } else if (payload.eventType === "UPDATE") {
-        fetchTasks();
-      } else if (payload.eventType === "DELETE") {
-        const deletedTask = payload.old;
-        setTasks(prevTasks => 
-          prevTasks.filter(task => task.id !== deletedTask.id)
-        );
-      }
-    },
-    [user?.id]
-  );
+  // Set up real-time subscription for tasks using Supabase's built-in capabilities
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const subscription = supabase
+      .channel('tasks-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `assigned_to=eq.${user.id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            fetchTasks();
+          } else if (payload.eventType === 'DELETE') {
+            const deletedTask = payload.old;
+            setTasks(prevTasks => 
+              prevTasks.filter(task => task.id !== deletedTask.id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user?.id, fetchTasks]);
 
   // Initial fetch
   useEffect(() => {

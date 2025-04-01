@@ -25,7 +25,7 @@ const getUserIdFromStorage = (): string => {
 };
 
 /**
- * Typed Supabase client instance
+ * Typed Supabase client instance with real-time enabled
  */
 export const supabase = createClient<Database>(
   supabaseUrl, 
@@ -39,6 +39,11 @@ export const supabase = createClient<Database>(
     global: {
       headers: {
         'X-User-ID': getUserIdFromStorage(),
+      },
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
       },
     },
   }

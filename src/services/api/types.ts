@@ -34,7 +34,13 @@ export type TableName =
   | 'service_subcategories'
   | 'units'
   | 'notifications'
-  | 'offer_history';
+  | 'offer_history'
+  | 'task_history'
+  | 'materials'
+  | 'brands'
+  | 'comments'
+  | 'resource_locks'
+  | 'history_logs';
 
 /**
  * Customer table row type
@@ -48,6 +54,7 @@ export interface Customer {
   address?: string | null;
   created_at: string;
   updated_at?: string | null;
+  deleted_at?: string | null;
 }
 
 /**
@@ -76,6 +83,7 @@ export interface ContactPosition {
   id: string;
   name: string;
   created_at?: string;
+  deleted_at?: string | null;
 }
 
 /**
@@ -85,6 +93,7 @@ export interface Department {
   id: string;
   name: string;
   created_at?: string;
+  deleted_at?: string | null;
 }
 
 /**
@@ -94,7 +103,7 @@ export interface Offer {
   id: string;
   customer_id: string;
   requirements: string | null;
-  amount: string | number | null;
+  amount: string | null;
   offer_result: string | null;
   result: string | null;
   created_at: string;
@@ -126,6 +135,7 @@ export interface Offer {
     fullname: string;
   };
   created_by?: string;
+  updated_by?: string;
   customer_name?: string;
   deleted_at?: string | null;
   title?: string;
@@ -151,6 +161,7 @@ export interface OfferDetail {
   total_price?: number;
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
 }
 
 /**
@@ -205,6 +216,7 @@ export interface User {
   updated_at?: string | null;
   last_login_at?: string | null;
   avatar_url?: string;
+  deleted_at?: string | null;
 }
 
 /**
@@ -219,6 +231,7 @@ export interface ServiceCategory {
   user_create?: string;
   user_updated?: string;
   category_name?: string;
+  deleted_at?: string | null;
 }
 
 /**
@@ -234,6 +247,7 @@ export interface ServiceSubcategory {
   date_updated?: string;
   user_create?: string;
   user_updated?: string;
+  deleted_at?: string | null;
 }
 
 /**
@@ -253,6 +267,7 @@ export interface Unit {
   name: string;
   abbreviation?: string;
   created_at?: string;
+  deleted_at?: string | null;
 }
 
 /**
@@ -267,6 +282,7 @@ export interface Notification {
   read: boolean;
   created_at: string;
   related_task_id?: string | null;
+  deleted_at?: string | null;
   // Relations
   sender?: {
     id: string;
@@ -287,18 +303,47 @@ export interface Notification {
 }
 
 /**
+ * Equipment table row type
+ */
+export interface Equipment {
+  id: string;
+  name?: string;
+  description?: string;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+  // Add other fields based on your database schema
+}
+
+/**
+ * Task history table row type
+ */
+export interface TaskHistory {
+  id: string;
+  task_id: string;
+  action: string;
+  old_values: any;
+  new_values: any;
+  user_id?: string;
+  created_at: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
+}
+
+/**
  * Offer history table row type
  */
 export interface OfferHistory {
   id: string;
   offer_id: string;
   action: string;
-  old_values?: any;
-  new_values?: any;
+  old_values: any;
+  new_values: any;
   user_id?: string;
-  created_at?: string;
-  ip_address?: string;
-  user_agent?: string;
+  created_at: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
 }
 
 /**
@@ -309,4 +354,18 @@ export interface DeletedRecord {
   deleted_at: string;
   record: any;
   table: string;
+}
+
+/**
+ * ResourceLock table row type for handling concurrent editing
+ */
+export interface ResourceLock {
+  id: string;
+  resource_type: string;
+  resource_id: string;
+  user_id: string;
+  user_name: string;
+  locked_at: string;
+  expires_at: string;
+  _timestamp?: number;
 } 

@@ -107,4 +107,118 @@ When adding new components or modifying existing ones:
 2. Ensure accessibility requirements are met
 3. Add appropriate documentation
 4. Include examples of usage
-5. Update the relevant README files 
+5. Update the relevant README files
+
+# Delete Confirmation Utilities
+
+This folder contains reusable delete confirmation components and hooks that provide a consistent experience across the application.
+
+## DeleteConfirmationDialog Component
+
+Use this component directly in your React component when you need a delete confirmation dialog.
+
+```tsx
+import { useState } from 'react';
+import { DeleteConfirmationDialog } from '@/components/ui/DeleteConfirmationDialog';
+import { Button } from '@/components/ui/button';
+
+const YourComponent = () => {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
+  const handleDelete = async () => {
+    // Implement your delete logic here
+    await deleteRecord();
+    // You can update the UI directly here or in the onSuccess callback
+  };
+  
+  return (
+    <div>
+      <Button onClick={() => setShowDeleteDialog(true)}>Delete Item</Button>
+      
+      <DeleteConfirmationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onDelete={handleDelete}
+        onSuccess={() => {
+          // This will be called after the dialog closes on successful deletion
+          // Update your UI or show a toast notification
+          console.log('Item deleted successfully');
+        }}
+        title="Delete Item"
+        description="Are you sure you want to delete this item? This action cannot be undone."
+        successMessage="Item deleted successfully."
+      />
+    </div>
+  );
+};
+```
+
+## useDeleteConfirmation Hook
+
+For more advanced usage or when you need more control, use the hook version:
+
+```tsx
+import { Button } from '@/components/ui/button';
+import { useDeleteConfirmation } from '@/utils/ui/useDeleteConfirmation';
+
+const YourComponent = () => {
+  const { 
+    open: openDeleteDialog,
+    DeleteConfirmationDialog
+  } = useDeleteConfirmation({
+    title: 'Delete Item',
+    description: 'Are you sure you want to delete this item? This action cannot be undone.',
+    successMessage: 'Item deleted successfully.',
+    onDelete: async () => {
+      // Implement your delete logic here
+      await deleteRecord();
+    },
+    onSuccess: () => {
+      // This will be called after the dialog closes on successful deletion
+      // Update your UI or show a toast notification
+      console.log('Item deleted successfully');
+    }
+  });
+  
+  return (
+    <div>
+      <Button onClick={openDeleteDialog}>Delete Item</Button>
+      <DeleteConfirmationDialog />
+    </div>
+  );
+};
+```
+
+## Customization Options
+
+Both the component and hook support the following customization options:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `title` | Dialog title | "Confirmation" |
+| `description` | Dialog description | "Are you sure you want to delete this item? This action cannot be undone." |
+| `successMessage` | Message shown after successful deletion | "Successfully deleted." |
+| `errorMessage` | Default error message if deletion fails | "An error occurred while trying to delete." |
+| `deleteButtonLabel` | Text for the delete button | "Delete" |
+| `cancelButtonLabel` | Text for the cancel button | "Cancel" |
+| `autoCloseDelay` | Delay in ms before auto-closing on success | 200 |
+| `onSuccess` | Callback function executed after successful deletion | undefined |
+| `onCancel` | Callback function executed when dialog is canceled | undefined |
+
+## Implementation Details
+
+The deletion flow works as follows:
+
+1. Dialog opens showing a confirmation message
+2. User clicks "Delete" button
+3. Dialog shows "Deleting..." state and disables buttons
+4. If deletion succeeds:
+   - Shows success message
+   - Auto-closes after `autoCloseDelay` ms
+   - Calls `onSuccess` callback after closing
+5. If deletion fails:
+   - Shows error message
+   - Keeps dialog open for user to acknowledge
+   - Provides an "OK" button to dismiss
+
+This ensures a consistent and user-friendly experience across all delete operations in the application. 

@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTableBase } from "@/components/ui/data-table-base";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, ArrowLeft } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,11 +28,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 import { formatDateTime } from "@/utils/formatUtils";
 import ReactDOM from "react-dom";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
+import { useDataService } from "@/hooks/useDataService";
 
 // Extend Window interface to include our custom property
 declare global {
@@ -251,38 +251,62 @@ export default function ServiceTypesPage() {
     }
   }, [user, navigate, hasEditPermission]);
 
+  // State for active tab
+  const [activeTab, setActiveTab] = useState<string>("categories");
+  
+  // Refresh triggers for each tab
+  const [categoriesRefreshTrigger, setCategoriesRefreshTrigger] = useState(0);
+  const [unitsRefreshTrigger, setUnitsRefreshTrigger] = useState(0);
+  const [departmentsRefreshTrigger, setDepartmentsRefreshTrigger] = useState(0);
+
+  // Handler for tab changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    
+    // Refresh the data for the newly selected tab
+    if (value === 'categories') {
+      setCategoriesRefreshTrigger(prev => prev + 1);
+    } else if (value === 'units') {
+      setUnitsRefreshTrigger(prev => prev + 1);
+    } else if (value === 'departments') {
+      setDepartmentsRefreshTrigger(prev => prev + 1);
+    }
+  };
+
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <AppTabs defaultValue="categories">
-        <AppTabsList>
-          <AppTabsTrigger value="categories">
-            Εργασίες σε προσφορές
-          </AppTabsTrigger>
-          <AppTabsTrigger value="units">
-            Μονάδες Μέτρησης
-          </AppTabsTrigger>
-          <AppTabsTrigger value="departments">
-            Τμήματα
-          </AppTabsTrigger>
+    <div className="py-6 px-8 bg-[#2f3e46]">
+      <div className="mb-8 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-[#cad2c5]">Ρυθμίσεις Συστήματος</h1>
+        <Button
+          variant="outline"
+          className="gap-2 border-[#52796f] text-[#84a98c] hover:bg-[#354f52] hover:text-[#cad2c5]"
+          onClick={() => navigate(-1)}
+        >
+          <ArrowLeft className="h-4 w-4" /> Επιστροφή
+        </Button>
+      </div>
+
+      <AppTabs defaultValue="categories" onValueChange={handleTabChange}>
+        <AppTabsList className="w-full">
+          <AppTabsTrigger value="categories">Κατηγορίες Εργασιών</AppTabsTrigger>
+          <AppTabsTrigger value="units">Μονάδες Μέτρησης</AppTabsTrigger>
+          <AppTabsTrigger value="departments">Τμήματα</AppTabsTrigger>
         </AppTabsList>
-        
         <AppTabsContent value="categories">
-          <CategoriesTab />
+          <CategoriesTab refreshTrigger={categoriesRefreshTrigger} />
         </AppTabsContent>
-        
         <AppTabsContent value="units">
-          <UnitsTab />
+          <UnitsTab refreshTrigger={unitsRefreshTrigger} />
         </AppTabsContent>
-        
         <AppTabsContent value="departments">
-          <DepartmentsTab />
+          <DepartmentsTab refreshTrigger={departmentsRefreshTrigger} />
         </AppTabsContent>
       </AppTabs>
     </div>
   );
 }
 
-function CategoriesTab() {
+function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
   const { user } = useAuth();
   const [categories, setCategories] = useState<CategoryWithSubcategories[]>([]);
   const [subcategories, setSubcategories] = useState<ServiceSubcategory[]>([]);
@@ -301,62 +325,43 @@ function CategoriesTab() {
     text: string;
   } | null>(null);
 
-  // Set up real-time subscription for service categories
-  useRealtimeSubscription(
-    {
-      table: 'service_categories',
-      event: '*',
-    },
-    (payload) => {
-      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-        fetchCategories(); // Refresh the list
-      }
-    },
-    []
-  );
-
-  // Set up real-time subscription for service subcategories
-  useRealtimeSubscription(
-    {
-      table: 'service_subcategories',
-      event: '*',
-    },
-    (payload) => {
-      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-        fetchCategories(); // Refresh the list
-      }
-    },
-    []
-  );
+  // Initialize data services
+  const { 
+    fetchAll: fetchAllCategories,
+    create: createCategory,
+    update: updateCategory,
+    remove: removeCategory
+  } = useDataService<ServiceCategory>('service_categories');
+  
+  const {
+    fetchAll: fetchAllSubcategories,
+    create: createSubcategory,
+    update: updateSubcategory,
+    remove: removeSubcategory
+  } = useDataService<ServiceSubcategory>('service_subcategories');
 
   // Fetch service categories and subcategories
   const fetchCategories = async () => {
     try {
       setLoading(true);
       
-      // Fetch categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("service_categories")
-        .select("*")
-        .order("category_name", { ascending: true });
-
-      if (categoriesError) throw categoriesError;
+      // Fetch categories using DataService
+      const categoriesData = await fetchAllCategories({
+        order: { column: "category_name", ascending: true }
+      });
       
-      // Fetch subcategories
-      const { data: subcategoriesData, error: subcategoriesError } = await supabase
-        .from("service_subcategories")
-        .select("*")
-        .order("subcategory_name", { ascending: true });
-
-      if (subcategoriesError) throw subcategoriesError;
+      // Fetch subcategories using DataService
+      const subcategoriesData = await fetchAllSubcategories({
+        order: { column: "subcategory_name", ascending: true }
+      });
       
-      setSubcategories(subcategoriesData as ServiceSubcategory[] || []);
+      setSubcategories(subcategoriesData || []);
       
       // Combine categories and subcategories for display
       const combinedData: CategoryWithSubcategories[] = [];
       
       // Process each category and its subcategories
-      (categoriesData as any[])?.forEach(category => {
+      categoriesData?.forEach(category => {
         // Add the main category
         combinedData.push({
           ...category,
@@ -401,9 +406,49 @@ function CategoriesTab() {
     }
   };
 
-  // Fetch data on component mount
+  // Fetch data on component mount or when refresh trigger changes
   useEffect(() => {
     fetchCategories();
+  }, [fetchCategories, refreshTrigger]);
+
+  // Set up real-time subscriptions using Supabase's built-in capabilities
+  useEffect(() => {
+    // Service categories subscription
+    const categoriesSubscription = supabase
+      .channel('service-categories-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'service_categories'
+        },
+        () => {
+          fetchCategories(); // Refresh the list
+        }
+      )
+      .subscribe();
+      
+    // Service subcategories subscription
+    const subcategoriesSubscription = supabase
+      .channel('service-subcategories-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'service_subcategories'
+        },
+        () => {
+          fetchCategories(); // Refresh the list
+        }
+      )
+      .subscribe();
+
+    return () => {
+      categoriesSubscription.unsubscribe();
+      subcategoriesSubscription.unsubscribe();
+    };
   }, []);
 
   // Handle form input changes
@@ -427,49 +472,48 @@ function CategoriesTab() {
     
     try {
       if (currentCategory && !currentCategory.isSubcategory) {
-        // Update existing category
-        const { error } = await supabase
-          .from("service_categories")
-          .update({
-            category_name: formData.category_name,
-            date_updated: new Date().toISOString(),
-            user_updated: user?.id,
-          } as any);
+        // Update existing category using DataService
+        const updatedCategory = await updateCategory(currentCategory.id, {
+          category_name: formData.category_name,
+          date_updated: new Date().toISOString(),
+          user_updated: user?.id,
+        });
 
-        if (error) throw error;
+        if (!updatedCategory) {
+          throw new Error("Failed to update category");
+        }
         
         setFormMessage({
           type: "success",
           text: "Η κατηγορία ενημερώθηκε με επιτυχία."
         });
       } else if (currentCategory && currentCategory.isSubcategory) {
-        // Update existing subcategory
-        const { error } = await supabase
-          .from("service_subcategories")
-          .update({
-            subcategory_name: formData.category_name,
-            date_updated: new Date().toISOString(),
-            user_updated: user?.id,
-          } as any)
-          .eq("id", currentCategory.id);
+        // Update existing subcategory using DataService
+        const updatedSubcategory = await updateSubcategory(currentCategory.id, {
+          subcategory_name: formData.category_name,
+          date_updated: new Date().toISOString(),
+          user_updated: user?.id,
+        });
 
-        if (error) throw error;
+        if (!updatedSubcategory) {
+          throw new Error("Failed to update subcategory");
+        }
         
         setFormMessage({
           type: "success",
           text: "Η περιγραφή ενημερώθηκε με επιτυχία."
         });
       } else {
-        // Create new category
-        const { error } = await supabase
-          .from("service_categories")
-          .insert({
-            category_name: formData.category_name,
-            date_created: new Date().toISOString(),
-            user_create: user?.id,
-          } as any);
+        // Create new category using DataService
+        const newCategory = await createCategory({
+          category_name: formData.category_name,
+          date_created: new Date().toISOString(),
+          user_create: user?.id,
+        });
 
-        if (error) throw error;
+        if (!newCategory) {
+          throw new Error("Failed to create category");
+        }
         
         setFormMessage({
           type: "success",
@@ -510,17 +554,17 @@ function CategoriesTab() {
     }
     
     try {
-      // Create new subcategory
-      const { error } = await supabase
-        .from("service_subcategories")
-        .insert({
-          subcategory_name: formData.subcategory_name,
-          category_id: currentParentCategory?.id,
-          date_created: new Date().toISOString(),
-          user_create: user?.id,
-        } as any);
+      // Create new subcategory using DataService
+      const newSubcategory = await createSubcategory({
+        subcategory_name: formData.subcategory_name,
+        category_id: currentParentCategory?.id,
+        date_created: new Date().toISOString(),
+        user_create: user?.id,
+      });
 
-      if (error) throw error;
+      if (!newSubcategory) {
+        throw new Error("Failed to create subcategory");
+      }
       
       // Show success message
       setFormMessage({
@@ -595,13 +639,12 @@ function CategoriesTab() {
     
     try {
       if (currentCategory.isSubcategory) {
-        // Delete subcategory
-        const { error } = await supabase
-          .from("service_subcategories")
-          .delete()
-          .eq("id", currentCategory.id);
+        // Delete subcategory using DataService
+        const success = await removeSubcategory(currentCategory.id);
 
-        if (error) throw error;
+        if (!success) {
+          throw new Error("Failed to delete subcategory");
+        }
         
         setFormMessage({
           type: "success",
@@ -622,18 +665,17 @@ function CategoriesTab() {
           return;
         }
         
-        // Delete category
-      const { error } = await supabase
-        .from("service_categories")
-        .delete()
-        .eq("id", currentCategory.id);
+        // Delete category using DataService
+        const success = await removeCategory(currentCategory.id);
 
-      if (error) throw error;
+        if (!success) {
+          throw new Error("Failed to delete category");
+        }
       
-      setFormMessage({
-        type: "success",
-        text: "Η κατηγορία διαγράφηκε με επιτυχία."
-      });
+        setFormMessage({
+          type: "success",
+          text: "Η κατηγορία διαγράφηκε με επιτυχία."
+        });
       }
       
       // Refresh the list
@@ -726,9 +768,12 @@ function CategoriesTab() {
 
         {/* Category Form Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10">
+          <DialogContent 
+            className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
+            aria-labelledby="category-dialog-title"
+          >
             <DialogHeader>
-              <DialogTitle className="text-[#84a98c] text-xl font-medium">
+              <DialogTitle id="category-dialog-title" className="text-[#84a98c] text-xl font-medium">
                 {currentCategory 
                   ? currentCategory.isSubcategory 
                     ? "Επεξεργασία Περιγραφής" 
@@ -815,9 +860,12 @@ function CategoriesTab() {
             }
           }}
         >
-          <DialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10">
+          <DialogContent 
+            className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
+            aria-labelledby="subcategory-dialog-title"
+          >
             <DialogHeader>
-              <DialogTitle className="text-[#84a98c] text-xl font-medium">
+              <DialogTitle id="subcategory-dialog-title" className="text-[#84a98c] text-xl font-medium">
                 {currentParentCategory?.category_name 
                   ? (currentParentCategory.category_name.length > 40 
                       ? <TruncateWithTooltip text={currentParentCategory.category_name} maxLength={40} tooltipPosition="top" />
@@ -890,9 +938,12 @@ function CategoriesTab() {
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10">
+          <AlertDialogContent 
+            className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
+            aria-labelledby="delete-dialog-title"
+          >
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-[#84a98c] text-xl font-medium">
+              <AlertDialogTitle id="delete-dialog-title" className="text-[#84a98c] text-xl font-medium">
                 {currentCategory && currentCategory.isSubcategory 
                   ? "Διαγραφή Περιγραφής" 
                   : "Διαγραφή Κατηγορίας"}
@@ -924,7 +975,7 @@ function CategoriesTab() {
   );
 }
 
-function UnitsTab() {
+function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
   const { user } = useAuth();
   const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -939,41 +990,27 @@ function UnitsTab() {
     text: string;
   } | null>(null);
 
-  // Set up real-time subscription for units
-  useRealtimeSubscription(
-    {
-      table: 'units',
-      event: '*',
-    },
-    (payload) => {
-      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-        fetchUnits(); // Refresh the list
-      }
-    },
-    []
-  );
+  // Initialize data service for units
+  const { 
+    fetchAll: fetchAllUnits,
+    create: createUnit,
+    update: updateUnit,
+    remove: removeUnit
+  } = useDataService<any>('units');
 
   // Fetch units
   const fetchUnits = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("units")
-        .select("*")
-        .order("name", { ascending: true });
-
-      if (error) throw error;
       
-      // Ensure data has the correct field names for consistency
-      const formattedData = data?.map(unit => ({
-        ...unit,
-        date_created: unit.date_created || unit.created_at,
-        date_updated: unit.date_updated || unit.updated_at
-      })) || [];
+      // Use DataService to fetch units
+      const unitsData = await fetchAllUnits({
+        order: { column: "name", ascending: true }
+      });
       
-      setUnits(formattedData);
+      setUnits(unitsData || []);
     } catch (error) {
-      console.error("Error fetching measurement units:", error);
+      console.error("Error fetching units:", error);
       setFormMessage({
         type: "error",
         text: "Υπήρξε πρόβλημα κατά την ανάκτηση των μονάδων μέτρησης."
@@ -983,9 +1020,31 @@ function UnitsTab() {
     }
   };
 
-  // Fetch data on component mount
+  // Fetch data on component mount or when refresh trigger changes
   useEffect(() => {
     fetchUnits();
+  }, [fetchUnits, refreshTrigger]);
+
+  // Set up real-time subscription using Supabase's built-in capabilities
+  useEffect(() => {
+    const unitsSubscription = supabase
+      .channel('units-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'units'
+        },
+        () => {
+          fetchUnits(); // Refresh the list
+        }
+      )
+      .subscribe();
+
+    return () => {
+      unitsSubscription.unsubscribe();
+    };
   }, []);
 
   // Handle form input changes
@@ -1009,31 +1068,30 @@ function UnitsTab() {
     
     try {
       if (currentUnit) {
-        // Update existing unit
-        const { error } = await supabase
-          .from("units")
-          .update({ 
-            name: formData.name,
-            date_updated: new Date().toISOString()
-          })
-          .eq("id", currentUnit.id);
+        // Update existing unit using DataService
+        const updatedUnit = await updateUnit(currentUnit.id, { 
+          name: formData.name,
+          date_updated: new Date().toISOString()
+        });
           
-        if (error) throw error;
+        if (!updatedUnit) {
+          throw new Error("Failed to update unit");
+        }
         
         setFormMessage({
           type: "success",
           text: "Η μονάδα μέτρησης ενημερώθηκε με επιτυχία."
         });
       } else {
-        // Create new unit
-        const { error } = await supabase
-          .from("units")
-          .insert({
-            name: formData.name,
-            date_created: new Date().toISOString()
-          });
+        // Create new unit using DataService
+        const newUnit = await createUnit({
+          name: formData.name,
+          date_created: new Date().toISOString()
+        });
 
-        if (error) throw error;
+        if (!newUnit) {
+          throw new Error("Failed to create unit");
+        }
         
         setFormMessage({
           type: "success",
@@ -1083,12 +1141,12 @@ function UnitsTab() {
     if (!currentUnit) return;
     
     try {
-      const { error } = await supabase
-        .from("units")
-        .delete()
-        .eq("id", currentUnit.id);
+      // Delete unit using DataService
+      const success = await removeUnit(currentUnit.id);
 
-      if (error) throw error;
+      if (!success) {
+        throw new Error("Failed to delete unit");
+      }
       
       setFormMessage({
         type: "success",
@@ -1159,9 +1217,12 @@ function UnitsTab() {
 
         {/* Unit Form Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10">
+          <DialogContent 
+            className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
+            aria-labelledby="unit-dialog-title"
+          >
             <DialogHeader>
-              <DialogTitle className="text-[#84a98c] text-xl font-medium">
+              <DialogTitle id="unit-dialog-title" className="text-[#84a98c] text-xl font-medium">
                 {currentUnit ? "Επεξεργασία Μονάδας Μέτρησης" : "Προσθήκη Μονάδας Μέτρησης"}
               </DialogTitle>
               <DialogDescription className="text-[#a8c5b5]">
@@ -1221,9 +1282,12 @@ function UnitsTab() {
       
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10">
+          <AlertDialogContent 
+            className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
+            aria-labelledby="delete-unit-dialog-title"
+          >
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-[#84a98c] text-xl font-medium">
+              <AlertDialogTitle id="delete-unit-dialog-title" className="text-[#84a98c] text-xl font-medium">
                 Διαγραφή Μονάδας Μέτρησης
               </AlertDialogTitle>
               <AlertDialogDescription className="text-[#a8c5b5]">
@@ -1250,7 +1314,7 @@ function UnitsTab() {
   );
 }
 
-function DepartmentsTab() {
+function DepartmentsTab({ refreshTrigger }: { refreshTrigger: number }) {
   const { user } = useAuth();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1265,32 +1329,25 @@ function DepartmentsTab() {
     text: string;
   } | null>(null);
 
-  // Set up real-time subscription for departments
-  useRealtimeSubscription(
-    {
-      table: 'departments',
-      event: '*',
-    },
-    (payload) => {
-      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-        fetchDepartments(); // Refresh the list
-      }
-    },
-    []
-  );
+  // Initialize data service for departments
+  const { 
+    fetchAll: fetchAllDepartments,
+    create: createDepartment,
+    update: updateDepartment,
+    remove: removeDepartment
+  } = useDataService<Department>('departments');
 
   // Fetch departments
   const fetchDepartments = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("departments")
-        .select("*")
-        .order("name", { ascending: true });
-
-      if (error) throw error;
       
-      setDepartments(data || []);
+      // Use DataService to fetch departments
+      const departmentsData = await fetchAllDepartments({
+        order: { column: "name", ascending: true }
+      });
+      
+      setDepartments(departmentsData || []);
     } catch (error) {
       console.error("Error fetching departments:", error);
       setFormMessage({
@@ -1302,9 +1359,31 @@ function DepartmentsTab() {
     }
   };
 
-  // Fetch data on component mount
+  // Fetch data on component mount or when refresh trigger changes
   useEffect(() => {
     fetchDepartments();
+  }, [fetchDepartments, refreshTrigger]);
+
+  // Set up real-time subscription using Supabase's built-in capabilities
+  useEffect(() => {
+    const departmentsSubscription = supabase
+      .channel('departments-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'departments'
+        },
+        () => {
+          fetchDepartments(); // Refresh the list
+        }
+      )
+      .subscribe();
+
+    return () => {
+      departmentsSubscription.unsubscribe();
+    };
   }, []);
 
   // Handle form input changes
@@ -1328,15 +1407,13 @@ function DepartmentsTab() {
     
     try {
       if (currentDepartment) {
-        // Update existing department
-        const { error: updateError } = await supabase
-          .from("departments")
-          .update({ name: formData.name })
-          .eq("id", currentDepartment.id);
+        // Update existing department using DataService
+        const updatedDepartment = await updateDepartment(currentDepartment.id, { 
+          name: formData.name 
+        });
           
-        if (updateError) {
-          console.error("Update failed:", updateError);
-          throw updateError;
+        if (!updatedDepartment) {
+          throw new Error("Failed to update department");
         }
         
         setFormMessage({
@@ -1344,14 +1421,14 @@ function DepartmentsTab() {
           text: "Το τμήμα ενημερώθηκε με επιτυχία."
         });
       } else {
-        // Create new department
-        const { error } = await supabase
-          .from("departments")
-          .insert({
-            name: formData.name,
-          });
+        // Create new department using DataService
+        const newDepartment = await createDepartment({
+          name: formData.name,
+        });
 
-        if (error) throw error;
+        if (!newDepartment) {
+          throw new Error("Failed to create department");
+        }
         
         setFormMessage({
           type: "success",
@@ -1401,12 +1478,12 @@ function DepartmentsTab() {
     if (!currentDepartment) return;
     
     try {
-      const { error } = await supabase
-        .from("departments")
-        .delete()
-        .eq("id", currentDepartment.id);
+      // Delete department using DataService
+      const success = await removeDepartment(currentDepartment.id);
 
-      if (error) throw error;
+      if (!success) {
+        throw new Error("Failed to delete department");
+      }
       
       setFormMessage({
         type: "success",
@@ -1471,9 +1548,12 @@ function DepartmentsTab() {
 
         {/* Department Form Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10">
+          <DialogContent 
+            className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
+            aria-labelledby="department-dialog-title"
+          >
             <DialogHeader>
-              <DialogTitle className="text-[#84a98c] text-xl font-medium">
+              <DialogTitle id="department-dialog-title" className="text-[#84a98c] text-xl font-medium">
                 {currentDepartment ? "Επεξεργασία Τμήματος" : "Προσθήκη Τμήματος"}
               </DialogTitle>
               <DialogDescription className="text-[#a8c5b5]">
@@ -1533,9 +1613,12 @@ function DepartmentsTab() {
       
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10">
+          <AlertDialogContent 
+            className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
+            aria-labelledby="delete-department-dialog-title"
+          >
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-[#84a98c] text-xl font-medium">
+              <AlertDialogTitle id="delete-department-dialog-title" className="text-[#84a98c] text-xl font-medium">
                 Διαγραφή Τμήματος
               </AlertDialogTitle>
               <AlertDialogDescription className="text-[#a8c5b5]">

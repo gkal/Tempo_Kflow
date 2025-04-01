@@ -1,8 +1,8 @@
 "use client";
 
 import React from 'react';
-import ReusableCustomersPage from '@/components/customers/ReusableCustomersPage';
+import CustomersPageComponent from '@/components/customers/CustomersPage';
 
 export default function CustomersPage() {
-  return <ReusableCustomersPage />;
+  return <CustomersPageComponent />;
 } 

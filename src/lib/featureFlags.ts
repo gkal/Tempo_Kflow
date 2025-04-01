@@ -28,8 +28,7 @@ export enum FeatureName {
   UpdatedColumnNames = 'useUpdatedColumnNames',
   DebugLogging = 'enableDebugLogging',
   ImprovedOffers = 'useImprovedOffers',
-  EnhancedNotifications = 'useEnhancedNotifications',
-  RealTimeUpdates = 'useRealTimeUpdates'
+  EnhancedNotifications = 'useEnhancedNotifications'
 }
 
 /**
@@ -52,10 +51,6 @@ export const FeatureFlags = {
   // Notification features
   [FeatureName.EnhancedNotifications]: ENV.isDevelopment || 
     getBooleanFlag('VITE_ENABLE_ENHANCED_NOTIFICATIONS'),
-  
-  // Communication features
-  [FeatureName.RealTimeUpdates]: ENV.isDevelopment || 
-    getBooleanFlag('VITE_ENABLE_REAL_TIME_UPDATES'),
   
   // Debugging features
   [FeatureName.DebugLogging]: ENV.isDevelopment || 

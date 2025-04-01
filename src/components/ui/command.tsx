@@ -4,7 +4,7 @@ import { MagnifyingGlassIcon } from "@radix-ui/react-icons"
 import { Command as CommandPrimitive } from "cmdk"
 
 import { cn } from "@/lib/utils"
-import { Dialog, DialogContent, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
@@ -28,8 +28,12 @@ const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
     <Dialog {...props}>
       <DialogContent 
         className="overflow-hidden p-0"
+        aria-labelledby="command-dialog-title"
         aria-describedby="command-dialog-description"
       >
+        <DialogTitle id="command-dialog-title" className="sr-only">
+          Command Menu
+        </DialogTitle>
         <DialogDescription id="command-dialog-description" className="sr-only">
           Command menu for searching and executing commands
         </DialogDescription>

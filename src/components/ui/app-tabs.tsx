@@ -77,7 +77,7 @@ export function AppTabsTrigger({
     <TabsTrigger 
       value={value} 
       className={cn(
-        "px-3 py-1 text-sm text-[#cad2c5] font-normal",
+        "px-3 py-0.5 text-sm text-[#cad2c5] font-normal",
         "data-[state=active]:bg-transparent",
         "border-b-2 border-b-transparent",
         "data-[state=active]:border-b-[#84a98c]",

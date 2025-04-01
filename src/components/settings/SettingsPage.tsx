@@ -8,7 +8,6 @@ import { useAuth } from "@/lib/AuthContext";
 import { checkPermission } from "@/lib/permissions";
 import SimpleUserDialog from "./SimpleUserDialog";
 import './settings-cursor-fix.css'; // Import the CSS fix
-import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 import { toast } from "@/components/ui/use-toast";
 
 export default function SettingsPage() {
@@ -23,20 +22,28 @@ export default function SettingsPage() {
   const isAdmin = user?.role?.toLowerCase() === "admin";
   const isSuperUser = user?.role === "Super User" || user?.role?.toLowerCase() === "super user";
 
-  // Set up real-time subscription for users
-  useRealtimeSubscription(
-    {
-      table: 'users',
-      event: '*',
-    },
-    (payload) => {
-      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-        // Silently update the user list without any notifications
-        fetchUsers();
-      }
-    },
-    []
-  );
+  // Set up real-time subscription for users with Supabase's built-in capabilities
+  useEffect(() => {
+    const subscription = supabase
+      .channel('users-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users'
+        },
+        () => {
+          // Silently update the user list without any notifications
+          fetchUsers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // Add a flag to prevent notifications
   const preventNotifications = true;

@@ -55,14 +55,23 @@ interface SheetContentProps
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
+>(({ side = "right", className, children, ...props }, ref) => {
+  // Generate a unique ID for the title
+  const titleId = React.useId();
+  
+  return (
   <SheetPortal>
     <SheetOverlay />
     <SheetPrimitive.Content
       ref={ref}
       className={cn(sheetVariants({ side }), className)}
+      aria-labelledby={titleId}
       {...props}
     >
+      {/* Add a visually hidden DialogTitle for accessibility */}
+      <SheetPrimitive.Title id={titleId} className="sr-only">
+        Sheet
+      </SheetPrimitive.Title>
       {children}
       <SheetPrimitive.Close asChild>
         <div className="absolute right-4 top-4">
@@ -72,7 +81,7 @@ const SheetContent = React.forwardRef<
       </SheetPrimitive.Close>
     </SheetPrimitive.Content>
   </SheetPortal>
-));
+)});
 SheetContent.displayName = SheetPrimitive.Content.displayName;
 
 const SheetHeader = ({

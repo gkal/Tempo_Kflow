@@ -16,9 +16,23 @@ const RecoveryPage = lazy(() => import("./admin/RecoveryPage"));
 const BackupPage = lazy(() => import("./admin/BackupPage"));
 const ServiceTypesPage = lazy(() => import("./admin/ServiceTypesPage"));
 const TasksPage = lazy(() => import("./tasks/TasksPage"));
+
+/**
+ * CRITICAL: CustomersPage implements real-time subscriptions that update data automatically.
+ * This feature took 10+ hours to implement and ensures that when customer data is created, 
+ * updated, or deleted, all connected users see changes instantly without page refresh.
+ * Only the affected rows are updated in the UI. DO NOT MODIFY this real-time functionality.
+ */
 const CustomersPage = lazy(() => import("./customers/CustomersPage"));
 const CustomerDetailPage = lazy(() => import("./customers/CustomerDetailPage"));
-const OffersPage = lazy(() => import("./offers/improved/CustomerOffersPage"));
+
+/**
+ * CRITICAL: OffersPage implements real-time subscriptions that update data automatically.
+ * This feature took 10+ hours to implement and ensures that when offer data is created,
+ * updated, or deleted, all connected users see changes instantly without page refresh.
+ * Only the affected rows are updated in the UI. DO NOT MODIFY this real-time functionality.
+ */
+const OffersPage = lazy(() => import("./offers/customer_offers/CustomerOffersPage"));
 
 /**
  * Loading spinner component used across lazy-loaded routes
@@ -129,6 +143,12 @@ const Home = () => {
     if (path === "/customers") {
       return (
         <Suspense fallback={<LoadingContent />}>
+          {/* 
+            CRITICAL: This component uses real-time subscriptions for customers data.
+            Changes (create/update/delete) automatically propagate to all connected users
+            without requiring page refresh. Only affected rows are updated.
+            DO NOT modify this functionality - it took 10+ hours to implement correctly.
+          */}
           <CustomersPage />
         </Suspense>
       );
@@ -165,6 +185,12 @@ const Home = () => {
     if (path === "/offers") {
       return (
         <Suspense fallback={<LoadingContent />}>
+          {/* 
+            CRITICAL: This component uses real-time subscriptions for offers data.
+            Changes (create/update/delete) automatically propagate to all connected users
+            without requiring page refresh. Only affected rows are updated.
+            DO NOT modify this functionality - it took 10+ hours to implement correctly.
+          */}
           <OffersPage />
         </Suspense>
       );

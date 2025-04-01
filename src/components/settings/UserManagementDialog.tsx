@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useDataService } from "@/hooks/useDataService";
 
 interface UserManagementDialogProps {
   open: boolean;
@@ -53,6 +54,16 @@ export default function UserManagementDialog({
   const [success, setSuccess] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  // Initialize data services
+  const { 
+    fetchAll: fetchAllDepartments
+  } = useDataService<any>('departments');
+  
+  const {
+    update: updateUser,
+    create: createUser
+  } = useDataService<any>('users');
+
   useEffect(() => {
     fetchDepartments();
   }, []);
@@ -86,8 +97,11 @@ export default function UserManagementDialog({
   }, [user]);
 
   const fetchDepartments = async () => {
-    const { data } = await supabase.from("departments").select("id, name");
-    setDepartments(data || []);
+    // Use DataService to fetch departments
+    const departments = await fetchAllDepartments({
+      select: "id, name"
+    });
+    setDepartments(departments || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -146,47 +160,27 @@ export default function UserManagementDialog({
           }
         }
 
-        const { error: updateError } = await supabase
-          .from("users")
-          .update(updateData)
-          .eq("id", user.id);
-
-        if (updateError) {
-          if (
-            updateError.code === "23505" &&
-            updateError.message.includes("users_username_key")
-          ) {
-            throw new Error(
-              "Το όνομα χρήστη χρησιμοποιείται ήδη. Παρακαλώ επιλέξτε διαφορετικό.",
-            );
-          }
-          throw updateError;
+        // Use DataService to update user
+        const updatedUser = await updateUser(user.id, updateData);
+        
+        if (!updatedUser) {
+          throw new Error("Failed to update user");
         }
       } else {
-        // Create new user
-        const { error: createError } = await supabase
-          .from("users")
-          .insert([{
-            username: formData.username,
-            password: formData.password,
-            fullname: formData.fullname,
-            email: formData.email,
-            phone: formData.phone,
-            department_id: formData.department_id,
-            role: formData.role as any,
-            status: formData.status,
-          }]);
-
-        if (createError) {
-          if (
-            createError.code === "23505" &&
-            createError.message.includes("users_username_key")
-          ) {
-            throw new Error(
-              "Το όνομα χρήστη χρησιμοποιείται ήδη. Παρακαλώ επιλέξτε διαφορετικό.",
-            );
-          }
-          throw createError;
+        // Create new user with DataService
+        const newUser = await createUser({
+          username: formData.username,
+          password: formData.password,
+          fullname: formData.fullname,
+          email: formData.email,
+          phone: formData.phone,
+          department_id: formData.department_id,
+          role: formData.role as any,
+          status: formData.status,
+        });
+        
+        if (!newUser) {
+          throw new Error("Failed to create user");
         }
       }
 

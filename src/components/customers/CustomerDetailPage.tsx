@@ -39,10 +39,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import OffersTable, { OffersTableRef } from "./OffersTable";
-import { openNewOfferDialog, openEditOfferDialog } from './OfferDialogManager';
+import OffersTable, { OffersTableRef } from "@/components/offers/main_offers_form/OffersTable";
+import { openNewOfferDialog, openEditOfferDialog } from '@/components/offers/main_offers_form/OfferDialogManager';
 import { CustomerDialog } from "./CustomerDialog";
-import { useRealtimeSubscription } from "@/lib/useRealtimeSubscription";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
@@ -88,87 +87,116 @@ export default function CustomerDetailPage() {
   const savingRef = useRef(false);
   const offersTableRef = useRef<OffersTableRef>(null);
 
-  // Set up real-time subscription for customer data
-  useRealtimeSubscription(
-    {
-      table: 'customers',
-      filter: `id=eq.${id}`,
-      event: '*',
-    },
-    (payload) => {
-      if (payload.eventType === 'UPDATE' && payload.new) {
-        setCustomer(payload.new);
-      } else if (payload.eventType === 'DELETE') {
-        navigate('/customers');
-      }
-    },
-    [id, navigate]
-  );
-
-  // Set up real-time subscription for contacts
-  useRealtimeSubscription(
-    {
-      table: 'contacts',
-      filter: `customer_id=eq.${id}`,
-      event: '*',
-    },
-    (payload) => {
-      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-        fetchContacts();
-      }
-    },
-    [id]
-  );
-
-  // Set up real-time subscription for offers
-  useRealtimeSubscription(
-    {
-      table: 'offers',
-      filter: `customer_id=eq.${id}`,
-      event: '*',
-    },
-    (payload) => {
-      if (payload.eventType === 'INSERT') {
-        // Only add the new offer if it's not soft-deleted
-        if (payload.new && !payload.new.deleted_at) {
-          setRecentOffers(prev => [payload.new, ...prev]);
-        } else {
-          fetchRecentOffers();
-        }
-      } else if (payload.eventType === 'UPDATE') {
-        // Update the offer in the list only if it's not soft-deleted
-        if (payload.new) {
-          if (payload.new.deleted_at) {
-            // If the offer was soft-deleted, remove it from the list
-            setRecentOffers(prev => 
-              prev.filter(offer => offer.id !== payload.new.id)
-            );
-          } else {
-            // Update the offer in the list if it's not deleted
-            setRecentOffers(prev => 
-              prev.map(offer => 
-                offer.id === payload.new.id ? payload.new : offer
-              )
-            );
-          }
-        } else {
-          fetchRecentOffers();
-        }
-      } else if (payload.eventType === 'DELETE') {
-        // Remove the offer from the list
-        if (payload.old && payload.old.id) {
-          setRecentOffers(prev => 
-            prev.filter(offer => offer.id !== payload.old.id)
-          );
-        } else {
-          fetchRecentOffers();
-        }
-      }
-    },
-    [id]
-  );
-
+  // Set up real-time subscriptions using Supabase's built-in capabilities
   useEffect(() => {
+    if (!id) return;
+    
+    // Customer data subscription
+    const customerSubscription = supabase
+      .channel('customer-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'customers',
+          filter: `id=eq.${id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            setCustomer(payload.new);
+          } else if (payload.eventType === 'DELETE') {
+            navigate('/customers');
+          }
+        }
+      )
+      .subscribe();
+      
+    // Contacts subscription
+    const contactsSubscription = supabase
+      .channel('contacts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contacts',
+          filter: `customer_id=eq.${id}`
+        },
+        () => {
+          fetchContacts();
+        }
+      )
+      .subscribe();
+      
+    // Offers subscription
+    const offersSubscription = supabase
+      .channel('offers-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'offers',
+          filter: `customer_id=eq.${id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            // Only add the new offer if it's not soft-deleted
+            if (payload.new && !payload.new.deleted_at) {
+              setRecentOffers(prev => [payload.new, ...prev]);
+            } else {
+              fetchRecentOffers();
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            // Update the offer in the list only if it's not soft-deleted
+            if (payload.new) {
+              if (payload.new.deleted_at) {
+                // If the offer was soft-deleted, remove it from the list
+                setRecentOffers(prev => 
+                  prev.filter(offer => offer.id !== payload.new.id)
+                );
+              } else {
+                // Update the offer in the list if it's not deleted
+                setRecentOffers(prev => 
+                  prev.map(offer => 
+                    offer.id === payload.new.id ? payload.new : offer
+                  )
+                );
+              }
+            } else {
+              fetchRecentOffers();
+            }
+          } else if (payload.eventType === 'DELETE') {
+            // Remove the offer from the list
+            if (payload.old && payload.old.id) {
+              setRecentOffers(prev => 
+                prev.filter(offer => offer.id !== payload.old.id)
+              );
+            } else {
+              fetchRecentOffers();
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      customerSubscription.unsubscribe();
+      contactsSubscription.unsubscribe();
+      offersSubscription.unsubscribe();
+    };
+  }, [id, navigate]);
+
+  // Initial data loading
+  useEffect(() => {
+    if (id === "new") {
+      // This is a new customer, show the form directly
+      setShowCustomerForm(true);
+      setLoading(false);
+      return;
+    } 
+    
     if (id) {
       const loadData = async () => {
         await fetchCustomerData();
@@ -176,6 +204,8 @@ export default function CustomerDetailPage() {
         await fetchRecentOffers();
       };
       loadData();
+    } else {
+      setLoading(false);
     }
   }, [id]);
 
@@ -623,29 +653,14 @@ export default function CustomerDetailPage() {
     );
   }
 
-  if (!customer) {
-    return (
-      <div className="p-8 text-center text-[#cad2c5]">
-        <h2 className="text-xl">Ο πελάτης δεν βρέθηκε</h2>
-        <Button
-          onClick={() => navigate("/customers")}
-          className="mt-4 bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Επιστροφή
-        </Button>
-      </div>
-    );
-  }
-
-  // If showing the form, render it instead of the customer details
-  if (showCustomerForm) {
+  // If this is a new customer, render just the form with minimal chrome
+  if (id === "new") {
     return (
       <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between mb-4 p-4 bg-[#354f52] border-b border-[#52796f]">
+        <div className="flex items-center justify-between mb-2 p-2 bg-[#354f52] border-b border-[#52796f]">
           <div className="flex items-center">
             <h1 className="text-xl font-bold text-[#a8c5b5]">
-              Επεξεργασία {customer.company_name}
+              Νέος Πελάτης
             </h1>
           </div>
           <div className="flex items-center space-x-4">
@@ -661,6 +676,55 @@ export default function CustomerDetailPage() {
               Αποθήκευση
             </Button>
             <CloseButton size="md" onClick={() => {
+              // For new customer, go back to customers list
+              navigate("/customers");
+            }} />
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto p-1">
+          <CustomerForm
+            customerId={undefined}
+            onSave={(newCustomerId) => {
+              if (newCustomerId) {
+                // For new customer, navigate to the new customer detail page
+                navigate(`/customers/${newCustomerId}`);
+              }
+            }}
+            onCancel={() => {
+              // For new customer, go back to customers list
+              navigate("/customers");
+            }}
+            onValidityChange={setFormValid}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // For editing an existing customer
+  if (showCustomerForm) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex items-center justify-between mb-4 p-4 bg-[#354f52] border-b border-[#52796f]">
+          <div className="flex items-center">
+            <h1 className="text-xl font-bold text-[#a8c5b5]">
+              Επεξεργασία {customer?.company_name}
+            </h1>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Button
+              onClick={() => {
+                // Trigger the save action in the form
+                document.getElementById('save-customer-form')?.click();
+              }}
+              disabled={!formValid}
+              className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Αποθήκευση
+            </Button>
+            <CloseButton size="md" onClick={() => {
+              // For existing customer, fetch data and hide form
               fetchCustomerData();
               fetchContacts();
               setShowCustomerForm(false);
@@ -671,11 +735,13 @@ export default function CustomerDetailPage() {
           <CustomerForm
             customerId={id}
             onSave={() => {
+              // For existing customer, fetch data and hide form
               fetchCustomerData();
               fetchContacts();
               setShowCustomerForm(false);
             }}
             onCancel={() => {
+              // For existing customer, fetch data and hide form
               fetchCustomerData();
               fetchContacts();
               setShowCustomerForm(false);
@@ -683,6 +749,21 @@ export default function CustomerDetailPage() {
             onValidityChange={setFormValid}
           />
         </div>
+      </div>
+    );
+  }
+
+  if (!customer) {
+    return (
+      <div className="p-8 text-center text-[#cad2c5]">
+        <h2 className="text-xl">Ο πελάτης δεν βρέθηκε</h2>
+        <Button
+          onClick={() => navigate("/customers")}
+          className="mt-4 bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Επιστροφή
+        </Button>
       </div>
     );
   }

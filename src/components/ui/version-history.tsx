@@ -21,10 +21,11 @@ export function VersionHistory({ open, onOpenChange }: VersionHistoryProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         className="bg-[#2f3e46] border-[#52796f] text-[#cad2c5] max-w-2xl"
+        aria-labelledby="version-history-title"
         aria-describedby="version-history-description"
       >
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-[#cad2c5] flex items-center justify-between">
+          <DialogTitle id="version-history-title" className="text-xl font-bold text-[#cad2c5] flex items-center justify-between">
             <span>Ιστορικό Εκδόσεων</span>
             <DialogClose asChild>
               <Button

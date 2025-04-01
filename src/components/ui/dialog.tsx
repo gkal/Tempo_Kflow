@@ -1,5 +1,6 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 import { cn } from "@/lib/utils";
 import { CloseButton } from "@/components/ui/close-button";
@@ -50,11 +51,98 @@ export function useDialogState(defaultOpen = false) {
   };
 }
 
-// Common z-index values for consistent layering
-const Z_INDICES = {
-  overlay: 1000,
-  content: 1001,
-};
+/**
+ * Dialog overlay component with backdrop styling
+ */
+const DialogOverlay = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
+>(({ className, style, ...props }, ref) => (
+  <DialogPrimitive.Overlay
+    ref={ref}
+    className={cn(
+      "fixed inset-0 z-50 bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      className
+    )}
+    {...props}
+  />
+));
+DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+
+/**
+ * Dialog content component with styling and accessibility enhancements
+ */
+const DialogContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    showCloseButton?: boolean;
+    onCloseClick?: () => void;
+  }
+>(({ 
+  className, 
+  children, 
+  style, 
+  showCloseButton = true, 
+  onCloseClick,
+  ...props 
+}, ref) => {
+  const descriptionId = React.useId();
+  const titleId = React.useId();
+  const ariaDescribedBy = props['aria-describedby'] || descriptionId;
+  const ariaLabelledBy = props['aria-labelledby'] || titleId;
+  
+  const hasDialogTitle = React.Children.toArray(children).some(
+    child => React.isValidElement(child) && 
+    (
+      child.type === DialogTitle ||
+      (child.type === DialogHeader && 
+       React.Children.toArray(child.props.children).some(
+         headerChild => React.isValidElement(headerChild) && headerChild.type === DialogTitle
+       ))
+    )
+  );
+  
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg",
+          "max-h-[90vh] overflow-y-auto",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
+          "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+          className
+        )}
+        style={{
+          overflowX: 'hidden'
+        }}
+        {...props}
+      >
+        {!hasDialogTitle && (
+          <VisuallyHidden asChild>
+            <DialogTitle id={titleId}>Dialog</DialogTitle>
+          </VisuallyHidden>
+        )}
+        {children}
+        <div id={descriptionId} style={{ display: 'none' }} aria-hidden="true">
+          Dialog content
+        </div>
+        {showCloseButton && (
+          <DialogPrimitive.Close asChild>
+            <div className="absolute right-4 top-4 z-[51]">
+              <CloseButton onClick={onCloseClick || (() => {})} />
+            </div>
+          </DialogPrimitive.Close>
+        )}
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  );
+});
+DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 /**
  * Dialog root component
@@ -75,105 +163,6 @@ const DialogPortal = DialogPrimitive.Portal;
  * Dialog close component
  */
 const DialogClose = DialogPrimitive.Close;
-
-/**
- * Dialog overlay component with backdrop styling
- */
-const DialogOverlay = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, style, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      "fixed inset-0 bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className
-    )}
-    style={{
-      ...style,
-      zIndex: Z_INDICES.overlay // Much higher z-index for overlay to handle nested dialogs
-    }}
-    {...props}
-  />
-));
-DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
-
-// Content animation classes for consistent animation effects
-const CONTENT_ANIMATION_CLASSES = `
-  duration-200 
-  data-[state=open]:animate-in data-[state=closed]:animate-out 
-  data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 
-  data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 
-  data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] 
-  data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]
-`;
-
-/**
- * Dialog content component with styling and accessibility enhancements
- */
-const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
-    /**
-     * Whether to show the close button
-     * @default true
-     */
-    showCloseButton?: boolean;
-    /**
-     * Handler for when the close button is clicked
-     */
-    onCloseClick?: () => void;
-  }
->(({ 
-  className, 
-  children, 
-  style, 
-  showCloseButton = true, 
-  onCloseClick,
-  ...props 
-}, ref) => {
-  // Generate a unique ID for the description if aria-describedby is not provided
-  const descriptionId = React.useId();
-  const ariaDescribedBy = props['aria-describedby'] || descriptionId;
-  
-  return (
-    <DialogPortal>
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(
-          "fixed left-[50%] top-[50%] -translate-x-[50%] -translate-y-[50%] grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
-          "max-h-[90vh] overflow-hidden",
-          CONTENT_ANIMATION_CLASSES,
-          className
-        )}
-        style={{
-          ...style,
-          zIndex: Z_INDICES.content, // Higher than overlay for nested dialogs
-          height: style?.height || 'auto',
-          margin: 'auto'
-        }}
-        aria-describedby={ariaDescribedBy}
-        aria-modal="true"
-        role="dialog"
-        {...props}
-      >
-        {children}
-        <div id={descriptionId} style={{ display: 'none' }} aria-hidden="true">
-          Dialog content
-        </div>
-        {showCloseButton && (
-          <DialogPrimitive.Close asChild>
-            <div className="absolute right-4 top-4" style={{ zIndex: 9999, pointerEvents: 'auto' }}>
-              <CloseButton onClick={onCloseClick || (() => {})} />
-            </div>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
-    </DialogPortal>
-  );
-});
-DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 /**
  * Dialog header component for title and description layout

@@ -26,11 +26,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { AccessibleAlertDialogContent } from "@/components/ui/DialogUtilities";
 import { usePhoneFormat } from "@/hooks/usePhoneFormat";
 import { validateRequired, validateEmail, validatePhone, validateMultiple } from "../../utils/validationUtils";
 import { useMountEffect } from "../../hooks/useMountEffect";
 import { createPrefixedLogger, logDebug, logError, logInfo, logWarning } from "@/utils/loggingUtils";
 import { useLoading } from '@/lib/LoadingContext';
+import { useDataService } from "@/hooks/useDataService";
 
 // Map of normalized customer types that match the database constraint
 const CUSTOMER_TYPE_MAP = {
@@ -170,6 +172,21 @@ const CustomerForm = ({
   // Create a logger for this component
   const logger = createPrefixedLogger('CustomerForm');
 
+  // Initialize the data services
+  const { 
+    data: customerData, 
+    getById: getCustomerById, 
+    create: createCustomer,
+    update: updateCustomer
+  } = useDataService<any>('customers');
+  
+  const {
+    data: contactsData,
+    fetchAll: fetchAllContacts,
+    update: updateContact,
+    softDelete: softDeleteContact
+  } = useDataService<any>('contacts');
+
   // Fetch customer data if editing
   useEffect(() => {
     if (customerId) {
@@ -181,34 +198,30 @@ const CustomerForm = ({
   const fetchCustomerData = async () => {
     try {
       showLoading();
-      const { data, error } = await supabase
-        .from("customers")
-        .select(
-          `*, created_by:users!created_by(fullname), modified_by:users!modified_by(fullname)`,
-        )
-        .eq("id", customerId)
-        .single();
+      
+      // Use DataService instead of direct supabase call
+      const customer = await getCustomerById(customerId, {
+        select: "*, created_by:users!created_by(fullname), modified_by:users!modified_by(fullname)"
+      });
 
-      if (error) throw error;
-
-      if (data) {
+      if (customer) {
         setFormData({
-          company_name: data.company_name || "",
-          afm: data.afm || "",
-          doy: data.doy || "",
-          customer_type: CUSTOMER_TYPE_MAP[data.customer_type] || data.customer_type || "Εταιρεία",
-          address: data.address || "",
-          postal_code: data.postal_code || "",
-          town: data.town || "",
-          telephone: data.telephone || "",
-          email: data.email || "",
-          webpage: data.webpage || "",
-          fax_number: data.fax_number || "",
-          notes: data.notes || "",
-          primary_contact_id: data.primary_contact_id || "",
+          company_name: customer.company_name || "",
+          afm: customer.afm || "",
+          doy: customer.doy || "",
+          customer_type: CUSTOMER_TYPE_MAP[customer.customer_type] || customer.customer_type || "Εταιρεία",
+          address: customer.address || "",
+          postal_code: customer.postal_code || "",
+          town: customer.town || "",
+          telephone: customer.telephone || "",
+          email: customer.email || "",
+          webpage: customer.webpage || "",
+          fax_number: customer.fax_number || "",
+          notes: customer.notes || "",
+          primary_contact_id: customer.primary_contact_id || "",
         });
         // Update phone value in the custom hook
-        setPhone(data.telephone || "");
+        setPhone(customer.telephone || "");
       }
     } catch (error) {
       console.error("Error fetching customer:", error);
@@ -220,56 +233,41 @@ const CustomerForm = ({
 
   const fetchContacts = async () => {
     try {
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .eq("customer_id", customerId)
-        .eq("status", "active")
-        .is("deleted_at", null);
+      // Use DataService instead of direct supabase call
+      const contacts = await fetchAllContacts({
+        filters: {
+          customer_id: customerId,
+          status: "active",
+          deleted_at: null
+        }
+      });
 
-      if (error) throw error;
-      setContacts(data || []);
+      setContacts(contacts || []);
 
-      // Get the customer's primary contact ID
-      const { data: customerData } = await supabase
-        .from("customers")
-        .select("primary_contact_id")
-        .eq("id", customerId)
-        .single();
-
+      // Get the customer's primary contact ID from the already fetched customer data
       if (customerData && customerData.primary_contact_id) {
         setFormData((prev) => ({
           ...prev,
           primary_contact_id: customerData.primary_contact_id,
         }));
-      } else if (data && data.length > 0) {
+      } else if (contacts && contacts.length > 0) {
         // If no primary contact is set but contacts exist, set the first one as primary
-        await setPrimaryContact(data[0].id);
+        await setPrimaryContact(contacts[0].id);
       }
     } catch (error) {
       console.error("Error fetching contacts:", error);
     }
   };
 
-  // Primary contact management
   const setPrimaryContact = async (contactId: string) => {
-    if (!customerId) return;
-
     try {
-      // Update customer with primary contact
-      const { error } = await supabase
-        .from("customers")
-        .update({
-          primary_contact_id: contactId,
-          modified_by: user?.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", customerId);
-
-      if (error) throw error;
-
-      // Refresh contacts to show updated primary status
-      await fetchContacts();
+      // Use DataService instead of direct supabase call
+      await updateCustomer(customerId, { primary_contact_id: contactId });
+      
+      setFormData((prev) => ({
+        ...prev,
+        primary_contact_id: contactId,
+      }));
     } catch (error) {
       console.error("Error setting primary contact:", error);
     }
@@ -359,49 +357,37 @@ const CustomerForm = ({
       
       // If customerId is provided, update existing customer
       if (customerId) {
-        const { data, error } = await supabase
-          .from("customers")
-          .update(submissionData)
-          .eq("id", customerId)
-          .select();
+        // Use DataService instead of direct supabase call
+        const updatedCustomer = await updateCustomer(customerId, submissionData);
         
-        if (error) {
-          console.error('Update failed with error:', error);
-          throw error;
+        if (updatedCustomer) {
+          setSuccess(true);
+          
+          if (onSave) {
+            onSave(customerId, formData.company_name);
+          }
+          
+          // Dispatch a success event that other components can listen for
+          dispatchEvent(new CustomEvent("customer-form-success"));
         }
-        
-        setSuccess(true);
-        
-        if (onSave) {
-          onSave(customerId, formData.company_name);
-        }
-        
-        // Dispatch a success event that other components can listen for
-        dispatchEvent(new CustomEvent("customer-form-success"));
       } else {
-        // Create new customer
-        const { data: customerData, error } = await createNewCustomer(submissionData);
+        // Create new customer using DataService
+        const newCustomer = await createCustomer(submissionData);
         
-        if (error) {
-          throw error;
+        if (newCustomer) {
+          setSuccess(true);
+          
+          // Get the ID of the newly created customer
+          const newCustomerId = newCustomer.id;
+          
+          // Call onSave callback if provided
+          if (onSave) {
+            onSave(newCustomerId, formData.company_name);
+          }
+          
+          // Dispatch a success event
+          dispatchEvent(new CustomEvent("customer-form-success"));
         }
-        
-        setSuccess(true);
-        
-        // Get the ID of the newly created customer
-        let newCustomerId = null;
-        
-        if (customerData && customerData.length > 0) {
-          newCustomerId = customerData[0].id;
-        }
-        
-        // Call onSave callback if provided
-        if (onSave) {
-          onSave(newCustomerId, formData.company_name);
-        }
-        
-        // Dispatch a success event
-        dispatchEvent(new CustomEvent("customer-form-success"));
       }
       
       // Reset temporary customer type
@@ -464,12 +450,7 @@ const CustomerForm = ({
       // Check if this is the primary contact
       if (contactToDelete.id === formData.primary_contact_id) {
         // Update customer to remove primary contact reference
-        const { error: customerError } = await supabase
-          .from("customers")
-          .update({ primary_contact_id: null })
-          .eq("id", customerId);
-          
-        if (customerError) throw customerError;
+        await updateCustomer(customerId, { primary_contact_id: null });
         
         // Also update local form data
         setFormData(prev => ({
@@ -478,13 +459,8 @@ const CustomerForm = ({
         }));
       }
       
-      // Delete the contact (or mark as inactive)
-      const { error } = await supabase
-        .from("contacts")
-        .update({ status: "inactive" })
-        .eq("id", contactToDelete.id);
-        
-      if (error) throw error;
+      // Delete the contact using DataService soft delete
+      await softDeleteContact(contactToDelete.id);
       
       // Show success state
       setIsDeleteSuccessful(true);
@@ -560,15 +536,14 @@ const CustomerForm = ({
     }
   };
 
-  // Create new customer with fallback for field errors
+  // Create new customer with fallback for field errors - Replacing this function with DataService
   async function createNewCustomer(data: CustomerFormSubmissionData) {
     try {
-      // First attempt with minimal fields to avoid schema issues
+      // Use the DataService to create a new customer
       const basicCustomerData = {
         company_name: data.company_name,
         telephone: data.telephone,
         customer_type: data.customer_type,
-        created_at: new Date().toISOString(),
         // Include these only if they have values
         ...(data.afm ? { afm: data.afm } : {}),
         ...(data.doy ? { doy: data.doy } : {}),
@@ -581,16 +556,13 @@ const CustomerForm = ({
         ...(data.notes ? { notes: data.notes } : {})
       };
       
-      const { data: responseData, error } = await supabase
-        .from("customers")
-        .insert(basicCustomerData)
-        .select();
+      const newCustomer = await createCustomer(basicCustomerData);
         
-      if (error) {
-        throw error;
+      if (newCustomer) {
+        return { data: [newCustomer], error: null };
       }
       
-      return { data: responseData, error: null };
+      throw new Error("Failed to create customer");
     } catch (insertError) {
       console.error('Customer creation failed:', insertError);
       
@@ -603,16 +575,13 @@ const CustomerForm = ({
           customer_type: "Εταιρεία"
         };
         
-        const { data: retryData, error } = await supabase
-          .from("customers")
-          .insert(minimalFields)
-          .select();
+        const newCustomer = await createCustomer(minimalFields);
           
-        if (error) {
-          throw error;
+        if (newCustomer) {
+          return { data: [newCustomer], error: null };
         }
         
-        return { data: retryData, error: null };
+        throw new Error("Failed to create customer with minimal fields");
       } catch (retryError) {
         console.error('All attempts failed:', retryError);
         return { data: null, error: retryError };
@@ -746,6 +715,8 @@ const CustomerForm = ({
                         }));
                       }}
                       placeholder="Επιλέξτε τύπο πελάτη"
+                      formContext={true}
+                      disabled={viewOnly}
                     />
                   </div>
                 </div>
@@ -915,80 +886,53 @@ const CustomerForm = ({
         {/* Delete Confirmation Dialog */}
         <AlertDialog 
           open={showDeleteDialog} 
-          onOpenChange={(open) => {
-            // Prevent closing the dialog while deleting
-            if (!isDeleting && !open) {
-              handleDeleteDialogClose(open);
-            }
-          }}
+          onOpenChange={handleDeleteDialogClose}
         >
-          <AlertDialogContent className="bg-[#2f3e46] border-[#52796f] text-white">
+          <AlertDialogContent 
+            aria-labelledby="delete-dialog-title" 
+            aria-describedby="delete-contact-description"
+            className="bg-[#2f3e46] border-[#52796f] text-white"
+          >
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-[#cad2c5]">
-                {isDeleteSuccessful 
-                  ? "Επιτυχής Διαγραφή" 
-                  : "Διαγραφή Επαφής"
-                }
+              <AlertDialogTitle id="delete-dialog-title" className="text-[#cad2c5]">
+                {`${isDeleting ? "Διαγραφή" : "Επεξεργασία"} Επαφής`}
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-[#84a98c]">
+              <AlertDialogDescription 
+                id="delete-contact-description" 
+                className="text-[#84a98c]"
+              >
                 {isDeleting ? (
-                  <div className="flex flex-col items-center justify-center space-y-3 py-3">
-                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#52796f] border-t-transparent"></div>
-                    <p className="text-[#cad2c5]">Η διαγραφή βρίσκεται σε εξέλιξη. Παρακαλώ περιμένετε...</p>
-                    <p className="text-sm text-[#84a98c]">Αυτή η διαδικασία μπορεί να διαρκέσει μερικά δευτερόλεπτα.</p>
-                  </div>
-                ) : isDeleteSuccessful ? (
-                  <div className="flex flex-col items-center justify-center space-y-3 py-3">
-                    <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <p className="text-center text-green-500 font-medium">
-                      Η επαφή διαγράφηκε με επιτυχία!
-                    </p>
-                  </div>
+                  <>
+                    Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την επαφή;
+                    <br />
+                    <span className="text-red-400">
+                      Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.
+                    </span>
+                  </>
                 ) : (
-                  "Είστε βέβαιοι ότι θέλετε να διαγράψετε αυτή την επαφή; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί."
+                  "Θέλετε να αποθηκεύσετε τις αλλαγές σε αυτή την επαφή;"
                 )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-4">
-              {isDeleteSuccessful ? (
-                <Button 
+              <div className="flex justify-end gap-2">
+                <AlertDialogCancel 
                   onClick={() => handleDeleteDialogClose(false)}
-                  className="bg-[#52796f] hover:bg-[#52796f]/90 text-white"
+                  className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5]"
                 >
-                  OK
-                </Button>
-              ) : (
-                <>
-                  <AlertDialogCancel 
-                    className="bg-transparent border border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-white" 
-                    disabled={isDeleting}
-                  >
-                    Άκυρο
-                  </AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={(e) => {
-                      e.preventDefault(); // Prevent default to handle manually
-                      handleDeleteContact();
-                    }}
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Διαγραφή...
-                      </>
-                    ) : "Διαγραφή"}
-                  </AlertDialogAction>
-                </>
-              )}
+                  Άκυρο
+                </AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleDeleteContact}
+                  className={`${
+                    isDeleting 
+                      ? "bg-red-600 hover:bg-red-700" 
+                      : "bg-[#52796f] hover:bg-[#354f52]"
+                  } text-white`}
+                >
+                  {isDeleting ? "Διαγραφή" : "Αποθήκευση"}
+                </AlertDialogAction>
+              </div>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -1014,4 +958,3 @@ const CustomerForm = ({
 };
 
 export default CustomerForm;
-

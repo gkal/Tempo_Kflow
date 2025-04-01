@@ -9,7 +9,7 @@ import { VersionHistory } from "@/components/ui/version-history";
 import { useFormContext } from "@/lib/FormContext";
 import { NotificationPanel } from "@/components/ui/NotificationPanel";
 import { supabase } from "@/lib/supabaseClient";
-import { notificationEvents } from "@/lib/notificationEvents";
+import { toast } from "@/components/ui/use-toast";
 
 const getPageTitle = (pathname: string) => {
   switch (pathname) {
@@ -69,23 +69,45 @@ export default function TopBar() {
 
     // Fetch initial unread count
     fetchUnreadCount();
+  }, [user]);
 
-    // Subscribe to notification events
-    const unsubscribeNew = notificationEvents.addEventListener('new-notification', (data) => {
-      if (data.userId === user.id) {
-        setUnreadCount(prev => prev + 1);
-      }
-    });
-
-    const unsubscribeRead = notificationEvents.addEventListener('notification-read', (data) => {
-      if (data.userId === user.id) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-    });
+  // Subscribe to real-time updates for notifications table
+  useEffect(() => {
+    if (!user) return;
+    
+    // Set up real-time listener for notification table with Supabase's built-in channel capability
+    const notificationsSubscription = supabase
+      .channel('notifications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT' && payload.new && !payload.new.read) {
+            setUnreadCount(prev => prev + 1);
+            
+            // Show toast notification for important events
+            if (payload.new.type === 'task' || payload.new.type === 'system') {
+              toast({
+                title: 'Νέα ειδοποίηση',
+                description: payload.new.message,
+                duration: 5000,
+              });
+            }
+          } else if (payload.eventType === 'UPDATE' && payload.new && payload.new.read) {
+            // Decrease count when a notification is marked as read
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
-      unsubscribeNew();
-      unsubscribeRead();
+      notificationsSubscription.unsubscribe();
     };
   }, [user]);
 

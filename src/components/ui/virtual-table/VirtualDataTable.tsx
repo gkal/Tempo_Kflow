@@ -483,6 +483,15 @@ export function VirtualDataTable<T extends Record<string, any>>({
   
   // Handle row click
   const handleRowClick = useCallback((e: React.MouseEvent, row: T) => {
+    // Check if there's an open context menu
+    const isContextMenu = (e.target as HTMLElement).closest('.dropdown-menu');
+    if (isContextMenu) {
+      // If this row was clicked while a context menu was open, don't proceed with the row click
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    
     if (onRowClick) {
       e.preventDefault();
       onRowClick(row);
@@ -745,7 +754,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
       
       {/* Table */}
       <div className="border border-[#52796f] bg-[#2f3e46]">
-        <div className="overflow-auto relative" ref={parentRef} style={{ height: '65vh' }}>
+        <div className="overflow-auto relative" ref={parentRef} style={{ height: '60vh' }}>
           {isDragging && (
             <div className="absolute inset-0 bg-[#354f52]/30 pointer-events-none z-10" />
           )}
@@ -862,7 +871,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
                   </td>
                 </tr>
               ) : filteredData.length === 0 ? (
-                <tr style={{ height: 'calc(65vh - 100px)' }}>
+                <tr style={{ height: 'calc(60vh - 100px)' }}>
                   <td 
                     colSpan={tableColumns.length} 
                     className="text-center"
@@ -893,6 +902,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
                           isExpanded && "bg-[#354f52]/30 sticky top-0 z-10"
                         )}
                         onClick={e => onRowClick && handleRowClick(e, rowData)}
+                        data-customer-id={rowId}
                       >
                         {row.getVisibleCells().map((cell, cellIndex) => {
                           // Safe access to meta with type assertion
@@ -918,7 +928,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
                       
                       {/* Expanded content */}
                       {isExpanded && renderExpandedContent && (
-                        <tr className="bg-[#2f3e46]">
+                        <tr className="bg-[#2f3e46]" data-customer-id={rowId}>
                           <td colSpan={tableColumns.length} className="px-0 py-0">
                             <div className="relative">
                               {renderExpandedContent(rowData)}

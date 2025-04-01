@@ -12,9 +12,11 @@ import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
-  useTooltip,
-  RadixTooltip as CustomTooltip,
-  SimpleTooltip as OriginalSimpleTooltip
+  TooltipPortal,
+  TooltipArrow,
+  GlobalTooltip,
+  SafeTooltip,
+  TruncateWithTooltip
 } from "./GlobalTooltip";
 
 // Log deprecation warning when this module is imported
@@ -28,28 +30,17 @@ import {
   }
 })();
 
-// Create a wrapped SimpleTooltip that logs deprecation warnings
-const SimpleTooltip = (props: Parameters<typeof OriginalSimpleTooltip>[0]) => {
-  React.useEffect(() => {
-    logDeprecationWarning(
-      'SimpleTooltip',
-      'Please use SimpleTooltip from @/components/ui/GlobalTooltip instead.'
-    );
-  }, []);
-  
-  return <OriginalSimpleTooltip {...props} />;
-};
-
 // Re-export for backward compatibility
 export {
   TooltipProvider,
   Tooltip,
   TooltipTrigger,
   TooltipContent,
-  useTooltip,
-  CustomTooltip,
-  SimpleTooltip
+  TooltipPortal,
+  TooltipArrow,
+  GlobalTooltip as RadixTooltip,
+  SafeTooltip as SimpleTooltip
 };
 
 // Default export for backward compatibility
-export default CustomTooltip;
+export default GlobalTooltip;

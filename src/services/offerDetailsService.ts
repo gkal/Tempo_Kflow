@@ -170,38 +170,25 @@ export const updateOfferDetail = async (
 };
 
 /**
- * Delete an offer detail
+ * Delete an offer detail using soft delete
  * 
- * @param detailId - The ID of the detail to delete
- * @returns Promise that resolves when the detail is deleted
+ * @param detailId - The ID of the detail to soft delete
+ * @param userId - Optional user ID performing the deletion
+ * @returns Promise that resolves when the detail is soft deleted
  * @usedIn src/components/offers/OfferDetailsTab.tsx
  */
-export const deleteOfferDetail = async (detailId: string): Promise<void> => {
+export const deleteOfferDetail = async (detailId: string, userId?: string): Promise<void> => {
   logDebug(`[OfferDetailsService] deleteOfferDetail called with ID: ${detailId}`);
   
-  if (!detailId) {
-    logError("No detailId provided to deleteOfferDetail", null, "OfferDetailsService");
-    throw new Error("Detail ID is required");
-  }
-  
   try {
-    logDebug(`[OfferDetailsService] Attempting soft delete for detail ID: ${detailId}`);
-    // Try soft delete first
-    const { error: softDeleteError } = await softDeleteRecord("offer_details", detailId);
+    const { error: softDeleteError } = await softDeleteRecord("offer_details", detailId, userId);
     
     if (softDeleteError) {
-      logDebug(`[OfferDetailsService] Soft delete failed, falling back to regular delete: ${JSON.stringify(softDeleteError)}`);
-      
-      // If soft delete is not available or fails, fallback to regular delete
-      const { error } = await deleteRecord("offer_details", detailId);
-      
-      if (error) {
-        logError("Error deleting offer detail:", error, "OfferDetailsService");
-        throw error;
-      }
+      logError("Error soft deleting offer detail:", softDeleteError, "OfferDetailsService");
+      throw softDeleteError;
     }
     
-    logInfo(`[OfferDetailsService] Successfully deleted offer detail with ID: ${detailId}`);
+    logInfo(`[OfferDetailsService] Successfully soft deleted offer detail with ID: ${detailId}`);
   } catch (error) {
     logError("Exception in deleteOfferDetail:", error, "OfferDetailsService");
     throw error;

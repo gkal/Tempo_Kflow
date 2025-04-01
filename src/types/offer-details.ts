@@ -30,6 +30,7 @@ export interface OfferDetail {
   category_id: string;
   subcategory_id?: string;
   unit_id?: string;
+  unit_name?: string;  // Add unit_name field
   quantity: number;
   price: number;
   total: number;
@@ -52,4 +53,4 @@ export interface OfferDetailFormData {
   quantity: number;
   price: number;
   notes?: string;
-} 
+}

@@ -657,6 +657,44 @@ export type Database = {
         }
         Relationships: []
       }
+      resource_locks: {
+        Row: {
+          id: string
+          resource_type: string
+          resource_id: string
+          user_id: string
+          user_name: string
+          locked_at: string
+          expires_at: string
+        }
+        Insert: {
+          id?: string
+          resource_type: string
+          resource_id: string
+          user_id: string
+          user_name: string
+          locked_at?: string
+          expires_at: string
+        }
+        Update: {
+          id?: string
+          resource_type?: string
+          resource_id?: string
+          user_id?: string
+          user_name?: string
+          locked_at?: string
+          expires_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_locks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

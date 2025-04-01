@@ -5,7 +5,6 @@ import { TaskDialog } from './TaskDialog';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/lib/AuthContext';
 import { Plus } from 'lucide-react';
-import { useRealtimeSubscription } from '@/lib/useRealtimeSubscription';
 import { Task } from '@/services/api/types';
 import { 
   Card, 
@@ -82,7 +81,7 @@ export function TaskList({
     fetchTasks();
   }, [offerId, showAssignedToMe, user, propTasks, refreshTrigger]);
 
-  // Set up real-time subscription for tasks
+  // Add real-time subscription for tasks through Supabase's built-in channel capability
   useEffect(() => {
     if (!user) return;
 
@@ -115,29 +114,6 @@ export function TaskList({
       subscription.unsubscribe();
     };
   }, [user, offerId, showAssignedToMe]);
-
-  // Add real-time subscription for tasks
-  useRealtimeSubscription(
-    { table: 'tasks' },
-    (payload) => {
-      // Handle different types of changes
-      if (payload.eventType === 'INSERT') {
-        // A new task was created - refresh the task list
-        // You'll need to implement a refresh function or use a state management solution
-        // For example, you could call a refreshTasks() function here
-      } else if (payload.eventType === 'UPDATE') {
-        // A task was updated - update it in the local state
-        const updatedTask = payload.new;
-        // Update the task in your local state
-        // This depends on how you're managing state in this component
-      } else if (payload.eventType === 'DELETE') {
-        // A task was deleted - remove it from the local state
-        const deletedTask = payload.old;
-        // Remove the task from your local state
-        // This depends on how you're managing state in this component
-      }
-    }
-  );
 
   return (
     <div className="space-y-4">

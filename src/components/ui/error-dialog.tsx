@@ -22,12 +22,19 @@ export function ErrorDialog({
   title,
   description,
 }: ErrorDialogProps) {
+  const titleId = React.useId();
+  const descriptionId = React.useId();
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5]">
+      <AlertDialogContent 
+        className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5]"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+      >
         <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription className="text-[#84a98c]">
+          <AlertDialogTitle id={titleId}>{title}</AlertDialogTitle>
+          <AlertDialogDescription id={descriptionId} className="text-[#84a98c]">
             {description}
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -42,4 +49,4 @@ export function ErrorDialog({
       </AlertDialogContent>
     </AlertDialog>
   );
-} 
+}

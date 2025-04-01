@@ -75,7 +75,7 @@ export function TruncatedText({
     <TruncateWithTooltip
       text={text}
       maxLength={maxLength}
-      position={tooltipPosition}
+      position="bottom"
       className={className}
       maxWidth={tooltipMaxWidth}
       multiLine={multiLine}

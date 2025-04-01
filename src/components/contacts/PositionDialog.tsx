@@ -11,7 +11,7 @@ import { useFormRegistration } from '@/lib/FormContext';
 interface PositionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  position?: string; // If provided, we're editing this position
+  position?: { id: string; name: string };
   onSave: () => void;
 }
 
@@ -21,7 +21,7 @@ export function PositionDialog({
   position,
   onSave,
 }: PositionDialogProps) {
-  const [name, setName] = useState(position || "");
+  const [name, setName] = useState(position?.name || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -29,7 +29,7 @@ export function PositionDialog({
   // Register this form when it's open
   useFormRegistration(
     position 
-      ? `Επεξεργασία Θέσης: ${position}` 
+      ? `Επεξεργασία Θέσης: ${position.name}` 
       : "Νέα Θέση", 
     open
   );
@@ -37,7 +37,7 @@ export function PositionDialog({
   // Reset form when dialog opens/closes
   useEffect(() => {
     if (open) {
-      setName(position || "");
+      setName(position?.name || "");
       setError(null);
       setSuccess(false);
     }
@@ -69,7 +69,7 @@ export function PositionDialog({
         const { error: updateError } = await supabase
           .from("contact_positions")
           .update({ name: name.trim() })
-          .eq("name", position);
+          .eq("id", position.id);
           
         if (updateError) throw updateError;
         
@@ -133,10 +133,11 @@ export function PositionDialog({
     >
       <DialogContent 
         className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f] p-0 max-w-md fixed top-[50%] left-[50%] -translate-x-[50%] -translate-y-[50%]"
+        aria-labelledby="position-dialog-title"
       >
         <DialogHeader className="p-4 border-b border-[#52796f]">
           <div className="flex justify-between items-center">
-            <DialogTitle className="text-lg font-semibold text-[#cad2c5]">
+            <DialogTitle id="position-dialog-title" className="text-lg font-semibold text-[#cad2c5]">
               {position ? "Επεξεργασία Θέσης" : "Νέα Θέση"}
             </DialogTitle>
             <Button

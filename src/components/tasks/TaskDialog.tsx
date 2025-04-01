@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { CheckCircle, AlertCircle, Clock, ArrowUpRight, Trash2, Link, Link2Off, ExternalLink } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { openEditOfferDialog } from "@/components/customers/OfferDialogManager";
+import { openEditOfferDialog } from "@/components/offers/main_offers_form/OfferDialogManager";
 import { truncate } from "@/utils/textUtils";
 import { DialogClose } from "@/components/ui/dialog";
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
@@ -441,9 +441,12 @@ export function TaskDialog({ isOpen, onClose, taskId, offerId: propOfferId, onTa
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="bg-[#354f52] border-[#52796f] text-[#cad2c5] max-w-2xl">
+        <DialogContent 
+          className="bg-[#354f52] border-[#52796f] text-[#cad2c5] max-w-2xl"
+          aria-labelledby="task-dialog-title"
+        >
           <DialogHeader>
-            <DialogTitle className="flex items-center text-xl">
+            <DialogTitle id="task-dialog-title" className="flex items-center text-xl">
               {taskId ? "Επεξεργασία Εργασίας" : "Νέα Εργασία"}
               
               {taskId && task && (
@@ -673,9 +676,12 @@ export function TaskDialog({ isOpen, onClose, taskId, offerId: propOfferId, onTa
 
       {/* Delete Confirmation Modal */}
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
-        <DialogContent className="bg-[#354f52] border-[#52796f] text-[#cad2c5]">
+        <DialogContent 
+          className="bg-[#354f52] border-[#52796f] text-[#cad2c5]"
+          aria-labelledby="delete-task-dialog-title"
+        >
           <DialogHeader>
-            <DialogTitle>Επιβεβαίωση Διαγραφής</DialogTitle>
+            <DialogTitle id="delete-task-dialog-title">Επιβεβαίωση Διαγραφής</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p>Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την εργασία;</p>

@@ -23,3 +23,5 @@ export * from './useDialogCleanup';
 
 // Add other hooks as they are created
 // export * from './useOtherHook'; 
+
+export * from './useDataService'; 

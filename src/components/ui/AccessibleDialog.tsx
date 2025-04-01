@@ -114,7 +114,8 @@ export function AccessibleDialog({
           {...contentProps}
         >
           <DialogHeader>
-            <div id="dialog-title">{titleContent}</div>
+            {/* Replace div with proper DialogTitle for accessibility */}
+            <DialogTitle id="dialog-title">{titleContent}</DialogTitle>
             {description && (
               <DialogDescription id={descriptionId}>
                 {description}

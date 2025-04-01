@@ -4,17 +4,19 @@ import { ChevronDown, Edit } from "lucide-react";
 import "../ui/dropdown.css";
 
 interface GlobalDropdownProps {
-  options: string[];
+  options: (string | { id: string; name: string })[];
   onSelect: (option: string) => void;
-  onEdit?: (option: string) => void;
+  onEdit?: (option: string | { id: string; name: string }) => void;
   placeholder?: string;
   value?: string;
   header?: string;
   className?: string;
   disabled?: boolean;
-  renderOption?: (option: string) => React.ReactNode;
+  renderOption?: (option: string | { id: string; name: string }) => React.ReactNode;
+  renderValue?: (value: string) => React.ReactNode;
   onContextMenu?: (e: React.MouseEvent) => void;
   showEditButton?: boolean;
+  formContext?: boolean;
 }
 
 export function GlobalDropdown({
@@ -27,8 +29,10 @@ export function GlobalDropdown({
   className = "",
   disabled = false,
   renderOption,
+  renderValue,
   onContextMenu,
   showEditButton = false,
+  formContext = false,
 }: GlobalDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | undefined>(value);
@@ -36,10 +40,12 @@ export function GlobalDropdown({
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [isPositioned, setIsPositioned] = useState(false);
 
   useEffect(() => {
-    setSelectedOption(value);
+    const selected = findSelectedOption();
+    setSelectedOption(selected ? (typeof selected === 'string' ? selected : selected.id) : undefined);
   }, [value]);
 
   // Reset state when dropdown closes
@@ -49,18 +55,62 @@ export function GlobalDropdown({
     }
   }, [isOpen]);
 
+  const findSelectedOption = () => {
+    return options.find(opt => 
+      typeof opt === 'string' 
+        ? opt === value 
+        : opt.id === value || opt.name === value
+    );
+  };
+
+  const getDisplayValue = () => {
+    const selectedOpt = findSelectedOption();
+    if (!selectedOpt) return value;
+    return typeof selectedOpt === 'string' ? selectedOpt : selectedOpt.name;
+  };
+
+  const handleEdit = (option: string | { id: string; name: string }) => {
+    if (onEdit) {
+      onEdit(option);
+    }
+  };
+
+  const renderDefaultOption = (option: string | { id: string; name: string }) => {
+    return typeof option === 'string' ? option : option.name;
+  };
+
   useEffect(() => {
     if (isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setButtonPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width
-      });
-    }
+      const updatePosition = () => {
+        const rect = buttonRef.current?.getBoundingClientRect();
+        if (rect) {
+          const scrollY = window.scrollY || document.documentElement.scrollTop;
+          const scrollX = window.scrollX || document.documentElement.scrollLeft;
+          
+          setDropdownPosition({
+            top: rect.bottom + scrollY,
+            left: rect.left + scrollX,
+            width: rect.width
+          });
+          setIsPositioned(true);
+        }
+      };
 
+      updatePosition();
+      window.addEventListener('scroll', updatePosition);
+      window.addEventListener('resize', updatePosition);
+
+      return () => {
+        window.removeEventListener('scroll', updatePosition);
+        window.removeEventListener('resize', updatePosition);
+      };
+    } else {
+      setIsPositioned(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      // Only close if clicking outside both the dropdown and the menu
       const target = event.target as Node;
       const dropdownMenu = document.querySelector('.dropdown-menu');
       
@@ -80,10 +130,27 @@ export function GlobalDropdown({
     };
   }, [isOpen]);
 
-  const handleSelect = (option: string) => {
-    setSelectedOption(option);
-    onSelect(option);
+  const handleOptionClick = (option: string | { id: string; name: string }) => {
+    const optionValue = typeof option === 'string' ? option : option.id;
+    setSelectedOption(optionValue);
+    onSelect(optionValue);
     setIsOpen(false);
+  };
+
+  const renderOptionContent = (option: string | { id: string; name: string }) => {
+    if (renderOption) {
+      return renderOption(option);
+    }
+    return renderDefaultOption(option);
+  };
+
+  const renderSelectedValue = () => {
+    if (!selectedOption) return placeholder;
+    if (renderValue) return renderValue(selectedOption);
+    const selectedItem = findSelectedOption();
+    if (!selectedItem) return placeholder;
+    if (renderOption) return renderOption(selectedItem);
+    return renderDefaultOption(selectedItem);
   };
 
   // Handle wheel scrolling in the dropdown menu
@@ -101,122 +168,96 @@ export function GlobalDropdown({
   // Render the dropdown menu using a portal
   const renderDropdownMenu = () => {
     if (!isOpen) return null;
-    
+
+    const menuStyle: React.CSSProperties = {
+      top: `${dropdownPosition.top}px`,
+      left: `${dropdownPosition.left}px`,
+      width: `${dropdownPosition.width}px`,
+      visibility: isPositioned ? 'visible' : 'hidden' as const
+    };
+
     return ReactDOM.createPortal(
       <div 
-        className="dropdown-menu" 
-        style={{
-          top: `${buttonPosition.top}px`,
-          left: `${buttonPosition.left}px`,
-          width: `${buttonPosition.width}px`,
-          minWidth: `${buttonPosition.width}px`,
-          zIndex: 9999,  // Much higher to ensure it's above other elements
-          pointerEvents: 'auto',
-          maxHeight: '300px',
-          overflowY: 'auto',
-          position: 'fixed' // Use fixed positioning to ensure it's always visible
-        }}
-        onClick={(e) => e.stopPropagation()}
+        className="dropdown-menu fixed bg-[#2f3e46] border border-[#52796f] rounded-md shadow-lg overflow-y-auto max-h-48 z-[100]"
+        style={menuStyle}
         onWheel={handleWheel}
       >
-        {options.map((option) => (
-          <div
-            key={option}
-            className={`dropdown-item text-sm ${
-              option === selectedOption ? "selected-item" : ""
-            } relative group`}
-            onMouseEnter={() => setHoveredItem(option)}
-            onMouseLeave={() => setHoveredItem(null)}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleSelect(option);
-            }}
-          >
-            <div className="flex justify-between items-center w-full pr-2">
-              <span>{renderOption ? renderOption(option) : option}</span>
-              {hoveredItem === option && option !== "add_new_position" && showEditButton && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onEdit) {
-                      onEdit(option);
+        <div id="dropdown-menu-title" className="sr-only">Options Menu</div>
+        {options.map((option) => {
+          const optionValue = typeof option === 'string' ? option : option.id;
+          const isSelected = optionValue === selectedOption;
+          
+          return (
+            <div
+              key={optionValue}
+              className={`dropdown-item ${isSelected ? 'selected-item' : ''} ${
+                hoveredItem === optionValue ? 'hovered' : ''
+              } relative group`}
+              onMouseEnter={() => setHoveredItem(optionValue)}
+              onMouseLeave={() => setHoveredItem(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOptionClick(option);
+              }}
+            >
+              <div className="flex justify-between items-center w-full pr-2">
+                <span>{renderOptionContent(option)}</span>
+                {hoveredItem === optionValue && typeof option !== 'string' && showEditButton && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(option);
                       setIsOpen(false);
-                    }
-                  }}
-                  className="text-[#84a98c] hover:text-[#52796f] transition-colors"
-                >
-                  <Edit className="h-4 w-4" />
-                </button>
-              )}
+                    }}
+                    className="text-[#84a98c] hover:text-[#52796f] transition-colors"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>,
       document.body
     );
   };
 
-  // Button style with standard input background color
-  const buttonStyle = {
-    backgroundColor: '#2f3e46', // Standard input background color
-    color: '#cad2c5',
-    border: '1px solid #52796f',
-    boxShadow: isHovered || isOpen ? '0 0 0 1px #84a98c' : 'none',
-    transition: 'all 0.2s ease',
-    opacity: disabled ? 0.5 : 1,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    height: '100%'
-  };
-
-  // Render the selected value or placeholder
-  const renderSelectedValue = () => {
-    if (!selectedOption) return placeholder;
-    return renderOption ? renderOption(selectedOption) : selectedOption;
-  };
+  const toggleDropdown = () => !disabled && setIsOpen(!isOpen);
 
   return (
-    <div 
-      className={`GlobalDropdown ${className}`} 
+    <div
       ref={dropdownRef}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (onContextMenu && value && value !== "add_new_position") {
-          onContextMenu(e);
-        }
-      }}
-      style={{ height: '100%' }}
+      className={`relative inline-block w-full ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ zIndex: isOpen ? 50 : 'auto' }}
     >
-      {header && <div className="text-sm font-medium mb-1 text-[#cad2c5]">{header}</div>}
       <button
         ref={buttonRef}
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!disabled) {
-            setIsOpen(!isOpen);
-          }
+        className={`flex items-center justify-between w-full px-3 py-2 text-sm rounded-md border ${
+          formContext 
+            ? 'border-[#52796f]' 
+            : 'bg-[#2f3e46] border-[#52796f] hover:bg-[#2f3e46] focus:bg-[#2f3e46]'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${className}`}
+        style={{ 
+          backgroundColor: formContext ? '#3a5258' : undefined,
+          borderRadius: '0.375rem'
         }}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (onContextMenu && !disabled && value && value !== "add_new_position") {
-            onContextMenu(e);
-          }
-        }}
-        onMouseEnter={() => !disabled && setIsHovered(true)}
-        onMouseLeave={() => !disabled && setIsHovered(false)}
-        className="flex items-center justify-between w-full px-3 py-1 text-sm rounded-md focus:outline-none text-[#cad2c5] h-full"
-        style={buttonStyle}
+        onClick={toggleDropdown}
         disabled={disabled}
+        onContextMenu={onContextMenu}
       >
-        <span className="truncate">{renderSelectedValue()}</span>
-        <ChevronDown className={`h-4 w-4 ml-2 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="truncate">
+          {renderValue 
+            ? renderValue(value || '') 
+            : getDisplayValue() || placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
       </button>
-      
-      {renderDropdownMenu()}
+
+      {isOpen && renderDropdownMenu()}
     </div>
   );
 } 

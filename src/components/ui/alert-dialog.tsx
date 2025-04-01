@@ -1,6 +1,7 @@
 import * as React from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import { X } from "lucide-react";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 import { cn } from "@/lib/utils";
 import { CloseButton } from "@/components/ui/close-button";
@@ -34,6 +35,23 @@ const AlertDialogContent = React.forwardRef<
   // Generate a unique ID for the description if aria-describedby is not provided
   const descriptionId = React.useId();
   const ariaDescribedBy = props['aria-describedby'] || descriptionId;
+
+  // Generate a unique ID for the title
+  const titleId = React.useId();
+  
+  // Check if there's already an AlertDialogTitle in the children
+  const hasAlertDialogTitle = React.Children.toArray(children).some(
+    child => React.isValidElement(child) && 
+    (
+      // Check for AlertDialogTitle directly
+      child.type === AlertDialogTitle ||
+      // Check for AlertDialogHeader that might contain AlertDialogTitle
+      (child.type === AlertDialogHeader && 
+       React.Children.toArray(child.props.children).some(
+         headerChild => React.isValidElement(headerChild) && headerChild.type === AlertDialogTitle
+       ))
+    )
+  );
   
   return (
     <AlertDialogPortal>
@@ -47,6 +65,12 @@ const AlertDialogContent = React.forwardRef<
         aria-describedby={ariaDescribedBy}
         {...props}
       >
+        {/* Add a visually hidden AlertDialogTitle if none exists */}
+        {!hasAlertDialogTitle && (
+          <VisuallyHidden asChild>
+            <AlertDialogTitle id={titleId}>Alert Dialog</AlertDialogTitle>
+          </VisuallyHidden>
+        )}
         {children}
         <div id={descriptionId} style={{ display: 'none' }} aria-hidden="true">
           Alert dialog content

@@ -405,6 +405,15 @@ tr.force-hover td {
   text-decoration: underline !important;
 }
 
+/* Custom textarea with 2 visible lines */
+.textarea-3-lines {
+  min-height: 3.5rem !important;
+  height: 3.5rem !important;
+  line-height: 1.5 !important;
+  padding: 0.5rem !important;
+  resize: none !important;
+}
+
 /* Remove all borders from form elements */
 input, textarea, select, 
 .input, .textarea, .select,

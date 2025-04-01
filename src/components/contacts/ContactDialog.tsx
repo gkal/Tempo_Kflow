@@ -12,6 +12,8 @@ import { PositionDialog } from "./PositionDialog";
 import { useFormRegistration } from '@/lib/FormContext';
 import { usePhoneFormat } from "@/hooks/usePhoneFormat";
 import { logDebug } from "../../utils/loggingUtils";
+import { useDataService } from '@/hooks/useDataService';
+import { db } from '@/database';
 
 interface ContactDialogProps {
   open: boolean;
@@ -19,6 +21,11 @@ interface ContactDialogProps {
   customerId: string;
   contactId?: string;
   refreshData?: () => void;
+}
+
+interface CustomerInfo {
+  company_name: string;
+  id?: string;
 }
 
 export function ContactDialog({
@@ -31,6 +38,7 @@ export function ContactDialog({
   const [formData, setFormData] = useState({
     full_name: "",
     position: "",
+    position_name: "",
     telephone: "",
     mobile: "",
     email: "",
@@ -53,16 +61,40 @@ export function ContactDialog({
     inputRef: mobileInputRef
   } = usePhoneFormat(formData.mobile);
 
-  const [positions, setPositions] = useState<string[]>([]);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const [positions, setPositions] = useState<Array<{ id: string; name: string }>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [customerInfo, setCustomerInfo] = useState<{ company_name: string } | null>(null);
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo>({ company_name: "" });
   const [loading, setLoading] = useState(true);
   
   // Position dialog state
+  const [editingPosition, setEditingPosition] = useState<{ id: string; name: string } | null>(null);
   const [positionDialogOpen, setPositionDialogOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<string | undefined>(undefined);
+  const [newPositionName, setNewPositionName] = useState("");
+  const [isAddingPosition, setIsAddingPosition] = useState(false);
+  const [positionError, setPositionError] = useState<string | null>(null);
+
+  // Initialize data services
+  const { 
+    getById: getContactById, 
+    create: createContact, 
+    update: updateContact 
+  } = useDataService<any>('contacts');
+  
+  const { 
+    getById: getCustomerById 
+  } = useDataService<any>('customers');
+  
+  const contactPositionsService = db.contactPositions;
 
   // Fix the type issue with customerId
   const safeCustomerId = typeof customerId === 'string' 
@@ -84,7 +116,6 @@ export function ContactDialog({
     if (open) {
       fetchCustomerInfo();
       fetchPositions();
-      setSuccess(false); // Reset success state when dialog opens
       setError(null); // Reset error state when dialog opens
       
       // If editing an existing contact, fetch its data
@@ -95,16 +126,13 @@ export function ContactDialog({
         setFormData({
           full_name: "",
           position: "",
+          position_name: "",
           telephone: "",
           mobile: "",
           email: "",
           internal_telephone: "",
           notes: "",
         });
-        
-        // Reset phone values in the custom hooks when adding a new contact
-        setTelephone("");
-        setMobile("");
       }
     } else {
       // Reset state when dialog closes
@@ -116,7 +144,6 @@ export function ContactDialog({
   // Also reset success state when dialog closes
   useEffect(() => {
     if (!open) {
-      setSuccess(false);
       setError(null);
       
       // Reset all form data including telephone fields when dialog closes
@@ -124,6 +151,7 @@ export function ContactDialog({
       setFormData({
         full_name: "",
         position: "",
+        position_name: "",
         telephone: "",
         mobile: "",
         email: "",
@@ -131,7 +159,6 @@ export function ContactDialog({
         notes: "",
       });
       
-      // Reset phone format state
       setTelephone("");
       setMobile("");
     }
@@ -143,39 +170,35 @@ export function ContactDialog({
     try {
       setLoading(true);
       
-      const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .eq("id", contactId)
-        .is("deleted_at", null)
-        .single();
-        
-      if (error) {
-        console.error("Σφάλμα κατά τη φόρτωση στοιχείων επαφής:", error);
-        setError("Αδυναμία φόρτωσης στοιχείων επαφής");
-        setLoading(false);
-        return;
-      }
+      // Use DataService instead of direct supabase call
+      const contactData = await getContactById(contactId);
       
-      if (data) {
+      if (contactData) {
+        // Update form data
         setFormData({
-          full_name: data.full_name || "",
-          position: data.position || "",
-          telephone: data.telephone || "",
-          mobile: data.mobile || "",
-          email: data.email || "",
-          internal_telephone: data.internal_telephone || "",
-          notes: data.notes || "",
+          full_name: contactData.full_name || "",
+          position: contactData.position_id || "",  // Set position ID here
+          position_name: contactData.position || "",
+          telephone: contactData.telephone || "",
+          mobile: contactData.mobile || "",
+          email: contactData.email || "",
+          internal_telephone: contactData.internal_telephone || "",
+          notes: contactData.notes || "",
         });
         
-        // Update phone values in the custom hooks
-        setTelephone(data.telephone || "");
-        setMobile(data.mobile || "");
+        // Update phone format hooks
+        setTelephone(contactData.telephone || "");
+        setMobile(contactData.mobile || "");
+        
+        // Set selected position if it exists
+        if (contactData.position_id) {
+          setSelectedPosition(contactData.position_id);
+        }
       }
       
       setLoading(false);
-    } catch (err) {
-      console.error("Σφάλμα κατά τη φόρτωση στοιχείων επαφής:", err);
+    } catch (error) {
+      console.error("Error fetching contact data:", error);
       setError("Αδυναμία φόρτωσης στοιχείων επαφής");
       setLoading(false);
     }
@@ -191,24 +214,19 @@ export function ContactDialog({
     try {
       setLoading(true);
       
-      // Use the safe string ID in the API call
-      const { data, error } = await supabase
-        .from('customers')
-        .select('company_name')
-        .eq('id', safeCustomerId)
-        .single();
-
-      if (error) {
-        console.error("Σφάλμα κατά τη φόρτωση στοιχείων πελάτη:", error);
-        setError("Αδυναμία φόρτωσης στοιχείων πελάτη");
-        setLoading(false);
-        return;
+      // Use DataService instead of direct supabase call
+      const customer = await getCustomerById(safeCustomerId);
+      
+      if (customer) {
+        setCustomerInfo({
+          id: safeCustomerId,
+          company_name: customer.company_name || "Πελάτης",
+        });
       }
-
-      setCustomerInfo(data);
+      
       setLoading(false);
-    } catch (err) {
-      console.error("Σφάλμα κατά τη φόρτωση στοιχείων πελάτη:", err);
+    } catch (error) {
+      console.error("Error fetching customer info:", error);
       setError("Αδυναμία φόρτωσης στοιχείων πελάτη");
       setLoading(false);
     }
@@ -216,78 +234,56 @@ export function ContactDialog({
 
   const fetchPositions = async () => {
     try {
-      const { data, error } = await supabase
-        .from("contact_positions")
-        .select("name")
-        .order("name");
-
-      if (error) throw error;
+      logDebug("Fetching positions...");
+      const { data: positionsList, error } = await contactPositionsService.getAll({
+        // No need for explicit deleted_at filter, DataService handles it automatically
+        order: {
+          column: 'name',
+          ascending: true
+        }
+      });
       
-      // Add positions from the database
-      setPositions(data.map((pos) => pos.name));
+      logDebug("Positions response:", positionsList);
+      
+      if (error) {
+        console.error("Error fetching positions:", error);
+        return;
+      }
+      
+      if (positionsList) {
+        // Map positions to include both id and name
+        const mappedPositions = positionsList.map(p => ({ id: p.id, name: p.name }));
+        logDebug("Mapped positions:", mappedPositions);
+        setPositions(mappedPositions);
+      } else {
+        logDebug("No positions returned");
+      }
     } catch (error) {
-      console.error("Σφάλμα κατά τη φόρτωση θέσεων:", error);
+      console.error("Error fetching positions:", error);
     }
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    
-    // Handle telephone and mobile separately with our custom hooks
-    if (name === "telephone" && e.target instanceof HTMLInputElement) {
-      const result = handleTelephoneChange(e as React.ChangeEvent<HTMLInputElement>);
-      setFormData((prev) => ({
-        ...prev,
-        [name]: result.value,
-      }));
-      return;
-    }
-    
-    if (name === "mobile" && e.target instanceof HTMLInputElement) {
-      const result = handleMobileChange(e as React.ChangeEvent<HTMLInputElement>);
-      setFormData((prev) => ({
-        ...prev,
-        [name]: result.value,
-      }));
-      return;
-    }
-    
-    setFormData((prev) => ({
+  const handlePositionChange = (positionId: string) => {
+    const selectedPos = positions.find(p => p.id === positionId);
+    setSelectedPosition(positionId);
+    setFormData(prev => ({
       ...prev,
-      [name]: value,
+      position: positionId,
+      position_name: selectedPos?.name || ""
     }));
   };
 
-  const handlePositionChange = (value: string) => {
-    // Check if "Προσθήκη θέσης..." was selected
-    if (value === "add_new_position") {
-      setSelectedPosition(undefined); // No position selected for editing
-      setPositionDialogOpen(true);
-      return;
-    }
-    
-    setFormData((prev) => ({
-      ...prev,
-      position: value,
-    }));
-  };
-  
-  // Add a function to handle right-click on the dropdown
-  const handlePositionRightClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (formData.position && formData.position !== "add_new_position") {
-      logDebug("Right-clicked position:", formData.position);
-      setSelectedPosition(formData.position);
+  const handleEditPosition = (position: string | { id: string; name: string }) => {
+    if (typeof position === 'string') {
+      const foundPosition = positions.find(p => p.id === position || p.name === position);
+      if (foundPosition) {
+        setEditingPosition(foundPosition);
+        setPositionDialogOpen(true);
+      }
+    } else {
+      setEditingPosition(position);
       setPositionDialogOpen(true);
     }
-  };
-
-  const handleEditPosition = (position: string) => {
-    setSelectedPosition(position);
-    setPositionDialogOpen(true);
   };
 
   const isFormValid = () => {
@@ -296,96 +292,135 @@ export function ContactDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid()) return;
-
+    setError(null);
     setIsSubmitting(true);
-    setError("");
-    setSuccess(false);
-    
+
     try {
-      if (contactId) {
-        // Update existing contact
-        const { error } = await supabase
-          .from("contacts")
-          .update({
-            full_name: formData.full_name,
-            position: formData.position,
-            telephone: formData.telephone,
-            mobile: formData.mobile,
-            email: formData.email,
-            internal_telephone: formData.internal_telephone,
-            notes: formData.notes,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", contactId);
+      // Get the selected position object
+      const selectedPositionObj = positions.find(p => p.id === selectedPosition);
 
-        if (error) throw error;
-      } else {
-        // Create new contact
-        const { error } = await supabase.from("contacts").insert({
-          customer_id: safeCustomerId,
-          full_name: formData.full_name,
-          position: formData.position,
-          telephone: formData.telephone,
-          mobile: formData.mobile,
-          email: formData.email,
-          internal_telephone: formData.internal_telephone,
-          notes: formData.notes,
-        });
+      // Prepare contact data
+      const contactData = {
+        full_name: formData.full_name.trim(),
+        position: selectedPositionObj?.name || null,
+        telephone: telephoneValue || null,
+        mobile: mobileValue || null,
+        email: formData.email?.trim() || null,
+        internal_telephone: formData.internal_telephone?.trim() || null,
+        notes: formData.notes?.trim() || null,
+        customer_id: safeCustomerId,
+        position_id: selectedPositionObj?.id || null,
+        status: 'active'
+      };
 
-        if (error) throw error;
+      logDebug("Submitting contact data:", contactData);
+
+      // Ensure phone numbers are treated as strings
+      if (contactData.telephone) {
+        contactData.telephone = String(contactData.telephone).trim();
+      }
+      if (contactData.mobile) {
+        contactData.mobile = String(contactData.mobile).trim();
       }
 
-      // Call onSave immediately to refresh the contacts list
-      await refreshData?.();
+      let result;
+      if (contactId) {
+        result = await updateContact(contactId, contactData);
+      } else {
+        result = await createContact(contactData);
+      }
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      // Reset form
+      setFormData({
+        full_name: "",
+        position: "",
+        position_name: "",
+        telephone: "",
+        mobile: "",
+        email: "",
+        internal_telephone: "",
+        notes: "",
+      });
       
-      // Show success message briefly
-      setSuccess(true);
+      setTelephone("");
+      setMobile("");
       
-      // Close the dialog after a short delay
-      setTimeout(() => {
-        onOpenChange(false);
-      }, 800);
-    } catch (error: any) {
-      console.error("Σφάλμα κατά την αποθήκευση επαφής:", error);
-      setError(error.message || "Προέκυψε σφάλμα κατά την αποθήκευση της επαφής.");
+      if (refreshData) {
+        refreshData();
+      }
+      
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error saving contact:", error);
+      setError("Αδυναμία αποθήκευσης επαφής");
     } finally {
       setIsSubmitting(false);
     }
   };
-  
-  // Get all position options including "Add new position"
-  const getPositionOptions = () => {
-    return [...positions, "add_new_position"];
-  };
-  
-  // Custom renderer for position dropdown items
-  const renderPositionOption = (option: string): React.ReactNode => {
-    if (option === "add_new_position") {
-      return (
-        <div className="flex items-center text-blue-400 font-medium">
-          <Plus className="mr-2 h-4 w-4" />
-          <span>Προσθήκη θέσης...</span>
-        </div>
-      );
+
+  const handleAddPosition = async () => {
+    setIsAddingPosition(true);
+    setPositionError(null);
+    
+    try {
+      if (!newPositionName || newPositionName.trim() === "") {
+        setPositionError("Enter a position name");
+        return;
+      }
+      
+      // Check if position already exists
+      if (positions.find(p => p.name.trim() === newPositionName.trim())) {
+        setPositionError("Position already exists");
+        return;
+      }
+      
+      // Use DataService to create new position
+      const { data: newPosition, error } = await contactPositionsService.create({ 
+        name: newPositionName.trim() 
+      });
+      
+      if (error || !newPosition) {
+        throw new Error(error?.message || "Failed to create position");
+      }
+      
+      // Update positions list with new position
+      setPositions([...positions, { id: newPosition.id, name: newPosition.name }]);
+      
+      // Set the new position in the form
+      setFormData({
+        ...formData,
+        position: newPosition.id,
+        position_name: newPosition.name,
+      });
+      
+      // Close the position dialog
+      setPositionDialogOpen(false);
+      setNewPositionName("");
+    } catch (error) {
+      console.error("Error adding position:", error);
+      setPositionError("Error adding position");
+    } finally {
+      setIsAddingPosition(false);
     }
-    return option;
   };
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={(newOpen) => {
+    <Dialog 
+      open={open} 
+      onOpenChange={(newOpen) => {
         if (!newOpen) {
-          setSuccess(false);
           setError(null);
-          // Ensure position dialog is closed when contact dialog closes
           setPositionDialogOpen(false);
           setSelectedPosition(undefined);
           
-          // Reset form data completely when dialog closes
           setFormData({
             full_name: "",
             position: "",
+            position_name: "",
             telephone: "",
             mobile: "",
             email: "",
@@ -393,38 +428,33 @@ export function ContactDialog({
             notes: "",
           });
           
-          // Explicitly reset phone values in the custom hooks
           setTelephone("");
           setMobile("");
         }
         onOpenChange(newOpen);
-      }}>
-        <DialogContent 
-          className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f] p-0 max-w-5xl"
-          aria-describedby="contact-dialog-description"
-        >
-          <DialogHeader className="p-4 border-b border-[#52796f]">
-            <div className="flex justify-between items-center">
-              <DialogTitle className="text-lg font-semibold text-[#cad2c5]">
-                {customerInfo && (
-                  <span className="text-[#84a98c] mr-2">{customerInfo.company_name} -</span>
-                )}
-                {contactId ? "Επεξεργασία Επαφής" : "Νέα Επαφή"}
-              </DialogTitle>
-              <Button
-                variant="ghost"
-                className="h-8 w-8 p-0 text-[#cad2c5]"
-                onClick={() => onOpenChange(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <DialogDescription id="contact-dialog-description" className="sr-only">
-              {contactId ? "Φόρμα επεξεργασίας επαφής" : "Φόρμα δημιουργίας νέας επαφής"}
+      }}
+    >
+      <DialogContent 
+        className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f] p-0 max-w-5xl overflow-hidden"
+        aria-labelledby="contact-dialog-title"
+        aria-describedby="contact-dialog-description"
+      >
+        <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+          {/* Header */}
+          <DialogHeader className="px-4 py-2 border-b border-[#52796f] bg-[#2f3e46]">
+            <DialogTitle className="text-lg font-semibold text-[#cad2c5]">
+              {customerInfo && (
+                <span className="text-[#84a98c] mr-2">{customerInfo.company_name} -</span>
+              )}
+              {contactId ? "Επεξεργασία Επαφής" : "Νέα Επαφή"}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-[#a8c5b5]">
+              {customerInfo.company_name}
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-0">
+          {/* Main content */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 bg-[#2f3e46]">
             {/* Two columns layout for the first two sections */}
             <div className="grid grid-cols-2 gap-10 p-8 pt-4">
               {/* Group 1: Basic Contact Information */}
@@ -459,7 +489,7 @@ export function ContactDialog({
                         id="mobile"
                         name="mobile"
                         value={mobileValue}
-                        onChange={handleInputChange}
+                        onChange={handleMobileChange}
                         className="app-input w-full"
                         ref={mobileInputRef}
                       />
@@ -497,17 +527,12 @@ export function ContactDialog({
                     </div>
                     <div className="w-2/3">
                       <GlobalDropdown
-                        options={getPositionOptions()}
+                        options={positions}
                         value={formData.position}
                         onSelect={handlePositionChange}
-                        onEdit={(position) => {
-                          setSelectedPosition(position);
-                          setPositionDialogOpen(true);
-                        }}
-                        placeholder="Επιλέξτε θέση"
-                        className="w-full"
-                        renderOption={renderPositionOption}
+                        onEdit={handleEditPosition}
                         showEditButton={true}
+                        placeholder="Επιλέξτε θέση..."
                       />
                     </div>
                   </div>
@@ -521,7 +546,7 @@ export function ContactDialog({
                         id="telephone"
                         name="telephone"
                         value={telephoneValue}
-                        onChange={handleInputChange}
+                        onChange={handleTelephoneChange}
                         className="app-input w-full"
                         ref={telephoneInputRef}
                       />
@@ -554,66 +579,66 @@ export function ContactDialog({
                 </div>
                 
                 <div className="bg-[#3a5258] p-6 rounded-b-md space-y-4 border border-[#52796f] border-t-0">
-                  <Textarea
-                    id="notes"
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleInputChange}
-                    className="app-input w-full bg-[#2f3e46] border-[#52796f] text-[#cad2c5] min-h-[100px]"
-                    placeholder="Προσθέστε σημειώσεις για την επαφή..."
-                  />
+                  <div className="h-[120px]">
+                    <Textarea
+                      id="notes"
+                      name="notes"
+                      value={formData.notes}
+                      onChange={handleInputChange}
+                      className="app-input w-full h-full bg-[#2f3e46] border-[#52796f] text-[#cad2c5] resize-none py-1 px-2"
+                      placeholder="Προσθέστε σημειώσεις για την επαφή..."
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Footer with buttons */}
-            <div className="flex justify-end items-center gap-2 p-4 border-t border-[#52796f] bg-[#2f3e46]">
+            <div className="flex flex-col gap-4 px-4 py-4 border-t border-[#52796f] bg-[#2f3e46]">
               {error && (
-                <div className="text-red-500 mr-auto">{error}</div>
-              )}
-              
-              {success && (
-                <div className="text-green-500 mr-auto flex items-center">
-                  <Check className="mr-1 h-4 w-4" />
-                  Η επαφή αποθηκεύτηκε με επιτυχία!
+                <div className="mt-2 text-sm text-red-500 bg-red-100/10 px-3 py-2 rounded border border-red-500/20">
+                  {error}
                 </div>
               )}
-              
-              <Button
-                type="submit"
-                disabled={isSubmitting || !isFormValid()}
-                className="bg-[#52796f] text-white hover:bg-[#52796f]/90"
-              >
-                {isSubmitting ? (
-                  <>
-                    <LoadingSpinner className="mr-2" />
-                    Αποθήκευση...
-                  </>
-                ) : (
-                  "Αποθήκευση"
-                )}
-              </Button>
-              
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52]"
-              >
-                Ακύρωση
-              </Button>
+              <div className="flex justify-end items-center gap-2">
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || !isFormValid()}
+                  className="bg-[#52796f] text-white hover:bg-[#52796f]/90"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <LoadingSpinner className="mr-2" />
+                      Αποθήκευση...
+                    </>
+                  ) : (
+                    "Αποθήκευση"
+                  )}
+                </Button>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52]"
+                >
+                  Ακύρωση
+                </Button>
+              </div>
             </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Position Dialog */}
+          </div>
+        </form>
+      </DialogContent>
+
       <PositionDialog
         open={positionDialogOpen}
         onOpenChange={setPositionDialogOpen}
-        position={selectedPosition}
-        onSave={fetchPositions}
+        position={editingPosition}
+        onSave={() => {
+          fetchPositions();
+          setEditingPosition(null);
+        }}
       />
-    </>
+    </Dialog>
   );
 }

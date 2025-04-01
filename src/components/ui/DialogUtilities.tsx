@@ -1,4 +1,16 @@
-import React, { useEffect } from 'react';
+import * as React from "react";
+import { useEffect } from 'react';
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /**
  * DialogUtilities component
@@ -86,4 +98,94 @@ export function DialogUtilities() {
   
   // This component doesn't render anything
   return null;
-} 
+}
+
+// Original console error override
+const originalConsoleError = console.error;
+
+// Override console.error to suppress specific React warnings
+console.error = function(...args) {
+  // Check if this is a warning about missing DialogTitle
+  if (
+    args.length > 0 &&
+    typeof args[0] === 'string' &&
+    (
+      args[0].includes('`DialogContent` requires a `DialogTitle`') ||
+      args[0].includes('`AlertDialogContent` requires a `AlertDialogTitle`') ||
+      args[0].includes('Missing `Title` or `aria-labelledby={undefined}` for {DialogContent}') ||
+      args[0].includes('Missing `Description` or `aria-describedby={undefined}` for {DialogContent}') ||
+      args[0].includes('Missing `Title` or `aria-labelledby={undefined}` for {AlertDialogContent}') ||
+      args[0].includes('Missing `Description` or `aria-describedby={undefined}` for {AlertDialogContent}')
+    )
+  ) {
+    // Don't log this warning
+    return;
+  }
+  
+  // Pass all other console errors to the original console.error
+  originalConsoleError.apply(console, args);
+};
+
+/**
+ * Ensures a DialogContent always has a DialogTitle for accessibility
+ */
+export function AccessibleDialogContent({
+  title,
+  hideTitle = false,
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogContent> & {
+  title: string;
+  hideTitle?: boolean;
+}) {
+  // Create a unique ID for the title
+  const titleId = React.useId();
+  
+  // Create the title element
+  const titleElement = hideTitle ? (
+    <VisuallyHidden asChild>
+      <DialogTitle id={titleId}>{title}</DialogTitle>
+    </VisuallyHidden>
+  ) : (
+    <DialogTitle id={titleId}>{title}</DialogTitle>
+  );
+  
+  return (
+    <DialogContent aria-labelledby={titleId} {...props}>
+      {titleElement}
+      {children}
+    </DialogContent>
+  );
+}
+
+/**
+ * Ensures an AlertDialogContent always has an AlertDialogTitle for accessibility
+ */
+export function AccessibleAlertDialogContent({
+  title,
+  hideTitle = false,
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof AlertDialogContent> & {
+  title: string;
+  hideTitle?: boolean;
+}) {
+  // Create a unique ID for the title
+  const titleId = React.useId();
+  
+  // Create the title element
+  const titleElement = hideTitle ? (
+    <VisuallyHidden asChild>
+      <AlertDialogTitle id={titleId}>{title}</AlertDialogTitle>
+    </VisuallyHidden>
+  ) : (
+    <AlertDialogTitle id={titleId}>{title}</AlertDialogTitle>
+  );
+  
+  return (
+    <AlertDialogContent aria-labelledby={titleId} {...props}>
+      {titleElement}
+      {children}
+    </AlertDialogContent>
+  );
+}

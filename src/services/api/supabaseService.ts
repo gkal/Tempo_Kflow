@@ -33,31 +33,20 @@ import {
   OfferHistory
 } from './types';
 
+interface SoftDeleteFields {
+  is_deleted: boolean;
+  deleted_at: string;
+  user_updated: string | null;
+  date_updated: string;
+}
+
 /**
  * Fetch records from a table with optional filters and sorting
+ * Automatically excludes soft-deleted records unless explicitly included
  * 
  * @param table - Database table name
- * @param query - Query modifiers including select, filters, sorting, etc.
+ * @param options - Query options including filters, sorting, etc.
  * @returns Promise with typed data response
- * 
- * @example
- * ```tsx
- * // Fetch all customers
- * const { data, error } = await fetchRecords<Customer>('customers');
- * 
- * // Fetch specific customer fields with filtering
- * const { data, error } = await fetchRecords<Customer>('customers', {
- *   select: 'id, name, email, phone',
- *   filters: { is_active: true },
- *   order: { column: 'created_at', ascending: false },
- *   limit: 10
- * });
- * ```
- * 
- * Used in:
- * - src/components/customers/CustomersPage.tsx
- * - src/components/offers/OffersPage.tsx
- * - src/components/tasks/TasksPage.tsx
  */
 export async function fetchRecords<T>(
   table: TableName,
@@ -68,56 +57,63 @@ export async function fetchRecords<T>(
     limit?: number;
     range?: { from: number; to: number };
     single?: boolean;
+    includeSoftDeleted?: boolean;
   }
 ): Promise<DbResponse<T | T[]>> {
   try {
-    // Use a direct approach without type instantiation depth issues
     const client: any = supabase;
     let query = client.from(table).select(options?.select || '*');
 
-    // Apply filters if provided
+    // Add soft delete filter unless explicitly including deleted records
+    if (!options?.includeSoftDeleted) {
+      query = query.eq('is_deleted', false);
+    }
+
+    // Apply additional filters
     if (options?.filters) {
       Object.entries(options.filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          query = query.eq(key, value);
-        }
+        query = query.eq(key, value);
       });
     }
 
-    // Apply order if provided
+    // Apply ordering
     if (options?.order) {
       query = query.order(
-        options.order.column, 
+        options.order.column,
         { ascending: options.order.ascending ?? true }
       );
     }
 
-    // Apply limit if provided
+    // Apply limit
     if (options?.limit) {
       query = query.limit(options.limit);
     }
 
-    // Apply range if provided
+    // Apply range
     if (options?.range) {
       query = query.range(options.range.from, options.range.to);
     }
 
     // Execute query
-    const response = options?.single 
-      ? await query.single() 
+    const response = options?.single
+      ? await query.single()
       : await query;
 
     if (response.error) {
       return { data: null, error: response.error, status: 'error' };
     }
 
-    return { data: response.data as (T | T[]), error: null, status: 'success' };
+    return {
+      data: response.data as (T | T[]),
+      error: null,
+      status: 'success'
+    };
   } catch (error) {
     console.error(`Error fetching records from ${table}:`, error);
-    return { 
-      data: null, 
-      error: error instanceof Error ? error : new Error(String(error)), 
-      status: 'error' 
+    return {
+      data: null,
+      error: error instanceof Error ? error : new Error(String(error)),
+      status: 'error'
     };
   }
 }
@@ -261,10 +257,7 @@ export async function deleteRecord(
   try {
     // Use a direct approach without type instantiation depth issues
     const client: any = supabase;
-    const query = client.from(table);
-    const response = await query
-      .delete()
-      .eq(idField, id);
+    const response = await client.from(table).delete().eq(idField, id);
 
     if (response.error) {
       return { error: response.error, status: 'error' };
@@ -282,46 +275,39 @@ export async function deleteRecord(
 
 /**
  * Perform a soft delete by updating a record instead of removing it
- * Sets appropriate deletion flags while preserving the record
+ * Sets both is_deleted flag and deleted_at timestamp while preserving the record
  * 
  * @param table - Database table name that supports soft delete
  * @param id - Record ID to soft delete
+ * @param userId - Optional user ID performing the deletion for audit
  * @returns Promise with the soft-deleted record
  * 
  * @example
  * ```tsx
  * // Soft delete a customer
- * const { data, error } = await softDeleteRecord<Customer>('customers', '123');
+ * const { data, error } = await softDeleteRecord<Customer>('customers', '123', userId);
  * ```
  * 
  * Used in:
  * - src/components/customers/CustomerDetailPage.tsx
  * - src/components/offers/OffersPage.tsx
  */
-export async function softDeleteRecord<T extends { is_deleted?: boolean; deleted_at?: string }>(
+export async function softDeleteRecord<T extends Partial<SoftDeleteFields>>(
   table: TableName,
-  id: string
+  id: string,
+  userId?: string
 ): Promise<DbResponse<T>> {
   try {
-    const softDeleteData = {
+    const now = new Date().toISOString();
+    const softDeleteData: SoftDeleteFields = {
       is_deleted: true,
-      deleted_at: new Date().toISOString(),
+      deleted_at: now,
+      user_updated: userId || null,
+      date_updated: now
     };
 
-    // Use a direct approach without type instantiation depth issues
-    const client: any = supabase;
-    const query = client.from(table);
-    const response = await query
-      .update(softDeleteData)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (response.error) {
-      return { data: null, error: response.error, status: 'error' };
-    }
-
-    return { data: response.data as T, error: null, status: 'success' };
+    // Use the central updateRecord function
+    return await updateRecord<T>(table, id, softDeleteData as Partial<T>);
   } catch (error) {
     console.error(`Error soft deleting record from ${table}:`, error);
     return { 
