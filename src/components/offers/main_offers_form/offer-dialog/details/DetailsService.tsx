@@ -31,7 +31,7 @@ export const fetchOfferDetails = async (offerId: string): Promise<OfferDetail[]>
         subcategory:service_subcategories(*),
         unit:units(*)
       `,
-      filters: { offer_id: offerId },
+      filters: { offer_id: offerId, is_deleted: false },
       order: { column: "date_created", ascending: true }
     });
 
@@ -69,16 +69,19 @@ export const addOfferDetail = async (
     unit_id: string;
     price: number;
     quantity: number;
-    total: number;
+    total?: number;
     notes?: string;
   },
   userId: string
 ): Promise<OfferDetail> => {
   try {
+    const { total, ...dataWithoutTotal } = detailData;
+    
     const newDetailData = {
-      ...detailData,
-      created_by: userId,
-      updated_by: userId,
+      ...dataWithoutTotal,
+      user_create: userId,
+      user_updated: userId,
+      date_updated: new Date().toISOString()
     };
 
     const { data, error } = await createRecord<OfferDetail>("offer_details", newDetailData);
@@ -111,9 +114,13 @@ export const updateOfferDetail = async (
   userId: string
 ): Promise<OfferDetail> => {
   try {
+    // Remove the total field from the update data
+    const { total, ...dataWithoutTotal } = updateData;
+    
     const dataToUpdate = {
-      ...updateData,
-      updated_by: userId,
+      ...dataWithoutTotal,
+      user_updated: userId,
+      date_updated: new Date().toISOString()
     };
 
     const { data, error } = await updateRecord<OfferDetail>(

@@ -11,7 +11,13 @@ import {
 import { useDetailsContext } from './DetailsContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ServiceCategory, ServiceSubcategory } from '@/types/offer-details';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/GlobalTooltip";
+import { 
+  Tooltip, 
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger,
+  TruncateWithTooltip 
+} from "@/components/ui/GlobalTooltip";
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { fetchSubcategories } from './DetailsService';
 
@@ -30,8 +36,6 @@ const CategorySelectionDialog: React.FC = () => {
     // Dialog states
     showSelectionDialog,
     setShowSelectionDialog,
-    confirmingSelection,
-    setConfirmingSelection,
     
     // Selection states
     selectedItems,
@@ -116,58 +120,41 @@ const CategorySelectionDialog: React.FC = () => {
     }
   };
 
-  // Simple tooltip wrapper component that uses the global tooltip
-  const SafeTooltipWrapper = ({ content, children }: { content: string, children: React.ReactNode }) => (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {children}
-      </TooltipTrigger>
-      <TooltipContent>
-        {content}
-      </TooltipContent>
-    </Tooltip>
-  );
-
   return (
     <Dialog 
       open={showSelectionDialog} 
       onOpenChange={(open) => {
-        if (!open && !confirmingSelection) {
+        if (!open) {
           handleClose();
         }
       }}
       aria-labelledby="details-selection-dialog-title"
     >
       <DialogContent 
-        className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] max-w-5xl w-[90vw] max-h-[80vh] h-[600px] flex flex-col rounded-lg shadow-lg"
+        className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] max-w-5xl w-[90vw] max-h-[80vh] h-[550px] flex flex-col rounded-lg shadow-lg"
         onEscapeKeyDown={(e) => {
           // Prevent default escape key behavior and handle manually
           e.preventDefault();
-          if (!confirmingSelection) {
-            handleClose();
-          }
+          handleClose();
         }}
       >
-        <DialogHeader className="flex-shrink-0 flex justify-between items-center">
-          <DialogTitle id="details-selection-dialog-title" className="text-[#a8c5b5]">Επιλογή Λεπτομερειών</DialogTitle>
-          <DialogClose asChild onClick={handleClose}>
-            <Button variant="ghost" className="h-8 w-8 p-0 text-[#a8c5b5] hover:text-white hover:bg-[#354f52]" aria-label="Close">
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogClose>
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle id="details-selection-dialog-title" className="text-[#a8c5b5] text-left">Επιλογή Λεπτομερειών</DialogTitle>
         </DialogHeader>
         
-        <div className="flex flex-col space-y-4 py-4 flex-grow overflow-hidden px-2">
-          <div className="flex space-x-4 h-[450px] flex-shrink-0">
+        <div className="flex flex-col space-y-4 py-4 flex-grow overflow-hidden px-4">
+          <div className="flex space-x-6 h-[350px] flex-shrink-0">
             {/* Categories List */}
-            <div className="w-1/3 border border-[#52796f] rounded-md overflow-hidden flex-shrink-0 shadow-md">
+            <div className="w-[38%] border border-[#52796f] rounded-md overflow-hidden flex-shrink-0 shadow-md">
               <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
                 <h3 className="text-[#a8c5b5] text-base font-medium">Κατηγορίες</h3>
               </div>
-              <div className="overflow-y-auto h-[calc(100%-36px)]">
+              <div className="overflow-y-auto h-[calc(100%-36px)] max-h-[310px] overflow-x-hidden">
                 {categories.length > 0 ? (
                   <div className="divide-y divide-[#52796f]/30">
-                    {categories.map((category) => (
+                    {categories
+                      .sort((a, b) => a.category_name.toLowerCase().localeCompare(b.category_name.toLowerCase()))
+                      .map((category) => (
                       <div 
                         key={category.id}
                         className={`px-3 py-1 cursor-pointer hover:bg-[#354f52]/50 ${
@@ -175,15 +162,13 @@ const CategorySelectionDialog: React.FC = () => {
                         }`}
                         onClick={() => handleCategoryClick(category.id)}
                       >
-                        <TooltipProvider>
-                          <SafeTooltipWrapper content={category.category_name}>
-                            <span className="block truncate text-xs font-medium">
-                              {category.category_name.length > 30 
-                                ? `${category.category_name.substring(0, 30)}...` 
-                                : category.category_name}
-                            </span>
-                          </SafeTooltipWrapper>
-                        </TooltipProvider>
+                        <TruncateWithTooltip 
+                          text={category.category_name}
+                          maxLength={50}
+                          tooltipMaxWidth={600}
+                          className="block text-xs font-medium max-w-full break-words"
+                          disabled={category.category_name.length <= 50}
+                        />
                       </div>
                     ))}
                   </div>
@@ -196,7 +181,7 @@ const CategorySelectionDialog: React.FC = () => {
             </div>
             
             {/* Subcategories List */}
-            <div className="w-2/3 border border-[#52796f] rounded-md overflow-hidden flex-shrink-0 shadow-md">
+            <div className="w-[58%] border-[1px] border-[#52796f] rounded-md overflow-hidden flex-shrink-0 shadow-md">
               <div className="bg-[#354f52] px-3 py-2 border-b border-[#52796f]">
                 <h3 className="text-[#a8c5b5] text-base font-medium">
                   {currentCategoryId 
@@ -205,7 +190,7 @@ const CategorySelectionDialog: React.FC = () => {
                   }
                 </h3>
               </div>
-              <div className="overflow-y-auto h-[calc(100%-36px)]">
+              <div className="overflow-y-auto h-[calc(100%-36px)] max-h-[310px] overflow-x-hidden">
                 {currentCategoryId ? (
                   dialogLoading ? (
                     <div className="p-3 text-center">
@@ -215,6 +200,7 @@ const CategorySelectionDialog: React.FC = () => {
                     <div className="divide-y divide-[#52796f]/30">
                       {subcategories
                         .filter(sub => sub.category_id === currentCategoryId)
+                        .sort((a, b) => a.subcategory_name.toLowerCase().localeCompare(b.subcategory_name.toLowerCase()))
                         .map((subcategory) => {
                           const isSelected = selectedItems.some(
                             item => item.categoryId === currentCategoryId && item.subcategoryId === subcategory.id
@@ -232,38 +218,13 @@ const CategorySelectionDialog: React.FC = () => {
                                 <div className={`w-4 h-4 mr-2 border ${isSelected ? 'bg-[#84a98c] border-[#84a98c]' : 'border-[#52796f]'} rounded flex items-center justify-center`}>
                                   {isSelected && <span className="text-white text-xs">✓</span>}
                                 </div>
-                                <span className="text-xs">
-                                  {subcategory.subcategory_name.length > 60 ? (
-                                    tooltipMountedRef.current ? (
-                                      <ErrorBoundary
-                                        fallback={
-                                          <span>
-                                            {subcategory.subcategory_name.substring(0, 60)}
-                                            <span className="ml-1 ellipsis-blue">...</span>
-                                          </span>
-                                        }
-                                      >
-                                        <TooltipProvider>
-                                          <SafeTooltipWrapper 
-                                            content={subcategory.subcategory_name}
-                                          >
-                                            <span>
-                                              {subcategory.subcategory_name.substring(0, 60)}
-                                              <span className="ml-1 ellipsis-blue">...</span>
-                                            </span>
-                                          </SafeTooltipWrapper>
-                                        </TooltipProvider>
-                                      </ErrorBoundary>
-                                    ) : (
-                                      <span>
-                                        {subcategory.subcategory_name.substring(0, 60)}
-                                        <span className="ml-1 ellipsis-blue">...</span>
-                                      </span>
-                                    )
-                                  ) : (
-                                    subcategory.subcategory_name
-                                  )}
-                                </span>
+                                <TruncateWithTooltip 
+                                  text={subcategory.subcategory_name}
+                                  maxLength={70}
+                                  tooltipMaxWidth={600}
+                                  className="text-xs max-w-full break-words"
+                                  disabled={subcategory.subcategory_name.length <= 70}
+                                />
                               </div>
                             </div>
                           );

@@ -98,41 +98,133 @@ export const DetailsContextProvider: React.FC<DetailsContextProviderProps> = ({ 
 
   // Load data when the dialog is open and tab is "details"
   useEffect(() => {
-    if (dialogOpen && currentTab === 'details') {
-      resetState();
-      
-      // Function to fetch offer details
-      const fetchData = async () => {
-        if (!dialogId) {
-          setLoading(false);
-          return;
+    // Don't do anything if there's no dialogId (offer ID)
+    if (!dialogId) {
+      setLoading(false);
+      return;
+    }
+    
+    // Function to fetch offer details
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Load categories and units in parallel
+        await preloadCategoriesAndUnits({
+          setCategories,
+          setUnits,
+          setError
+        });
+        
+        // Load offer details
+        const offerDetails = await fetchOfferDetails(dialogId);
+        
+        // Store the details
+        setDetails(offerDetails);
+        
+        // Load all subcategories for used categories
+        const uniqueCategoryIds = [...new Set(offerDetails.map(detail => detail.category_id))];
+        
+        // Fetch subcategories for each category
+        const subcategoryPromises = uniqueCategoryIds.map(categoryId => 
+          fetchSubcategories(categoryId)
+        );
+        
+        const allSubcategoriesArrays = await Promise.all(subcategoryPromises);
+        const allSubcategories = allSubcategoriesArrays.flat();
+        
+        // Store subcategories
+        setSubcategories(allSubcategories);
+        
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching offer details:', err);
+        setError('Σφάλμα φόρτωσης στοιχείων προσφοράς');
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+    
+  }, [dialogId]); // Dependencies: dialogId only, so it reloads when the offer ID changes
+
+  // Register the saveDetailsToDatabase function
+  useEffect(() => {
+    if (!registerSaveDetails) return;
+    
+    const saveDetailsToDatabase = async (realOfferId: string): Promise<boolean> => {
+      try {
+        if (!user?.id) {
+          console.error('User ID not found');
+          return false;
         }
         
-        try {
-          setLoading(true);
-          
-          // Load categories and units in parallel
-          await preloadCategoriesAndUnits({
-            setCategories,
-            setUnits,
-            setError
+        // Handle marked for deletion items
+        if (markedForDeletion.size > 0) {
+          const deletionPromises = Array.from(markedForDeletion).map(async (detailId) => {
+            await deleteOfferDetail(detailId);
           });
           
-          // Load offer details
-          const offerDetails = await fetchOfferDetails(dialogId);
-          setDetails(offerDetails);
-          
-          setLoading(false);
-        } catch (err) {
-          console.error('Error fetching offer details:', err);
-          setError('Σφάλμα φόρτωσης στοιχείων προσφοράς');
-          setLoading(false);
+          await Promise.all(deletionPromises);
         }
-      };
-      
-      fetchData();
+        
+        // Add new selected details
+        if (selectedDetails.length > 0) {
+          const addPromises = selectedDetails.map(async (detail) => {
+            // Skip items that are marked for deletion
+            if (detail.id && markedForDeletion.has(detail.id)) {
+              return null;
+            }
+            
+            // Construct the data for the new detail - only include essential fields
+            const detailData = {
+              offer_id: realOfferId,
+              category_id: detail.category_id,
+              subcategory_id: detail.subcategory_id || '',
+              unit_id: detail.unit_id || '',
+              price: detail.price || 0,
+              quantity: 1, // Always set quantity to 1
+              notes: detail.notes
+              // total is excluded as it's a generated column
+            };
+            
+            // Add the detail to the database
+            return addOfferDetail(realOfferId, detailData, user.id);
+          });
+          
+          await Promise.all(addPromises.filter(Boolean));
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error saving offer details:', error);
+        return false;
+      }
+    };
+    
+    // Register the save function
+    registerSaveDetails(saveDetailsToDatabase);
+    
+    // Cleanup function to unregister when component unmounts
+    return () => {
+      registerSaveDetails(null);
+    };
+  }, [registerSaveDetails, selectedDetails, markedForDeletion, user, deleteOfferDetail, addOfferDetail]);
+
+  // Register the tab reset function
+  useEffect(() => {
+    // Register the resetState function with the parent context's registerTabReset method
+    if (registerTabReset) {
+      registerTabReset('details', resetState);
     }
-  }, [dialogOpen, currentTab, dialogId, resetState]);
+    
+    // Cleanup function to unregister when component unmounts
+    return () => {
+      if (offerDialogContext.unregisterTabReset) {
+        offerDialogContext.unregisterTabReset('details');
+      }
+    };
+  }, [registerTabReset, resetState, offerDialogContext]);
 
   // Handle cleanup when dialog is closed or tab changes
   useEffect(() => {
@@ -155,17 +247,12 @@ export const DetailsContextProvider: React.FC<DetailsContextProviderProps> = ({ 
     }
   }, []);
 
-  // Handle selection confirmation
+  // Handle selection confirmation - simplified to just add items without confirmation
   const handleSelectionConfirm = useCallback(async () => {
     try {
-      setConfirmingSelection(true);
-      setDialogLoading(true);
-      
       // Check if we have any selected items
       if (selectedItems.length === 0) {
         setShowSelectionDialog(false);
-        setConfirmingSelection(false);
-        setDialogLoading(false);
         return;
       }
       
@@ -174,7 +261,8 @@ export const DetailsContextProvider: React.FC<DetailsContextProviderProps> = ({ 
         // Check if this item already exists in the details list
         const existsInDetails = details.some(
           detail => detail.category_id === item.categoryId && 
-                   detail.subcategory_id === item.subcategoryId
+                   detail.subcategory_id === item.subcategoryId &&
+                   !detail.is_deleted
         );
         
         // Check if this item already exists in the selectedDetails list
@@ -187,66 +275,62 @@ export const DetailsContextProvider: React.FC<DetailsContextProviderProps> = ({ 
         return !existsInDetails && !existsInSelectedDetails;
       });
       
-      // If all selected items already exist, just close the dialog without showing any message
-      if (itemsToAdd.length === 0) {
-        setShowSelectionDialog(false);
-        setConfirmingSelection(false);
-        setDialogLoading(false);
-        return;
-      }
-      
-      // Create detail objects for UI display only - maintain original order from selectedItems
-      // We need to process items in reverse order to maintain the selection order
-      const newSelectedDetails = [...itemsToAdd].reverse().map(item => {
-        // Find the category and subcategory objects
-        const category = categories.find(c => c.id === item.categoryId);
-        const subcategory = subcategories.find(s => s.id === item.subcategoryId);
-        
-        // Default to first unit if none is selected
-        const unitId = item.unitId || (units.length > 0 ? units[0].id : "");
-        const unit = units.find(u => u.id === unitId);
-        
-        // Generate a UI-only ID with timestamp to prevent collisions
-        const uiId = `ui-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-        
-        // Create a detail object for UI only
-        return {
-          id: uiId,
-          offer_id: dialogId || 'pending',
-          category_id: item.categoryId,
-          subcategory_id: item.subcategoryId,
-          unit_id: unitId,
-          quantity: 1,
-          price: item.price,
-          total: item.price, // Price * quantity
-          date_created: new Date().toISOString(),
-          // Add the joined fields
-          category: category,
-          subcategory: subcategory,
-          unit: unit
-        } as OfferDetail;
+      // Sort items by subcategory name for consistent ordering
+      const sortedItemsToAdd = [...itemsToAdd].sort((a, b) => {
+        const subcategoryA = subcategories.find(s => s.id === a.subcategoryId);
+        const subcategoryB = subcategories.find(s => s.id === b.subcategoryId);
+        const nameA = subcategoryA?.subcategory_name.toLowerCase() || '';
+        const nameB = subcategoryB?.subcategory_name.toLowerCase() || '';
+        return nameA.localeCompare(nameB);
       });
       
-      // Add new items to the beginning of the list
-      setSelectedDetails(prev => [...newSelectedDetails, ...prev]);
+      // Create new detail objects for UI display only if there are any to add
+      if (sortedItemsToAdd.length > 0) {
+        const newSelectedDetails = sortedItemsToAdd.map(item => {
+          // Find the category and subcategory objects
+          const category = categories.find(c => c.id === item.categoryId);
+          const subcategory = subcategories.find(s => s.id === item.subcategoryId);
+          
+          // Default to first unit if none is selected
+          const unitId = item.unitId || (units.length > 0 ? units[0].id : "");
+          const unit = units.find(u => u.id === unitId);
+          
+          // Generate a UI-only ID with timestamp to prevent collisions
+          const uiId = `ui-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+          
+          // Create a detail object for UI only
+          return {
+            id: uiId,
+            offer_id: dialogId || 'pending',
+            category_id: item.categoryId,
+            subcategory_id: item.subcategoryId,
+            unit_id: unitId,
+            quantity: 1,
+            price: item.price,
+            total: item.price, // Price * quantity
+            date_created: new Date().toISOString(),
+            // Add the joined fields
+            category: category,
+            subcategory: subcategory,
+            unit: unit
+          } as OfferDetail;
+        });
+        
+        // Add new items to the list
+        setSelectedDetails(prev => [...newSelectedDetails, ...prev]);
+      }
       
       // Reset selection state
       setSelectedItems([]);
       setCurrentCategoryId(null);
       
-      // Wait a short time before closing the dialog to ensure state is updated
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Close the dialog window
+      // Close the dialog window immediately
       setShowSelectionDialog(false);
     } catch (error) {
       console.error("Error handling selection:", error);
       setError("Σφάλμα κατά την φόρτωση δεδομένων. Παρακαλώ δοκιμάστε ξανά.");
-    } finally {
-      setDialogLoading(false);
-      setConfirmingSelection(false);
     }
-  }, [categories, currentCategoryId, details, dialogId, selectedDetails, selectedItems, setConfirmingSelection, setCurrentCategoryId, setDialogLoading, setError, setSelectedDetails, setSelectedItems, setShowSelectionDialog, subcategories, units]);
+  }, [categories, currentCategoryId, details, dialogId, selectedDetails, selectedItems, setCurrentCategoryId, setError, setSelectedDetails, setSelectedItems, setShowSelectionDialog, subcategories, units]);
 
   // Handle deletion of marked items
   const handleDeleteMarked = useCallback(async () => {
@@ -280,81 +364,60 @@ export const DetailsContextProvider: React.FC<DetailsContextProviderProps> = ({ 
     }
   }, [dialogId, markedForDeletion, toast]);
 
-  // Handle unit change
-  const handleUnitChange = useCallback(async (detailId: string, unitId: string, isUIOnly: boolean) => {
-    if (isUIOnly) {
-      // Update UI-only item
-      setSelectedDetails(prevDetails => 
-        prevDetails.map(detail => 
-          (detail.subcategory_id === detailId) 
-            ? { ...detail, unit_id: unitId }
-            : detail
-        )
-      );
-      return;
-    }
-    
-    if (!dialogId || !user?.id) return;
-    
-    try {
-      // Update DB item
-      await updateOfferDetail(detailId, { unit_id: unitId }, user.id);
-      
-      // Update local state
-      setDetails(prevDetails => 
-        prevDetails.map(detail => 
-          (detail.id === detailId) 
-            ? { ...detail, unit_id: unitId }
-            : detail
-        )
-      );
-    } catch (err) {
-      console.error('Error updating unit:', err);
-      toast({
-        title: 'Σφάλμα',
-        description: 'Δεν ήταν δυνατή η ενημέρωση της μονάδας μέτρησης',
-        variant: 'destructive',
+  // Handle unit change - now only updates UI state, no database saves
+  const handleUnitChange = useCallback(async (detailId: string, unitId: string, isUIOnly: boolean = false): Promise<void> => {
+    setDetails(prevDetails => {
+      const updatedDetails = [...prevDetails];
+      const detailIndex = updatedDetails.findIndex(detail => {
+        const foundId = detail.id || detail.subcategory_id;
+        return foundId === detailId;
       });
-    }
-  }, [dialogId, toast, user?.id]);
 
-  // Handle price change
-  const handlePriceChange = useCallback(async (detailId: string, price: number, isUIOnly: boolean) => {
+      if (detailIndex !== -1) {
+        updatedDetails[detailIndex] = {
+          ...updatedDetails[detailIndex],
+          unit_id: unitId
+        };
+      }
+      return updatedDetails;
+    });
+    
+    // If it's a UI-only item, update in selectedDetails as well
+    if (isUIOnly) {
+      setSelectedDetails(prevDetails => 
+        prevDetails.map(detail => {
+          if (detail.id === detailId || detail.subcategory_id === detailId) {
+            return { ...detail, unit_id: unitId };
+          }
+          return detail;
+        })
+      );
+    }
+  }, [setSelectedDetails]);
+
+  // Handle price change - now only updates UI state, no database saves
+  const handlePriceChange = useCallback(async (detailId: string, price: number | undefined, isUIOnly: boolean) => {
     if (isUIOnly) {
       // Update UI-only item
       setSelectedDetails(prevDetails => 
         prevDetails.map(detail => 
-          (detail.subcategory_id === detailId) 
-            ? { ...detail, price }
+          (detail.id === detailId || detail.subcategory_id === detailId) 
+            ? { ...detail, price: price === undefined ? 0 : price }
             : detail
         )
       );
       return;
     }
     
-    if (!dialogId || !user?.id) return;
-    
-    try {
-      // Update DB item
-      await updateOfferDetail(detailId, { price }, user.id);
-      
-      // Update local state
-      setDetails(prevDetails => 
-        prevDetails.map(detail => 
-          (detail.id === detailId) 
-            ? { ...detail, price }
-            : detail
-        )
-      );
-    } catch (err) {
-      console.error('Error updating price:', err);
-      toast({
-        title: 'Σφάλμα',
-        description: 'Δεν ήταν δυνατή η ενημέρωση της τιμής',
-        variant: 'destructive',
-      });
-    }
-  }, [dialogId, toast, user?.id]);
+    // Update local state only, no database save
+    setDetails(prevDetails => 
+      prevDetails.map(detail => 
+        (detail.id === detailId) 
+          ? { ...detail, price: price === undefined ? 0 : price }
+          : detail
+      )
+    );
+  }, [setSelectedDetails, setDetails]);
 
   // Handle dialog open change
   const handleDialogOpenChange = useCallback((open: boolean) => {
@@ -409,8 +472,9 @@ export const DetailsContextProvider: React.FC<DetailsContextProviderProps> = ({ 
 
   // Utility function to get full unit name
   const getFullUnitName = useCallback((id: string): string => {
+    if (!id) return "Επιλέξτε μονάδα";
     const unit = units.find(u => u.id === id);
-    return unit ? unit.name : '';
+    return unit ? unit.name : "Επιλέξτε μονάδα";
   }, [units]);
 
   // Context value

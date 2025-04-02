@@ -37,8 +37,6 @@ export interface DetailsContextType {
   setShowSelectionDialog: React.Dispatch<React.SetStateAction<boolean>>;
   showDeleteDialog: boolean;
   setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  confirmingSelection: boolean;
-  setConfirmingSelection: React.Dispatch<React.SetStateAction<boolean>>;
   
   // Selection states
   selectedItems: {
@@ -64,7 +62,7 @@ export interface DetailsContextType {
   resetState: () => void;
   handleDeleteMarked: () => Promise<void>;
   handleUnitChange: (detailId: string, unitId: string, isUIOnly: boolean) => Promise<void>;
-  handlePriceChange: (detailId: string, price: number, isUIOnly: boolean) => Promise<void>;
+  handlePriceChange: (detailId: string, price: number | undefined, isUIOnly: boolean) => Promise<void>;
   handleDialogOpenChange: (open: boolean) => void;
   cleanupDialogPortals: () => void;
   handleSelectionConfirm: () => Promise<void>;

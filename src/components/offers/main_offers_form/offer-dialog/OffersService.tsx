@@ -19,10 +19,6 @@ export const saveOfferAndGetId = async (
     // Clear any previous errors
     setErrorMessage("");
     
-    // Log formData for debugging
-    console.log('📝 Form data:', formData);
-    console.log('📝 Postal code value:', formData.postal_code);
-
     const safeUserId = userId || ADMIN_USER_ID;
     const customerIdString = formData.customer_id || customerId;
 

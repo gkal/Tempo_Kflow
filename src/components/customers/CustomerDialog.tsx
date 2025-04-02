@@ -107,11 +107,6 @@ export function CustomerDialog({
     return () => registerForm(null);
   }, [customer, registerForm]);
 
-  useEffect(() => {
-    registerForm('CustomerDialog');
-    return () => registerForm(null);
-  }, [registerForm]);
-
   const handleSave = (newCustomerId?: string, companyName?: string) => {
     if (newCustomerId) {
       setSavedCustomerId(typeof newCustomerId === 'string' ? newCustomerId : String(newCustomerId));

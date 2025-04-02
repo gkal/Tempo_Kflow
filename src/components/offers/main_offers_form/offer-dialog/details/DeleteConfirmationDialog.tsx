@@ -33,9 +33,9 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
         aria-describedby="delete-dialog-description"
       >
         <AlertDialogHeader>
-          <AlertDialogTitle id="delete-dialog-title">Διαγραφή</AlertDialogTitle>
+          <AlertDialogTitle id="delete-dialog-title">Επισήμανση για διαγραφή</AlertDialogTitle>
           <AlertDialogDescription id="delete-dialog-description">
-            Είστε σίγουροι ότι θέλετε να διαγράψετε αυτό το στοιχείο;
+            Το στοιχείο θα επισημανθεί για διαγραφή και θα διαγραφεί οριστικά όταν αποθηκεύσετε την προσφορά. Θέλετε να συνεχίσετε;
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="flex justify-end space-x-2 mt-4">
@@ -45,7 +45,7 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
             onClick={onConfirm}
             className="bg-red-600 hover:bg-red-700 text-white"
           >
-            Διαγραφή
+            Επισήμανση για διαγραφή
           </Button>
           <Button
             type="button"

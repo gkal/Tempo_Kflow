@@ -33,10 +33,10 @@ interface GlobalTooltipProps {
  */
 const formatTooltipContent = (content: ReactNode): ReactNode => {
   if (typeof content !== 'string' || content.length <= 150) {
-    return <div className="whitespace-nowrap">{content}</div>;
+    return <div className="whitespace-nowrap overflow-hidden text-ellipsis">{content}</div>;
   }
   
-  return <div className="whitespace-normal">{content}</div>;
+  return <div className="whitespace-normal overflow-hidden break-words">{content}</div>;
 };
 
 /**
@@ -139,14 +139,16 @@ export function GlobalTooltip({
           <div 
             className={cn(
               "fixed z-[9999] rounded-md bg-[#1a2e35] px-3 py-1.5 text-xs text-[#cad2c5] border border-[#52796f] shadow-lg",
-              "min-w-[120px] transition-opacity duration-200",
+              "min-w-[120px] max-w-[600px] transition-opacity duration-200 overflow-hidden",
               className
             )}
             style={{ 
               maxWidth: `${maxWidth}px`,
               top: `${tooltipPosition.top}px`,
               left: `${tooltipPosition.left}px`,
-              transform: transformStyle
+              transform: transformStyle,
+              wordBreak: "break-word",
+              overflowWrap: "break-word"
             }}
           >
             {formattedContent}

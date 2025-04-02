@@ -1,7 +1,20 @@
+/*******************************************************************
+ * ⚠️ CUSTOMER FORM COMPONENT - UNDER ACTIVE DEVELOPMENT ⚠️
+ * Last updated: (Current Date)
+ * 
+ * This component is being updated to implement duplicate detection.
+ * It handles:
+ * - Customer creation and updates with proper user tracking (created_by/modified_by)
+ * - Form validation and error handling
+ * - Contact management integration
+ * - Real-time updates
+ * - Duplicate customer detection (in progress)
+ *******************************************************************/
+
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from '@/lib/supabaseClient';
-import { Search, Plus, ChevronDown, Trash2 } from "lucide-react";
+import { Search, Plus, ChevronDown, Trash2, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ContactDialog } from "@/components/contacts/ContactDialog";
@@ -33,6 +46,9 @@ import { useMountEffect } from "../../hooks/useMountEffect";
 import { createPrefixedLogger, logDebug, logError, logInfo, logWarning } from "@/utils/loggingUtils";
 import { useLoading } from '@/lib/LoadingContext';
 import { useDataService } from "@/hooks/useDataService";
+import { useNavigate } from "react-router-dom";
+import { findPotentialDuplicates } from '@/services/duplicateDetectionService';
+import CustomerDetailDialog from './CustomerDetailDialog';
 
 // Map of normalized customer types that match the database constraint
 const CUSTOMER_TYPE_MAP = {
@@ -57,7 +73,7 @@ const CUSTOMER_TYPE_OPTIONS = [
   "Εκτακτη Εταιρία"
 ];
 
-// Custom styles for select dropdown
+// Near the start of the file, update the CSS for the notes-textarea class
 const selectStyles = `
   select {
     -webkit-appearance: none !important;
@@ -90,6 +106,17 @@ const selectStyles = `
   select option:focus {
     background-color: #52796f !important;
     color: #cad2c5 !important;
+  }
+
+  .notes-textarea {
+    height: 75px !important;
+    min-height: 75px !important;
+    max-height: 75px !important;
+    padding: 5px 8px !important;
+    resize: none !important;
+    overflow-y: auto !important;
+    line-height: 1.4 !important;
+    font-size: 13px !important;
   }
 `;
 
@@ -124,6 +151,23 @@ interface CustomerFormSubmissionData {
   deleted_at?: string | null;
   contact_name?: string | null;
   phone?: string | null;
+  created_by?: string;
+  modified_by?: string;
+}
+
+// Add Customer interface before the component
+interface Customer {
+  id: string;
+  company_name: string;
+  telephone: string;
+  afm: string;
+  doy?: string;
+  email?: string;
+  address?: string;
+  town?: string;
+  postal_code?: string;
+  deleted?: boolean;
+  score?: number;
 }
 
 const CustomerForm = ({
@@ -186,6 +230,20 @@ const CustomerForm = ({
     update: updateContact,
     softDelete: softDeleteContact
   } = useDataService<any>('contacts');
+
+  // Add state for navigating to duplicate customer
+  const [navigatingToCustomer, setNavigatingToCustomer] = useState(false);
+
+  // Add potentialMatches state
+  const [potentialMatches, setPotentialMatches] = useState<Customer[]>([]);
+  
+  // Add navigate
+  const navigate = useNavigate();
+  
+  // Add state for customer detail dialog
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomerScore, setSelectedCustomerScore] = useState<number | undefined>(undefined);
 
   // Fetch customer data if editing
   useEffect(() => {
@@ -346,7 +404,9 @@ const CustomerForm = ({
         // Use the phoneValue from hook which contains the correctly formatted number
         telephone: phoneValue,
         // For new records, ensure primary_contact_id is null, not empty string
-        primary_contact_id: formData.primary_contact_id || null
+        primary_contact_id: formData.primary_contact_id || null,
+        // Add user IDs for tracking who created/modified the record
+        ...(customerId ? { modified_by: user?.id } : { created_by: user?.id })
       };
       
       // Clean up the data before submission
@@ -610,12 +670,78 @@ const CustomerForm = ({
     }
   }
 
+  // Handle selection of a potential duplicate
+  const handleSelectDuplicate = (duplicateId: string) => {
+    // If we're already viewing a customer, don't navigate
+    if (customerId) {
+      toast({
+        title: "Πληροφορία",
+        description: "Δεν μπορείτε να μεταβείτε σε άλλο πελάτη κατά την επεξεργασία.",
+      });
+      return;
+    }
+    
+    setNavigatingToCustomer(true);
+    
+    // Simulate navigation - in a real app, this might use a router
+    // or dispatch an event that the parent component handles
+    toast({
+      title: "Μετάβαση σε υπάρχοντα πελάτη",
+      description: "Μεταβαίνετε στη σελίδα του υπάρχοντος πελάτη...",
+    });
+    
+    // Example of navigating to the duplicate customer
+    // This could be handled by the parent component through a callback
+    if (onSave) {
+      onSave(duplicateId, "");
+    }
+  };
+
+  // Add useEffect for duplicate detection
+  useEffect(() => {
+    const detectDuplicates = async () => {
+      if (!formData.company_name || formData.company_name.trim().length < 3) {
+        setPotentialMatches([]);
+        return;
+      }
+
+      try {
+        // Send both company name and telephone values
+        // Our new scoring algorithm will prioritize name matches
+        const matches = await findPotentialDuplicates({
+          company_name: formData.company_name,
+          telephone: phoneValue, // Use actual phone value instead of empty string
+          afm: formData.afm || ''
+        }, 75);
+        
+        setPotentialMatches(matches);
+      } catch (error) {
+        console.error('Error detecting duplicates:', error);
+      }
+    };
+
+    const debounceTimeout = setTimeout(() => {
+      detectDuplicates();
+    }, 500);
+
+    return () => clearTimeout(debounceTimeout);
+  }, [formData.company_name, formData.afm, phoneValue]); // Added phoneValue back as a dependency
+  
+  // Add onSelectMatch function
+  const onSelectMatch = (customerId: string, score?: number) => {
+    setSelectedCustomerId(customerId);
+    setSelectedCustomerScore(score);
+    setDetailDialogOpen(true);
+  };
+
   return (
     <div className="h-full overflow-auto bg-[#2f3e46] text-[#cad2c5]">
-      <style>{selectStyles}</style>
+      <style>
+        {selectStyles}
+      </style>
       <form
         id="customer-form"
-        className="p-4 bg-[#2f3e46] text-[#cad2c5]"
+        className="p-2 bg-[#2f3e46] text-[#cad2c5]"
         onSubmit={handleSubmit}
         autoComplete="off"
       >
@@ -629,17 +755,17 @@ const CustomerForm = ({
         </button>
         
         {/* Form Sections */}
-        <div className="space-y-4 max-w-5xl mx-auto">
-          <div className="flex flex-col md:flex-row gap-4">
+        <div className="space-y-2 max-w-5xl mx-auto">
+          <div className="flex flex-col md:flex-row gap-2">
             {/* Account Information Section */}
             <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-              <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
+              <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
                 <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
                   ΣΤΟΙΧΕΙΑ ΠΕΛΑΤΗ
                 </h2>
               </div>
-              <div className="p-3">
-                <div className="flex items-center" style={{ marginBottom: '16px' }}>
+              <div className="p-2">
+                <div className="flex items-center" style={{ marginBottom: '12px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">
                     Επωνυμία <span className="text-red-500">*</span>
                   </div>
@@ -650,7 +776,7 @@ const CustomerForm = ({
                       value={formData.company_name}
                       onChange={handleInputChange}
                       className="app-input"
-                      disabled={viewOnly}
+                      disabled={viewOnly || navigatingToCustomer}
                       required
                       autoComplete="off"
                       onInvalid={(e) => e.currentTarget.setCustomValidity('Παρακαλώ συμπληρώστε αυτό το πεδίο')}
@@ -659,7 +785,10 @@ const CustomerForm = ({
                   </div>
                 </div>
 
-                <div className="flex items-center" style={{ marginBottom: '16px' }}>
+                {/* Duplicate Detection Component - only show when creating a new customer */}
+                {/* Removed as we're now showing matches in the Surprise section */}
+                
+                <div className="flex items-center" style={{ marginBottom: '12px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">
                     Τηλέφωνο <span className="text-red-500">*</span>
                   </div>
@@ -670,7 +799,7 @@ const CustomerForm = ({
                       value={phoneValue}
                       onChange={handleInputChange}
                       className="app-input"
-                      disabled={viewOnly}
+                      disabled={viewOnly || navigatingToCustomer}
                       required
                       autoComplete="off"
                       onInvalid={(e) => e.currentTarget.setCustomValidity('Παρακαλώ συμπληρώστε αυτό το πεδίο')}
@@ -680,7 +809,7 @@ const CustomerForm = ({
                   </div>
                 </div>
 
-                <div className="flex items-center" style={{ marginBottom: '16px' }}>
+                <div className="flex items-center" style={{ marginBottom: '12px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">ΑΦΜ</div>
                   <div className="w-2/3">
                     <Input
@@ -689,7 +818,7 @@ const CustomerForm = ({
                       value={formData.afm}
                       onChange={handleInputChange}
                       className="app-input"
-                      disabled={viewOnly}
+                      disabled={viewOnly || navigatingToCustomer}
                       autoComplete="off"
                       pattern="[0-9]{8}"
                       maxLength={8}
@@ -702,7 +831,7 @@ const CustomerForm = ({
                   </div>
                 </div>
 
-                <div className="flex items-center" style={{ marginBottom: '16px' }}>
+                <div className="flex items-center" style={{ marginBottom: '12px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Δ.Ο.Υ.</div>
                   <div className="w-2/3">
                     <Input
@@ -711,13 +840,13 @@ const CustomerForm = ({
                       value={formData.doy}
                       onChange={handleInputChange}
                       className="app-input"
-                      disabled={viewOnly}
+                      disabled={viewOnly || navigatingToCustomer}
                       autoComplete="off"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center" style={{ marginBottom: '16px' }}>
+                <div className="flex items-center" style={{ marginBottom: '12px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">
                     Τύπος Πελάτη
                   </div>
@@ -737,7 +866,7 @@ const CustomerForm = ({
                       }}
                       placeholder="Επιλέξτε τύπο πελάτη"
                       formContext={true}
-                      disabled={viewOnly}
+                      disabled={viewOnly || navigatingToCustomer}
                     />
                   </div>
                 </div>
@@ -752,7 +881,7 @@ const CustomerForm = ({
                       value={formData.email}
                       onChange={handleInputChange}
                       className="app-input"
-                      disabled={viewOnly}
+                      disabled={viewOnly || navigatingToCustomer}
                       autoComplete="off"
                     />
                   </div>
@@ -760,9 +889,66 @@ const CustomerForm = ({
               </div>
             </div>
 
+            {/* Address Section */}
+            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+              <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
+                <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                  ΣΤΟΙΧΕΙΑ ΔΙΕΥΘΥΝΣΕΩΣ
+                </h2>
+              </div>
+              <div className="p-2">
+                <div className="flex items-center" style={{ marginBottom: '12px' }}>
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Οδός</div>
+                  <div className="w-3/4">
+                    <Input
+                      id="address"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      className="app-input"
+                      disabled={viewOnly || navigatingToCustomer}
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center" style={{ marginBottom: '12px' }}>
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Πόλη</div>
+                  <div className="w-3/4">
+                    <Input
+                      id="town"
+                      name="town"
+                      value={formData.town}
+                      onChange={handleInputChange}
+                      className="app-input"
+                      disabled={viewOnly || navigatingToCustomer}
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center" style={{ marginBottom: '12px' }}>
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Τ.Κ.</div>
+                  <div className="w-3/4">
+                    <Input
+                      id="postal_code"
+                      name="postal_code"
+                      value={formData.postal_code}
+                      onChange={handleInputChange}
+                      className="app-input"
+                      disabled={viewOnly || navigatingToCustomer}
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-2">
             {/* Company Contacts Section */}
-            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden h-[350px]">
-              <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f] flex justify-between items-center">
+            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden h-[120px]">
+              <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f] flex justify-between items-center">
                 <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
                   ΕΠΑΦΕΣ ΕΤΑΙΡΕΙΑΣ
                 </h2>
@@ -770,19 +956,19 @@ const CustomerForm = ({
                   <div className="flex space-x-2">
                     <button
                       type="button"
-                      className="h-7 w-7 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-600 rounded-full flex items-center justify-center"
+                      className="h-6 w-6 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-[#2f3e46] border border-yellow-600 rounded-full flex items-center justify-center"
                       onClick={() => {
                         setSelectedContact(null);
                         setShowContactDialog(true);
                       }}
-                      disabled={viewOnly}
+                      disabled={viewOnly || navigatingToCustomer}
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-3 w-3" />
                     </button>
                   </div>
                 )}
               </div>
-              <div className="p-3">
+              <div className="p-2">
                 {customerId ? (
                   <ContactList
                     contacts={contacts}
@@ -797,7 +983,7 @@ const CustomerForm = ({
                       setContactToDelete(contact);
                       setShowDeleteDialog(true);
                     }}
-                    maxHeight="max-h-[200px]"
+                    maxHeight="max-h-[55px]"
                   />
                 ) : (
                   <div className="text-center py-3 text-[#a8c5b5]">
@@ -806,100 +992,98 @@ const CustomerForm = ({
                 )}
               </div>
             </div>
-          </div>
-
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Address Section */}
-            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-              <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
-                <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                  ΣΤΟΙΧΕΙΑ ΔΙΕΥΘΥΝΣΕΩΣ
-                </h2>
-              </div>
-              <div className="p-3">
-                <div className="flex items-center" style={{ marginBottom: '16px' }}>
-                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Οδός</div>
-                  <div className="w-3/4">
-                    <Input
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      className="app-input"
-                      disabled={viewOnly}
-                      autoComplete="off"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center" style={{ marginBottom: '16px' }}>
-                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Πόλη</div>
-                  <div className="w-3/4">
-                    <Input
-                      id="town"
-                      name="town"
-                      value={formData.town}
-                      onChange={handleInputChange}
-                      className="app-input"
-                      disabled={viewOnly}
-                      autoComplete="off"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center" style={{ marginBottom: '0' }}>
-                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Τ.Κ.</div>
-                  <div className="w-3/4">
-                    <Input
-                      id="postal_code"
-                      name="postal_code"
-                      value={formData.postal_code}
-                      onChange={handleInputChange}
-                      className="app-input"
-                      disabled={viewOnly}
-                      autoComplete="off"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {/* Notes Section */}
-            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-              <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
+            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden h-[120px]">
+              <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
                 <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
                   ΣΗΜΕΙΩΣΕΙΣ
                 </h2>
               </div>
-              <div className="p-3">
+              <div className="p-2 flex flex-col h-full">
                 <Textarea
                   id="notes"
                   name="notes"
                   value={formData.notes}
-                  className="customer-notes-textarea bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c]/50"
+                  className="customer-notes-textarea bg-[#2f3e46] text-[#cad2c5] placeholder:text-[#84a98c]/50 notes-textarea"
                   style={{
-                    minHeight: '124px !important',
-                    height: '124px !important',
-                    maxHeight: '124px !important',
                     resize: 'none',
                     border: 'none'
                   }}
+                  rows={1}
                   data-notes-textarea="true"
-                  onChange={(e) => {
-                    handleInputChange(e);
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.boxShadow = '0 0 0 1px #52796f';
-                  }}
-                  onMouseOut={(e) => {
-                    if (document.activeElement !== e.currentTarget) {
-                      e.currentTarget.style.boxShadow = 'none';
-                    }
-                  }}
-                  disabled={viewOnly}
+                  onChange={handleInputChange}
+                  disabled={viewOnly || navigatingToCustomer}
                   placeholder="Προσθέστε σημειώσεις για τον πελάτη..."
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Surprise Section - Full Width */}
+          <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden h-[140px]">
+            <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
+              <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                {potentialMatches && potentialMatches.length > 0 ? 'ΔΙΠΛΟΕΓΓΡΑΦΗ ΕΝΤΟΠΙΣΤΗΚΕ!' : 'SURPRISE!'}
+              </h2>
+            </div>
+            <div className="p-2 h-[calc(100%-32px)] overflow-auto">
+              {potentialMatches && potentialMatches.length > 0 ? (
+                <div className="text-[#cad2c5]">
+                  <table className="min-w-full divide-y divide-[#52796f]">
+                    <thead className="bg-[#2f3e46]">
+                      <tr>
+                        <th scope="col" className="px-3 py-1 text-left text-xs font-medium text-[#a8c5b5] uppercase tracking-wider">Ομοιότητα</th>
+                        <th scope="col" className="px-3 py-1 text-left text-xs font-medium text-[#a8c5b5] uppercase tracking-wider">Επωνυμία</th>
+                        <th scope="col" className="px-3 py-1 text-left text-xs font-medium text-[#a8c5b5] uppercase tracking-wider">ΑΦΜ</th>
+                        <th scope="col" className="px-3 py-1 text-left text-xs font-medium text-[#a8c5b5] uppercase tracking-wider">Τηλέφωνο</th>
+                        <th scope="col" className="px-3 py-1 text-left text-xs font-medium text-[#a8c5b5] uppercase tracking-wider">Email</th>
+                        <th scope="col" className="px-3 py-1 text-left text-xs font-medium text-[#a8c5b5] uppercase tracking-wider">Διεύθυνση</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-[#2f3e46] divide-y divide-[#52796f]">
+                      {potentialMatches.map((match) => (
+                        <tr 
+                          key={match.id}
+                          className={`${match.deleted ? 'opacity-60' : ''} cursor-pointer hover:bg-[#354f52]`}
+                          onClick={() => onSelectMatch(match.id, match.score)}
+                        >
+                          <td className="px-3 py-1 whitespace-nowrap text-xs">
+                            <span className={`inline-block px-1.5 py-0.5 rounded-full ${
+                              match.score && match.score >= 80
+                                ? 'bg-red-200 text-red-800 dark:bg-red-700/50 dark:text-red-200'
+                                : 'bg-amber-200 text-amber-800 dark:bg-amber-700/50 dark:text-amber-200'
+                            }`}>
+                              {match.score}%
+                            </span>
+                          </td>
+                          <td className="px-3 py-1 whitespace-nowrap text-xs">
+                            <div className="flex items-center">
+                              <span className="font-medium">{match.company_name}</span>
+                              {match.deleted && (
+                                <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-1 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/20 dark:text-red-200">
+                                  <Archive className="mr-1 h-3 w-3" />
+                                  Διαγραμμένος
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-1 whitespace-nowrap text-xs">{match.afm}</td>
+                          <td className="px-3 py-1 whitespace-nowrap text-xs">{match.telephone}</td>
+                          <td className="px-3 py-1 whitespace-nowrap text-xs">{match.email || '-'}</td>
+                          <td className="px-3 py-1 whitespace-nowrap text-xs">{match.address || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center text-[#cad2c5]">
+                    Νέο τμήμα που θα υλοποιηθεί σύντομα!
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -974,6 +1158,14 @@ const CustomerForm = ({
           }}
         />
       )}
+      
+      {/* Customer Detail Dialog */}
+      <CustomerDetailDialog
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        customerId={selectedCustomerId}
+        matchScore={selectedCustomerScore}
+      />
     </div>
   );
 };

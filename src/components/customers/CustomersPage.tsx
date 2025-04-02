@@ -1062,7 +1062,6 @@ const CustomersPage: React.FC = () => {
                     // Open edit dialog instead of navigating
                     openEditOfferDialog(customerId, offer.id, () => {
                       // We don't need to do anything here as real-time updates will handle the UI
-                      console.log("Edit dialog closed - real-time updates will refresh the UI");
                     });
                   }}
                 >

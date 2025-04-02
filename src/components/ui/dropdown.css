@@ -60,7 +60,7 @@
 }
 
 .dropdown-item {
-  padding: 0.5rem 0.75rem !important;
+  padding: 0.4rem 0.75rem !important;
   cursor: pointer !important;
   color: #cad2c5 !important;
   transition: background-color 0.2s !important;
@@ -68,6 +68,8 @@
   display: block !important;
   width: 100% !important;
   text-align: left !important;
+  font-size: 0.85rem !important;
+  line-height: 1.3 !important;
 }
 
 .dropdown-item:hover {

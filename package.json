@@ -69,6 +69,7 @@
     "dotenv": "^16.4.7",
     "embla-carousel-react": "^8.1.5",
     "express": "^4.21.2",
+    "fuzzball": "^2.2.2",
     "lucide-react": "^0.479.0",
     "material-react-table": "^3.2.1",
     "react": "^18.2.0",

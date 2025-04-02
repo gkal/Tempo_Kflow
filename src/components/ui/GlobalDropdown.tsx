@@ -42,10 +42,10 @@ export function GlobalDropdown({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const [isPositioned, setIsPositioned] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
 
   useEffect(() => {
-    const selected = findSelectedOption();
-    setSelectedOption(selected ? (typeof selected === 'string' ? selected : selected.id) : undefined);
+    setSelectedOption(value);
   }, [value]);
 
   // Reset state when dropdown closes
@@ -65,7 +65,7 @@ export function GlobalDropdown({
 
   const getDisplayValue = () => {
     const selectedOpt = findSelectedOption();
-    if (!selectedOpt) return value;
+    if (!selectedOpt) return placeholder;
     return typeof selectedOpt === 'string' ? selectedOpt : selectedOpt.name;
   };
 
@@ -76,6 +76,7 @@ export function GlobalDropdown({
   };
 
   const renderDefaultOption = (option: string | { id: string; name: string }) => {
+    if (!option) return placeholder;
     return typeof option === 'string' ? option : option.name;
   };
 
@@ -92,11 +93,10 @@ export function GlobalDropdown({
             left: rect.left + scrollX,
             width: rect.width
           });
-          setIsPositioned(true);
         }
       };
 
-      updatePosition();
+      // Handle scroll and resize events to reposition dropdown
       window.addEventListener('scroll', updatePosition);
       window.addEventListener('resize', updatePosition);
 
@@ -104,8 +104,16 @@ export function GlobalDropdown({
         window.removeEventListener('scroll', updatePosition);
         window.removeEventListener('resize', updatePosition);
       };
-    } else {
-      setIsPositioned(false);
+    }
+  }, [isOpen]);
+  
+  // Handle closing the dropdown when it's no longer open
+  useEffect(() => {
+    if (!isOpen) {
+      setTimeout(() => {
+        setShouldRender(false);
+        setIsPositioned(false);
+      }, 150); // Small delay to allow for animation
     }
   }, [isOpen]);
 
@@ -145,8 +153,8 @@ export function GlobalDropdown({
   };
 
   const renderSelectedValue = () => {
-    if (!selectedOption) return placeholder;
-    if (renderValue) return renderValue(selectedOption);
+    if (!value) return placeholder;
+    if (renderValue) return renderValue(value);
     const selectedItem = findSelectedOption();
     if (!selectedItem) return placeholder;
     if (renderOption) return renderOption(selectedItem);
@@ -167,13 +175,16 @@ export function GlobalDropdown({
 
   // Render the dropdown menu using a portal
   const renderDropdownMenu = () => {
-    if (!isOpen) return null;
+    if (!shouldRender && !isOpen) return null;
 
     const menuStyle: React.CSSProperties = {
       top: `${dropdownPosition.top}px`,
       left: `${dropdownPosition.left}px`,
       width: `${dropdownPosition.width}px`,
-      visibility: isPositioned ? 'visible' : 'hidden' as const
+      opacity: isOpen ? 1 : 0,
+      transform: isOpen ? 'translateY(0)' : 'translateY(-8px)',
+      transition: 'opacity 150ms ease-in-out, transform 150ms ease-in-out',
+      pointerEvents: isOpen ? 'auto' : 'none'
     };
 
     return ReactDOM.createPortal(
@@ -223,7 +234,38 @@ export function GlobalDropdown({
     );
   };
 
-  const toggleDropdown = () => !disabled && setIsOpen(!isOpen);
+  const toggleDropdown = () => {
+    if (disabled) return;
+    
+    if (!isOpen) {
+      // Calculate position before opening
+      if (buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect();
+        const scrollY = window.scrollY || document.documentElement.scrollTop;
+        const scrollX = window.scrollX || document.documentElement.scrollLeft;
+        
+        setDropdownPosition({
+          top: rect.bottom + scrollY,
+          left: rect.left + scrollX,
+          width: rect.width
+        });
+        
+        // Set positioned first, then open the dropdown in the next tick
+        setIsPositioned(true);
+        setTimeout(() => {
+          setShouldRender(true);
+          setIsOpen(true);
+        }, 0);
+      } else {
+        setIsOpen(true);
+      }
+    } else {
+      setIsOpen(false);
+      setTimeout(() => {
+        setShouldRender(false);
+      }, 150); // Small delay to allow for animation
+    }
+  };
 
   return (
     <div
@@ -250,14 +292,12 @@ export function GlobalDropdown({
         onContextMenu={onContextMenu}
       >
         <span className="truncate">
-          {renderValue 
-            ? renderValue(value || '') 
-            : getDisplayValue() || placeholder}
+          {renderSelectedValue()}
         </span>
         <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
       </button>
 
-      {isOpen && renderDropdownMenu()}
+      {(isOpen || shouldRender) && renderDropdownMenu()}
     </div>
   );
 } 

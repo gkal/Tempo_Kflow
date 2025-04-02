@@ -52,7 +52,39 @@
     2. Hook: `useDeleteConfirmation()`
     3. Wrapper: `<DeleteConfirmationDialog />`
 
-### 📦 Project Structure
+- **Global Utility Components**
+  - Use these standardized components for consistent UI/UX:
+  
+  1. **GlobalTooltip**
+     - Purpose: Display tooltips on hover with configurable options
+     - Features:
+       - Customizable width, position, and delay
+       - Text truncation with automatic tooltips
+       - Overflow protection for long content
+       - Consistent styling across application
+     - Components:
+       - `<GlobalTooltip />`: Core tooltip component
+       - `<TruncateWithTooltip />`: Auto-truncates text and shows tooltip
+     - Usage: Ideal for displaying additional info or full text of truncated elements
+  
+  2. **GlobalDropdown**
+     - Purpose: Standardized dropdown for selectable options
+     - Features:
+       - Consistent styling and behavior
+       - Custom rendering of options and values
+       - Support for objects or string options
+       - Optional edit button
+     - Usage: For all dropdowns/select inputs throughout the application
+  
+  3. **DialogUtilities**
+     - Purpose: Standardized dialogs for consistent user interaction
+     - Components:
+       - `<ModernDeleteConfirmation />`: For delete confirmations
+       - `<DialogWrapper />`: Basic dialog wrapper
+       - `<AccessibleDialog />`: Accessibility-focused dialog
+     - Usage: Maintain consistent dialog behavior across the application
+
+### 🔄 Project Structure
 ```
 src/
 ├── components/        # React components
@@ -101,6 +133,95 @@ src/
 - Inline documentation for complex logic
 
 ## 🔄 Recent Refactoring Work
+
+### 🔍 Customer Duplicate Detection Enhancement v1.5.4
+- **Date:** 2025-04-02
+- **Components:**
+  - duplicateDetectionService.ts in src/services/
+  - CustomerForm.tsx in src/components/customers/
+  - CustomerDetailDialog.tsx in src/components/customers/
+
+#### Changes Implemented:
+1. **Improved Duplicate Detection Algorithm:**
+   - Implemented fuzzball.js for fuzzy string matching with token_sort_ratio
+   - Enhanced phone matching with prefix detection and normalized comparison
+   - Added weighted scoring system with configurable weights (40% company name, 40% phone, 20% AFM)
+   - Created special handling for exact AFM and phone matches
+   - Added Greek character normalization to handle accented characters (τόνους)
+
+2. **UI Enhancements:**
+   - Integrated duplicate detection into the "Surprise" section of the customer form
+   - Redesigned duplicate match display with color-coding based on match confidence
+   - Added detailed customer information dialog when clicking on matches
+   - Enhanced duplicate table to show email and address information
+   - Fixed capitalization for Greek headers (removed τόνους in all-caps text)
+
+3. **Data Presentation:**
+   - Added counts for offers and contacts in customer detail view
+   - Implemented status indicators with appropriate icons
+   - Enhanced audit information display (created/modified/deleted by whom and when)
+   - Added proper user-friendly display of dates and times
+
+4. **Technical Improvements:**
+   - Fixed database query issues to avoid foreign key errors
+   - Implemented proper text normalization for Greek characters
+   - Enhanced telephone number standardization to handle various formats
+   - Created robust similarity calculation logic that properly combines scores
+
+#### Benefits:
+- Significantly improved duplicate detection accuracy
+- More intuitive user experience when dealing with potential duplicates
+- Better data visualization with detailed customer information
+- Enhanced reliability by fixing database query and foreign key issues
+- Improved text processing for Greek language support
+
+### 🔒 Customer & Contact Management Components Finalization
+- **Date:** 2024-03-29
+- **Components:** 
+  - CustomerForm.tsx in src/components/customers/
+  - ContactDialog.tsx in src/components/contacts/
+
+#### Components Marked as Complete:
+1. **CustomerForm Component:**
+   - Handles customer creation and updates
+   - Implements proper user tracking (created_by/modified_by)
+   - Form validation and error handling
+   - Contact management integration
+   - Real-time updates
+   - Status: 🔒 FINALIZED & VERIFIED
+
+2. **ContactDialog Component:**
+   - Handles contact creation and updates
+   - Position management
+   - Phone number formatting
+   - Form validation
+   - Real-time updates
+   - Status: 🔒 FINALIZED & VERIFIED
+
+3. **Key Features Implemented:**
+   - Soft delete functionality
+   - User action tracking
+   - Real-time data synchronization
+   - Proper error handling
+   - Accessibility compliance
+   - Mobile responsiveness
+
+4. **Architecture Principles Applied:**
+   - Components follow single responsibility principle
+   - Proper separation of concerns
+   - Type safety throughout
+   - Consistent error handling
+   - Reusable utility functions
+
+#### Guidelines for Future Development:
+1. **DO NOT MODIFY** these components without explicit approval
+2. Any new features should be implemented as separate components
+3. Use these components as reference for implementing similar functionality
+4. Follow the established patterns for:
+   - Form validation
+   - Error handling
+   - User tracking
+   - Real-time updates
 
 ### 🏗️ OffersDialog Component Refactoring
 - **Date:** 2023-09-29

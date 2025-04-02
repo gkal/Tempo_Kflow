@@ -37,9 +37,8 @@ export default function TopBar() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   
-  // Get form context
-  const { toggleFormInfo, registerForm, showFormInfo, currentForm } = useFormContext();
-  
+  const { toggleFormInfo, showFormInfo, currentForm } = useFormContext();
+
   // Update current date every minute
   useEffect(() => {
     const timer = setInterval(() => {
@@ -148,7 +147,7 @@ export default function TopBar() {
     return `hsl(${hue}, 70%, 60%)`;
   };
 
-  // Keyboard event handler
+  // Keyboard event handler for Form info toggle
   const handleKClick = useCallback((event: KeyboardEvent) => {
     if (event.key === 'k' || event.key === 'K') {
       toggleFormInfo();
@@ -187,13 +186,6 @@ export default function TopBar() {
           >
             v{VERSION}
           </div>
-          
-          {/* Form info popup - make it more visible */}
-          {showFormInfo && (
-            <div className="ml-4 bg-[#354f52] text-[#cad2c5] px-3 py-1 rounded-md text-sm">
-              {currentForm || "No form is currently open"}
-            </div>
-          )}
         </div>
       </div>
 

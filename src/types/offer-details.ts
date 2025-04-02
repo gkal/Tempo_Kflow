@@ -39,6 +39,8 @@ export interface OfferDetail {
   date_updated?: string;
   user_create?: string;
   user_updated?: string;
+  is_deleted?: boolean;
+  deleted_at?: string;
   
   // Joined fields
   category?: ServiceCategory;
