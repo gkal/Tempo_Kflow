@@ -172,7 +172,7 @@ const BasicTab = () => {
                 {...register("amount")}
                 disabled={formState.isSubmitting}
                 className="bg-[#2f3e46] border-2 border-[#52796f] text-[#cad2c5] rounded-md text-sm w-full hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] focus:shadow-[0_0_0_2px_#52796f] focus:outline-none transition-all duration-200 py-1 px-2 resize-none [height:70px!important]"
-                defaultValue=""
+                placeholder="Εισάγετε το ποσό"
                 onFocus={(e) => {
                   // Clear the field if it contains only "0"
                   if (e.target.value === "0") {

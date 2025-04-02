@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { supabase } from '@/lib/supabaseClient';
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { X, Star, Check, Plus, Edit } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from "@/components/ui/alert-dialog";
 import { PositionDialog } from "./PositionDialog";
@@ -111,98 +110,99 @@ export function ContactDialog({
     open
   );
 
-  // Reset form when dialog opens/closes
-  useEffect(() => {
-    if (open) {
-      fetchCustomerInfo();
-      fetchPositions();
-      setError(null); // Reset error state when dialog opens
-      
-      // If editing an existing contact, fetch its data
-      if (contactId) {
-        fetchContactData();
-      } else {
-        // Reset form data for new contact
-        setFormData({
-          full_name: "",
-          position: "",
-          position_name: "",
-          telephone: "",
-          mobile: "",
-          email: "",
-          internal_telephone: "",
-          notes: "",
-        });
-      }
-    } else {
-      // Reset state when dialog closes
-      setPositionDialogOpen(false); // Ensure position dialog is closed when contact dialog closes
-      setSelectedPosition(undefined);
-    }
-  }, [open, safeCustomerId, contactId]);
-  
-  // Also reset success state when dialog closes
-  useEffect(() => {
-    if (!open) {
-      setError(null);
-      
-      // Reset all form data including telephone fields when dialog closes
-      // This ensures that when opening a new contact dialog after closing, all fields are cleared
-      setFormData({
-        full_name: "",
-        position: "",
-        position_name: "",
-        telephone: "",
-        mobile: "",
-        email: "",
-        internal_telephone: "",
-        notes: "",
+  const fetchPositions = async () => {
+    try {
+      const { data: positionsList, error } = await contactPositionsService.getAll({
+        order: {
+          column: 'name',
+          ascending: true
+        }
       });
       
-      setTelephone("");
-      setMobile("");
-    }
-  }, [open]);
-
-  const fetchContactData = async () => {
-    if (!contactId) return;
-    
-    try {
-      setLoading(true);
-      
-      // Use DataService instead of direct supabase call
-      const contactData = await getContactById(contactId);
-      
-      if (contactData) {
-        // Update form data
-        setFormData({
-          full_name: contactData.full_name || "",
-          position: contactData.position_id || "",  // Set position ID here
-          position_name: contactData.position || "",
-          telephone: contactData.telephone || "",
-          mobile: contactData.mobile || "",
-          email: contactData.email || "",
-          internal_telephone: contactData.internal_telephone || "",
-          notes: contactData.notes || "",
-        });
-        
-        // Update phone format hooks
-        setTelephone(contactData.telephone || "");
-        setMobile(contactData.mobile || "");
-        
-        // Set selected position if it exists
-        if (contactData.position_id) {
-          setSelectedPosition(contactData.position_id);
-        }
+      if (error) {
+        console.error("Error fetching positions:", error);
+        return;
       }
       
-      setLoading(false);
+      if (positionsList) {
+        // Map positions to include both id and name
+        const mappedPositions = positionsList.map(p => ({ id: p.id, name: p.name }));
+        setPositions(mappedPositions);
+      } else {
+        logDebug("No positions returned");
+      }
     } catch (error) {
-      console.error("Error fetching contact data:", error);
-      setError("Αδυναμία φόρτωσης στοιχείων επαφής");
-      setLoading(false);
+      console.error("Error fetching positions:", error);
     }
   };
+
+  useEffect(() => {
+    if (open) {
+      const initializeData = async () => {
+        setLoading(true);
+        try {
+          // Load positions first
+          const { data: positionsList } = await contactPositionsService.getAll({
+            order: { column: 'name', ascending: true }
+          });
+          
+          if (positionsList) {
+            const mappedPositions = positionsList.map(p => ({ id: p.id, name: p.name }));
+            setPositions(mappedPositions);
+          }
+          
+          // Then load contact data if editing
+          if (contactId) {
+            const contactData = await getContactById(contactId);
+            if (contactData) {
+              // Set position first to avoid flicker
+              if (contactData.position_id) {
+                setSelectedPosition(contactData.position_id);
+              }
+
+              // Then set form data
+              setFormData({
+                full_name: contactData.full_name || "",
+                position: contactData.position_id || "",
+                position_name: contactData.position || "",
+                telephone: String(contactData.telephone || ""),
+                mobile: String(contactData.mobile || ""),
+                email: contactData.email || "",
+                internal_telephone: contactData.internal_telephone || "",
+                notes: contactData.notes || "",
+              });
+              
+              setTelephone(String(contactData.telephone || ""));
+              setMobile(String(contactData.mobile || ""));
+            }
+          } else {
+            // Reset form for new contact
+            setFormData({
+              full_name: "",
+              position: "",
+              position_name: "",
+              telephone: "",
+              mobile: "",
+              email: "",
+              internal_telephone: "",
+              notes: "",
+            });
+            setSelectedPosition(undefined);
+          }
+        } catch (error) {
+          setError("Αδυναμία φόρτωσης δεδομένων");
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      initializeData();
+      setError(null);
+    } else {
+      setPositionDialogOpen(false);
+      setSelectedPosition(undefined);
+    }
+  }, [open, contactId]);
 
   const fetchCustomerInfo = async () => {
     if (!safeCustomerId) {
@@ -229,37 +229,6 @@ export function ContactDialog({
       console.error("Error fetching customer info:", error);
       setError("Αδυναμία φόρτωσης στοιχείων πελάτη");
       setLoading(false);
-    }
-  };
-
-  const fetchPositions = async () => {
-    try {
-      logDebug("Fetching positions...");
-      const { data: positionsList, error } = await contactPositionsService.getAll({
-        // No need for explicit deleted_at filter, DataService handles it automatically
-        order: {
-          column: 'name',
-          ascending: true
-        }
-      });
-      
-      logDebug("Positions response:", positionsList);
-      
-      if (error) {
-        console.error("Error fetching positions:", error);
-        return;
-      }
-      
-      if (positionsList) {
-        // Map positions to include both id and name
-        const mappedPositions = positionsList.map(p => ({ id: p.id, name: p.name }));
-        logDebug("Mapped positions:", mappedPositions);
-        setPositions(mappedPositions);
-      } else {
-        logDebug("No positions returned");
-      }
-    } catch (error) {
-      console.error("Error fetching positions:", error);
     }
   };
 
@@ -290,30 +259,30 @@ export function ContactDialog({
     return formData.full_name.trim() !== "";
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
-
+  const handleSave = async () => {
     try {
-      // Get the selected position object
-      const selectedPositionObj = positions.find(p => p.id === selectedPosition);
+      setLoading(true);
+      setError(null);
 
-      // Prepare contact data
+      // Validate required fields
+      if (!formData.full_name?.trim()) {
+        setError("Το πεδίο 'Ονοματεπώνυμο' είναι υποχρεωτικό");
+        return;
+      }
+
       const contactData = {
-        full_name: formData.full_name.trim(),
-        position: selectedPositionObj?.name || null,
-        telephone: telephoneValue || null,
-        mobile: mobileValue || null,
-        email: formData.email?.trim() || null,
-        internal_telephone: formData.internal_telephone?.trim() || null,
-        notes: formData.notes?.trim() || null,
+        id: contactId,
         customer_id: safeCustomerId,
-        position_id: selectedPositionObj?.id || null,
+        full_name: formData.full_name.trim(),
+        position_id: selectedPosition || null,
+        position: formData.position_name,
+        telephone: String(formData.telephone || "").trim(),
+        mobile: String(formData.mobile || "").trim(),
+        email: formData.email?.trim(),
+        internal_telephone: formData.internal_telephone?.trim(),
+        notes: formData.notes?.trim(),
         status: 'active'
       };
-
-      logDebug("Submitting contact data:", contactData);
 
       // Ensure phone numbers are treated as strings
       if (contactData.telephone) {
@@ -323,32 +292,15 @@ export function ContactDialog({
         contactData.mobile = String(contactData.mobile).trim();
       }
 
-      let result;
-      if (contactId) {
-        result = await updateContact(contactId, contactData);
-      } else {
-        result = await createContact(contactData);
+      const { error: saveError } = contactId
+        ? await updateContact(contactId, contactData)
+        : await createContact(contactData);
+
+      if (saveError) {
+        setError("Σφάλμα κατά την αποθήκευση της επαφής");
+        return;
       }
 
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
-
-      // Reset form
-      setFormData({
-        full_name: "",
-        position: "",
-        position_name: "",
-        telephone: "",
-        mobile: "",
-        email: "",
-        internal_telephone: "",
-        notes: "",
-      });
-      
-      setTelephone("");
-      setMobile("");
-      
       if (refreshData) {
         refreshData();
       }
@@ -356,9 +308,9 @@ export function ContactDialog({
       onOpenChange(false);
     } catch (error) {
       console.error("Error saving contact:", error);
-      setError("Αδυναμία αποθήκευσης επαφής");
+      setError("Σφάλμα κατά την αποθήκευση της επαφής");
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -435,13 +387,19 @@ export function ContactDialog({
       }}
     >
       <DialogContent 
-        className="bg-[#2f3e46] text-[#cad2c5] border-[#52796f] p-0 max-w-5xl overflow-hidden"
+        className="bg-[#2f3e46] text-[#cad2c5] border-0 outline-none p-0 max-w-5xl overflow-hidden"
         aria-labelledby="contact-dialog-title"
         aria-describedby="contact-dialog-description"
       >
-        <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSave();
+          }} 
+          className="flex flex-col h-full overflow-hidden bg-[#2f3e46]"
+        >
           {/* Header */}
-          <DialogHeader className="px-4 py-2 border-b border-[#52796f] bg-[#2f3e46]">
+          <DialogHeader className="px-4 py-2 border-b border-[#52796f]">
             <DialogTitle className="text-lg font-semibold text-[#cad2c5]">
               {customerInfo && (
                 <span className="text-[#84a98c] mr-2">{customerInfo.company_name} -</span>
@@ -453,8 +411,8 @@ export function ContactDialog({
             </DialogDescription>
           </DialogHeader>
 
-          {/* Main content */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 bg-[#2f3e46]">
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {/* Two columns layout for the first two sections */}
             <div className="grid grid-cols-2 gap-10 p-8 pt-4">
               {/* Group 1: Basic Contact Information */}
@@ -528,11 +486,24 @@ export function ContactDialog({
                     <div className="w-2/3">
                       <GlobalDropdown
                         options={positions}
-                        value={formData.position}
-                        onSelect={handlePositionChange}
+                        value={selectedPosition || ""}
+                        onSelect={(value) => {
+                          handlePositionChange(value);
+                        }}
                         onEdit={handleEditPosition}
                         showEditButton={true}
                         placeholder="Επιλέξτε θέση..."
+                        renderOption={(option): React.ReactNode => {
+                          if (typeof option === 'object' && option.name) {
+                            return option.name;
+                          }
+                          const pos = positions.find(p => p.id === option);
+                          return pos ? pos.name : String(option);
+                        }}
+                        renderValue={(value): React.ReactNode => {
+                          const pos = positions.find(p => p.id === value);
+                          return pos ? pos.name : "";
+                        }}
                       />
                     </div>
                   </div>
@@ -578,49 +549,68 @@ export function ContactDialog({
                   <h3 className="text-sm font-medium text-[#a8c5b5] uppercase tracking-wider border-b border-[#52796f] pb-1 -mx-2 px-2">ΣΗΜΕΙΩΣΕΙΣ</h3>
                 </div>
                 
-                <div className="bg-[#3a5258] p-6 rounded-b-md space-y-4 border border-[#52796f] border-t-0">
-                  <div className="h-[120px]">
+                <div className="bg-[#3a5258] p-2 rounded-b-md space-y-2 border border-[#52796f] border-t-0">
+                  <div className="h-[70px] min-h-[70px]">
                     <Textarea
                       id="notes"
                       name="notes"
                       value={formData.notes}
                       onChange={handleInputChange}
-                      className="app-input w-full h-full bg-[#2f3e46] border-[#52796f] text-[#cad2c5] resize-none py-1 px-2"
+                      className="app-input w-full h-[70px] !min-h-[70px] bg-[#2f3e46] border-[#52796f] text-[#cad2c5] resize-none py-1 px-2"
                       placeholder="Προσθέστε σημειώσεις για την επαφή..."
+                      rows={3}
+                      style={{ minHeight: '70px !important', height: '70px !important' }}
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Footer with buttons */}
-            <div className="flex flex-col gap-4 px-4 py-4 border-t border-[#52796f] bg-[#2f3e46]">
+            {/* Footer */}
+            <div className="px-4 py-2 border-t border-[#52796f] mt-auto">
               {error && (
-                <div className="mt-2 text-sm text-red-500 bg-red-100/10 px-3 py-2 rounded border border-red-500/20">
+                <div className="mb-2 text-sm text-red-500 bg-red-100/10 px-3 py-2 rounded">
                   {error}
                 </div>
               )}
-              <div className="flex justify-end items-center gap-2">
+              <div className="flex justify-end space-x-2">
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !isFormValid()}
-                  className="bg-[#52796f] text-white hover:bg-[#52796f]/90"
+                  disabled={loading}
+                  className="bg-[#2f3e46] hover:bg-[#354f52] text-[#cad2c5] border border-[#52796f] min-w-[100px]"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <LoadingSpinner className="mr-2" />
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <svg 
+                        className="animate-spin h-4 w-4 mr-2" 
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle 
+                          className="opacity-25" 
+                          cx="12" 
+                          cy="12" 
+                          r="10" 
+                          stroke="currentColor" 
+                          strokeWidth="4"
+                        />
+                        <path 
+                          className="opacity-75" 
+                          fill="currentColor" 
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
                       Αποθήκευση...
-                    </>
+                    </div>
                   ) : (
                     "Αποθήκευση"
                   )}
                 </Button>
-                
                 <Button
                   type="button"
-                  variant="outline"
                   onClick={() => onOpenChange(false)}
-                  className="bg-transparent border-[#52796f] text-[#cad2c5] hover:bg-[#354f52]"
+                  disabled={loading}
+                  className="bg-[#2f3e46] hover:bg-[#354f52] text-[#cad2c5] border border-[#52796f] min-w-[100px]"
                 >
                   Ακύρωση
                 </Button>

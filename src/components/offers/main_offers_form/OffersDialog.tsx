@@ -123,7 +123,7 @@ interface DatabaseOffer {
   id: string;
   customer_id: string;
   requirements: string;
-  amount: number;
+  amount: string;  // Changed from number to string
   offer_result: string;
   result: string;
   created_at: string;
@@ -361,10 +361,9 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
 
         return isValid;
       },
-      normalizeAmount: (amount: any): string | null => {
-        if (!amount) return null;
-        const numericAmount = parseFloat(amount);
-        return isNaN(numericAmount) ? null : numericAmount.toString();
+      normalizeAmount: (amount: any): string => {
+        if (!amount) return '';
+        return String(amount);
       }
     };
   }, [getValues, setError]);

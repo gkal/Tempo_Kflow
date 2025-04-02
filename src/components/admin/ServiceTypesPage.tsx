@@ -330,14 +330,14 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
     fetchAll: fetchAllCategories,
     create: createCategory,
     update: updateCategory,
-    remove: removeCategory
+    softDelete: removeCategory
   } = useDataService<ServiceCategory>('service_categories');
   
   const {
     fetchAll: fetchAllSubcategories,
     create: createSubcategory,
     update: updateSubcategory,
-    remove: removeSubcategory
+    softDelete: removeSubcategory
   } = useDataService<ServiceSubcategory>('service_subcategories');
 
   // Fetch service categories and subcategories
@@ -995,7 +995,7 @@ function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
     fetchAll: fetchAllUnits,
     create: createUnit,
     update: updateUnit,
-    remove: removeUnit
+    softDelete: removeUnit
   } = useDataService<any>('units');
 
   // Fetch units
@@ -1334,7 +1334,7 @@ function DepartmentsTab({ refreshTrigger }: { refreshTrigger: number }) {
     fetchAll: fetchAllDepartments,
     create: createDepartment,
     update: updateDepartment,
-    remove: removeDepartment
+    softDelete: removeDepartment
   } = useDataService<Department>('departments');
 
   // Fetch departments

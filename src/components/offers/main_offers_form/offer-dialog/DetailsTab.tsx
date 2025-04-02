@@ -50,6 +50,9 @@ import {
 } from "@/components/ui/select";
 import { AccessibleAlertDialogContent } from "@/components/ui/DialogUtilities";
 import './OffersDialog.css';
+import { PostgrestResponse } from '@supabase/supabase-js';
+import { Database } from '@/types/supabase';
+import { supabase } from '@/lib/supabaseClient';
 
 /**
  * DetailsTab Component
@@ -427,41 +430,90 @@ const DetailsTab = React.memo(() => {
   // Preload categories and units
   const preloadCategoriesAndUnits = async () => {
     try {
-      // Only fetch if we don't already have the data
-      if (categories.length === 0 || units.length === 0) {
-        const [categoriesData, unitsData] = await Promise.all([
-          fetchServiceCategories(),
-          fetchMeasurementUnits()
-        ]);
+      // Load categories and units in parallel
+      const [categoriesResponse, unitsResponse] = await Promise.all([
+        supabase
+          .from('service_categories')
+          .select('*')
+          .is('deleted_at', null)
+          .order('category_name', { ascending: true }),
+        supabase
+          .from('units')
+          .select('*')
+          .is('deleted_at', null)
+          .order('name', { ascending: true })
+      ]) as [PostgrestResponse<ServiceCategory>, PostgrestResponse<MeasurementUnit>];
+
+      // Handle any errors
+      if (categoriesResponse.error) throw categoriesResponse.error;
+      if (unitsResponse.error) throw unitsResponse.error;
+
+      // Update state with loaded data
+      if (Array.isArray(categoriesResponse.data)) {
+        setCategories(categoriesResponse.data.map(cat => ({
+          id: cat.id,
+          category_name: cat.category_name,
+          date_created: cat.date_created,
+          date_updated: cat.date_updated,
+          user_create: cat.user_create,
+          user_updated: cat.user_updated
+        })));
+      }
+      if (Array.isArray(unitsResponse.data)) {
+        setUnits(unitsResponse.data.map(unit => ({
+          id: unit.id,
+          name: unit.name,
+          date_created: unit.date_created,
+          date_updated: unit.date_updated
+        })));
+      }
+      
+      // Preload subcategories for the first few categories to improve initial load time
+      if (Array.isArray(categoriesResponse.data) && categoriesResponse.data.length > 0) {
+        const categoriesToPreload = categoriesResponse.data.slice(0, 3); // Preload first 3 categories
         
-        // Add type assertions to fix the "unknown" type errors
-        setCategories(categoriesData as ServiceCategory[]);
-        setUnits(unitsData as MeasurementUnit[]);
+        // Fetch subcategories in parallel
+        const preloadPromises = categoriesToPreload.map(async (category) => {
+          if (!category?.id) return null;
+          
+          const response = await supabase
+            .from('service_subcategories')
+            .select('*')
+            .is('deleted_at', null)
+            .eq('category_id', category.id)
+            .order('subcategory_name', { ascending: true });
+            
+          return response;
+        });
         
-        // Preload subcategories for the first few categories to improve initial load time
-        if (categoriesData && Array.isArray(categoriesData) && categoriesData.length > 0) {
-          const categoriesToPreload = categoriesData.slice(0, 3); // Preload first 3 categories
-          
-          // Fetch subcategories in parallel
-          const preloadPromises = categoriesToPreload.map(category => 
-            fetchSubcategories(category.id)
-          );
-          
-          // Use Promise.allSettled to continue even if some requests fail
-          const results = await Promise.allSettled(preloadPromises);
-          
-          // Process successful results
-          const successfulResults = results
-            .filter((result): result is PromiseFulfilledResult<ServiceSubcategory[]> => 
-              result.status === 'fulfilled'
-            )
-            .map(result => result.value)
-            .flat();
-          
-          // Update subcategories state with preloaded data
-          if (successfulResults.length > 0) {
-            setSubcategories(successfulResults);
+        // Use Promise.allSettled to continue even if some requests fail
+        const results = await Promise.allSettled(preloadPromises);
+        
+        // Process successful results and merge subcategories
+        const newSubcategories = results.reduce<ServiceSubcategory[]>((acc, result) => {
+          if (
+            result.status === 'fulfilled' && 
+            result.value && 
+            !result.value.error && 
+            Array.isArray(result.value.data)
+          ) {
+            const mappedSubcategories = result.value.data.map((sub: RawSubcategory) => ({
+              id: sub.id,
+              subcategory_name: sub.subcategory_name,
+              category_id: sub.category_id,
+              date_created: sub.created_at,
+              date_updated: null,
+              user_create: null,
+              user_updated: null
+            }));
+            acc.push(...mappedSubcategories);
           }
+          return acc;
+        }, []);
+        
+        // Update subcategories state with preloaded data
+        if (newSubcategories.length > 0) {
+          setSubcategories(prev => [...prev, ...newSubcategories]);
         }
       }
     } catch (error) {
@@ -469,76 +521,107 @@ const DetailsTab = React.memo(() => {
     }
   };
 
+  // Type for raw database response
+  type RawSubcategory = {
+    id: string;
+    subcategory_name: string;
+    category_id: string;
+    created_at: string;
+  };
+
   // Handle add button click - open selection dialog
   const handleAddClick = async () => {
-    // Clear all state when opening the dialog
-    setSelectedItems([]);
-    setCurrentCategoryId(null);
-    setConfirmingSelection(false);
-    setError(null);
-    localStorage.removeItem('offerDetailsSelectedItems');
-    
-    // Open dialog immediately for better UX
-    setShowSelectionDialog(true);
-    
     try {
-      // Only show loading if we need to fetch data
-      const needToFetchData = categories.length === 0 || units.length === 0;
-      if (needToFetchData) {
-        setDialogLoading(true);
-      }
+      // Clear all state when opening the dialog
+      setSelectedItems([]);
+      setCurrentCategoryId(null);
+      setConfirmingSelection(false);
+      setError(null);
+      localStorage.removeItem('offerDetailsSelectedItems');
       
       // Only fetch categories and units if they haven't been preloaded
       if (categories.length === 0 || units.length === 0) {
-        const [categoriesData, unitsData] = await Promise.all([
-          fetchServiceCategories(),
-          fetchMeasurementUnits()
-        ]);
-        
-        setCategories(categoriesData as ServiceCategory[]);
-        setUnits(unitsData as MeasurementUnit[]);
+        const [{ data: categoriesData, error: categoriesError }, { data: unitsData, error: unitsError }] = await Promise.all([
+          supabase
+            .from('service_categories')
+            .select('*')
+            .is('deleted_at', null)
+            .order('category_name', { ascending: true }),
+          supabase
+            .from('units')
+            .select('*')
+            .is('deleted_at', null)
+            .order('name', { ascending: true })
+        ]) as [PostgrestResponse<ServiceCategory>, PostgrestResponse<MeasurementUnit>];
+
+        // Handle any errors
+        if (categoriesError) throw categoriesError;
+        if (unitsError) throw unitsError;
+
+        // Update state with loaded data
+        if (Array.isArray(categoriesData)) {
+          setCategories(categoriesData.map(cat => ({
+            id: cat.id,
+            category_name: cat.category_name,
+            date_created: cat.date_created,
+            date_updated: cat.date_updated,
+            user_create: cat.user_create,
+            user_updated: cat.user_updated
+          })));
+        }
+        if (Array.isArray(unitsData)) {
+          setUnits(unitsData.map(unit => ({
+            id: unit.id,
+            name: unit.name,
+            date_created: unit.date_created,
+            date_updated: unit.date_updated
+          })));
+        }
       }
+
+      // Open dialog immediately for better UX
+      setShowSelectionDialog(true);
     } catch (error) {
       console.error("Error fetching data:", error);
-      setError("Σφάλμα κατά την ανάκτηση δεδομένων. Παρακαλώ δοκιμάστε ξανά.");
-    } finally {
-      setDialogLoading(false);
+      setError("Failed to load data. Please try again.");
     }
   };
 
   // Handle category click
   const handleCategoryClick = async (categoryId: string) => {
     try {
-      // Update current category immediately for better UX
       setCurrentCategoryId(categoryId);
+      setDialogLoading(true);
       
-      // Check if we already have subcategories for this category
-      const existingSubcategories = subcategories.filter(sub => 
-        sub.category_id === categoryId
-      );
-      
-      // Only fetch if we don't have subcategories for this category
-      if (existingSubcategories.length === 0) {
-        // Show loading only when we need to fetch
-        setDialogLoading(true);
-        
-        // Fetch subcategories for this category
-        const subcategoriesData = await fetchSubcategories(categoryId);
-        
-        // Merge with existing subcategories
-        setSubcategories(prev => {
-          // Type guard to ensure subcategoriesData is an array
-          if (subcategoriesData && Array.isArray(subcategoriesData)) {
-            return [...prev, ...subcategoriesData as ServiceSubcategory[]];
-          }
-          return prev; // Return previous state if data is not valid
-        });
-        
-        setDialogLoading(false);
+      // Fetch subcategories for this category
+      const { data: subcategoryData, error } = await supabase
+        .from('service_subcategories')
+        .select('*')
+        .is('deleted_at', null)
+        .eq('category_id', categoryId)
+        .order('subcategory_name', { ascending: true });
+
+      // Handle any errors
+      if (error) throw error;
+
+      // Replace existing subcategories with new ones
+      if (Array.isArray(subcategoryData)) {
+        const mappedSubcategories = subcategoryData.map((sub: RawSubcategory) => ({
+          id: sub.id,
+          subcategory_name: sub.subcategory_name,
+          category_id: sub.category_id,
+          date_created: sub.created_at,
+          date_updated: null,
+          user_create: null,
+          user_updated: null
+        }));
+        setSubcategories(mappedSubcategories); // Replace instead of append
       }
+
+      setDialogLoading(false);
     } catch (error) {
       console.error("Error fetching subcategories:", error);
-      setError("Σφάλμα κατά την ανάκτηση υποκατηγοριών. Παρακαλώ δοκιμάστε ξανά.");
+      setError("Failed to load subcategories. Please try again.");
       setDialogLoading(false);
     }
   };
@@ -1254,14 +1337,29 @@ const DetailsTab = React.memo(() => {
                           ...details.map(detail => detail.category_id),
                           ...selectedDetails.map(detail => detail.category_id)
                         ])).map(categoryId => {
-                          // Get all details for this category
-                          const categoryDetails = [
-                            ...selectedDetails.filter(detail => detail.category_id === categoryId),
-                            ...details.filter(detail => detail.category_id === categoryId)
-                          ];
+                          // Get all details for this category, ensuring no duplicates
+                          const detailsMap = new Map<string, OfferDetail>();
                           
-                          // Get the category object from the first detail
-                          const category = categoryDetails[0]?.category;
+                          // Add selected details first
+                          selectedDetails
+                            .filter(detail => detail.category_id === categoryId)
+                            .forEach(detail => {
+                              if (detail && detail.id) {
+                                detailsMap.set(detail.id, detail);
+                              }
+                            });
+                          
+                          // Add database details, will override any duplicates
+                          details
+                            .filter(detail => detail.category_id === categoryId)
+                            .forEach(detail => {
+                              if (detail && detail.id) {
+                                detailsMap.set(detail.id, detail);
+                              }
+                            });
+                          
+                          const categoryDetails = Array.from(detailsMap.values());
+                          const category = categories.find(c => c.id === categoryId);
                           const categoryName = category?.category_name || "-";
                           
                           return (

@@ -133,9 +133,10 @@ export default function CustomerOffersPage() {
   } = useDataService<Customer>('customers');
   
   const {
-    fetchAll: fetchAllOffersService,
-    getById: getOfferById,
-    remove: removeOffer
+    fetchAll: fetchOffers,
+    create: createOffer,
+    update: updateOffer,
+    softDelete: removeOffer
   } = useDataService<Offer>('offers');
 
   // Show error dialog
@@ -234,7 +235,7 @@ export default function CustomerOffersPage() {
       }
       
       // Fetch offers using DataService
-      const offers = await fetchAllOffersService({
+      const offers = await fetchOffers({
         select: "*, assigned_user:users!assigned_to(fullname), created_user:users!created_by(fullname)",
         filters,
         order: { column: "created_at", ascending: false }
@@ -277,7 +278,7 @@ export default function CustomerOffersPage() {
       }
       
       // Fetch offers using DataService
-      const allOffers = await fetchAllOffersService({
+      const allOffers = await fetchOffers({
         select: "*, customer:customers(*)",
         filters,
         order: { column: "created_at", ascending: false }
@@ -328,7 +329,7 @@ export default function CustomerOffersPage() {
         const enrichedCustomers = await Promise.all(
           customersData.map(async (customer) => {
             // Get offer count for each customer
-            const offers = await fetchAllOffersService({
+            const offers = await fetchOffers({
               filters: { customer_id: customer.id }
             });
             
