@@ -37,6 +37,8 @@ export interface DetailsContextType {
   setShowSelectionDialog: React.Dispatch<React.SetStateAction<boolean>>;
   showDeleteDialog: boolean;
   setShowDeleteDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  confirmingSelection: boolean;
+  setConfirmingSelection: React.Dispatch<React.SetStateAction<boolean>>;
   
   // Selection states
   selectedItems: {
