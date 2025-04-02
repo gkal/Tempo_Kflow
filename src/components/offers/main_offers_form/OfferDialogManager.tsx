@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import OffersDialog, { OffersDialogProps } from './OffersDialog';
+import OffersDialog from './OffersDialog';
+import { OffersDialogProps } from './offer-dialog/OfferDialogContext';
 import { OffersTableRef } from './OffersTable';
 
 // Define the interface for dialog props (can be a subset of OffersDialogProps)

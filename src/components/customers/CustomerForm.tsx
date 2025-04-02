@@ -334,24 +334,28 @@ const CustomerForm = ({
       // Apply the temporary customer type immediately to ensure it's in formData
       const currentCustomerType = tempCustomerType !== null ? tempCustomerType : formData.customer_type;
       
+      // CRITICAL FIX: Ensure customer_type is ALWAYS one of the allowed values BEFORE creating submission data
+      const safeCustomerType = VALID_CUSTOMER_TYPES.includes(currentCustomerType) 
+        ? currentCustomerType 
+        : "Εταιρεία"; // Use a safe default value
+      
       // Create a copy of the form data with the correct customer type and phone value
       const submissionData: CustomerFormSubmissionData = {
         ...formData,
-        customer_type: currentCustomerType,
+        customer_type: safeCustomerType,
         // Use the phoneValue from hook which contains the correctly formatted number
         telephone: phoneValue,
-        // For new records, ensure primary_contact_id is null or empty string based on whether ID exists
-        primary_contact_id: customerId 
-          ? (formData.primary_contact_id || null) // Use null, not empty string for existing customers
-          : ""
+        // For new records, ensure primary_contact_id is null, not empty string
+        primary_contact_id: formData.primary_contact_id || null
       };
       
-      // CRITICAL FIX: Ensure customer_type is ALWAYS one of the allowed values
-      if (!VALID_CUSTOMER_TYPES.includes(submissionData.customer_type)) {
-        submissionData.customer_type = "Εταιρεία"; // Use a safe default value without trailing comma
-      }
-      
-      // Validation checks using our new validation utilities
+      // Clean up the data before submission
+      // Remove empty strings for fields that should be null
+      Object.keys(submissionData).forEach(key => {
+        if (submissionData[key] === "") {
+          submissionData[key] = null;
+        }
+      });
       
       setSaveDisabled(true);
       
@@ -400,6 +404,10 @@ const CustomerForm = ({
       // Provide a user-friendly error message
       if (errorMessage.includes('column') || errorMessage.includes('schema')) {
         errorMessage = 'Προέκυψε πρόβλημα με τη δομή της βάσης δεδομένων. Παρακαλώ επικοινωνήστε με το διαχειριστή.';
+      } else if (errorMessage.includes('violates check constraint')) {
+        errorMessage = 'Κάποιο από τα πεδία περιέχει μη έγκυρη τιμή. Παρακαλώ ελέγξτε τα δεδομένα σας.';
+      } else if (errorMessage.includes('null value')) {
+        errorMessage = 'Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία.';
       }
       
       setSuccess(false);
@@ -539,21 +547,34 @@ const CustomerForm = ({
   // Create new customer with fallback for field errors - Replacing this function with DataService
   async function createNewCustomer(data: CustomerFormSubmissionData) {
     try {
-      // Use the DataService to create a new customer
+      // Ensure customer_type is valid
+      const safeCustomerType = VALID_CUSTOMER_TYPES.includes(data.customer_type) 
+        ? data.customer_type 
+        : "Εταιρεία";
+      
+      // Process data - convert empty strings to null
+      const processedData = { ...data };
+      Object.keys(processedData).forEach(key => {
+        if (processedData[key] === "") {
+          processedData[key] = null;
+        }
+      });
+      
+      // Use the DataService to create a new customer with only non-null values
       const basicCustomerData = {
-        company_name: data.company_name,
-        telephone: data.telephone,
-        customer_type: data.customer_type,
-        // Include these only if they have values
-        ...(data.afm ? { afm: data.afm } : {}),
-        ...(data.doy ? { doy: data.doy } : {}),
-        ...(data.address ? { address: data.address } : {}),
-        ...(data.town ? { town: data.town } : {}),
-        ...(data.postal_code ? { postal_code: data.postal_code } : {}),
-        ...(data.email ? { email: data.email } : {}),
-        ...(data.webpage ? { webpage: data.webpage } : {}),
-        ...(data.fax_number ? { fax_number: data.fax_number } : {}),
-        ...(data.notes ? { notes: data.notes } : {})
+        company_name: processedData.company_name,
+        telephone: processedData.telephone,
+        customer_type: safeCustomerType,
+        // Include these only if they have non-null values
+        ...(processedData.afm !== null ? { afm: processedData.afm } : {}),
+        ...(processedData.doy !== null ? { doy: processedData.doy } : {}),
+        ...(processedData.address !== null ? { address: processedData.address } : {}),
+        ...(processedData.town !== null ? { town: processedData.town } : {}),
+        ...(processedData.postal_code !== null ? { postal_code: processedData.postal_code } : {}),
+        ...(processedData.email !== null ? { email: processedData.email } : {}),
+        ...(processedData.webpage !== null ? { webpage: processedData.webpage } : {}),
+        ...(processedData.fax_number !== null ? { fax_number: processedData.fax_number } : {}),
+        ...(processedData.notes !== null ? { notes: processedData.notes } : {})
       };
       
       const newCustomer = await createCustomer(basicCustomerData);

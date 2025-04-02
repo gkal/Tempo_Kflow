@@ -1,5 +1,5 @@
 import React, { useContext, CSSProperties, useEffect, useState, useRef } from 'react';
-import { OfferDialogContext } from '../OffersDialog';
+import { OfferDialogContext } from './OfferDialogContext';
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { Input } from "@/components/ui/input";
 import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
