@@ -134,6 +134,94 @@ src/
 
 ## 🔄 Recent Refactoring Work
 
+### 🚨 Phone-Only Match Detection and Warning System
+- **Date:** 2025-04-04
+- **Components:**
+  - duplicateDetectionService.ts in src/services/
+  - CustomerForm.tsx in src/components/customers/
+
+#### Changes Implemented:
+1. **Dedicated Phone-Only Search Function:**
+   - Created new `findDuplicatesByPhoneOnly` function to identify cases where different companies share the same phone number
+   - Implemented distinct scoring system that flags matches as phone-only matches
+   - Added a threshold filter (90% by default) to ensure only high-quality phone matches are shown
+
+2. **Enhanced UI Warning System:**
+   - Added a dedicated red-bordered warning section for phone-only matches
+   - Implemented clear visual differentiation between regular matches and phone-only matches
+   - Added warning icon and explanatory text to alert users to potential issues
+   - Special styling indicates the high importance of reviewing these matches
+
+3. **Use Cases Addressed:**
+   - Multiple business entities sharing same phone number
+   - Data entry errors with incorrect company names
+   - Phone numbers that have been reassigned to new companies
+   - Potential duplicate customer records
+
+4. **Technical Implementation:**
+   - Separate database query focused exclusively on phone matching
+   - Independent threshold and scoring system from the main duplicate detection
+   - Custom typing to ensure type safety and correct property access
+   - Efficient filtering and sorting to prioritize strongest matches
+
+#### Benefits:
+- Provides dedicated visibility for an important edge case (same phone, different name)
+- Creates clear separation between general similarity matches and phone-only matches
+- Reduces potential for missed duplicates due to combined scoring algorithms
+- Improves data quality by highlighting potential data entry errors
+- Enhances user experience by separately flagging different types of potential issues
+
+### 📱 Phone Number Normalization and Search Enhancement
+- **Date:** 2025-04-03
+- **Components:**
+  - duplicateDetectionService.ts in src/services/
+  - Database query functions in src/lib/supabaseClient.ts
+
+#### Changes Implemented:
+1. **Improved Phone Number Normalization:**
+   - Implemented SQL function to extract and normalize the first 10 digits of phone numbers
+   - Created consistent normalization approach to handle various phone formats (with dashes, dots, spaces, and special characters)
+   - Added support for phone numbers with extensions and annotations
+   - SQL implementation handles the normalization at the database level for faster searches
+
+2. **SQL Function for Phone Normalization:**
+   ```sql
+   CREATE OR REPLACE FUNCTION normalize_phone(phone_text TEXT) 
+   RETURNS TEXT AS $$
+   BEGIN
+     RETURN SUBSTRING(REGEXP_REPLACE(phone_text, '[^0-9]', '', 'g'), 1, 10);
+   END;
+   $$ LANGUAGE plpgsql;
+   ```
+
+3. **Enhanced Search Implementation:**
+   - Modified queries to use the normalize_phone function:
+   ```sql
+   SELECT * FROM customers 
+   WHERE normalize_phone(telephone) = normalize_phone(:search_telephone);
+   ```
+   - Integrated with existing fuzzy matching for better accuracy
+   - Maintained backward compatibility with current search patterns
+
+4. **Benefits:**
+   - Handles unpredictable user input patterns (special characters, annotations, etc.)
+   - Focuses on the core phone number (first 10 digits) while ignoring extensions and notes
+   - Provides consistent matching regardless of phone number formatting
+   - Accommodates real-world use cases where users add symbols for their own reference
+
+#### Implementation Rationale:
+- Phone numbers are stored in varying formats (dashes, dots, spaces, symbols)
+- Users often add special characters or notes (e.g., * for "good customer")
+- Normalizing to the first 10 digits provides the best balance between:
+  - Capturing the essential identifying information 
+  - Ignoring irrelevant formatting and annotations
+  - Consistent matching across different input patterns
+
+#### Next Steps:
+- Monitor performance and accuracy of the phone number matching
+- Consider adding a dedicated normalized_telephone column for further optimization
+- Extend the approach to other numeric identifiers if needed
+
 ### 🔍 Customer Duplicate Detection Enhancement v1.5.4
 - **Date:** 2025-04-02
 - **Components:**

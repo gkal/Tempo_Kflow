@@ -61,30 +61,30 @@ const normalizeAfm = (afm: string): string => {
 };
 
 /**
- * Normalize phone number by removing non-digits and handling Greek extensions
- * @param phone Phone number to normalize
- * @returns Normalized phone number with only digits (up to first Greek character)
+ * Normalize phone numbers for consistent comparison
+ * @param phone Raw phone number
+ * @returns Standardized phone number
  */
 const normalizePhone = (phone: string): string => {
   if (!phone) return '';
   
-  // Check if there's any Greek text (extensions like "εσ.201")
-  // Greek Unicode ranges: \u0370-\u03FF for Greek and Coptic
-  const greekExtensionMatch = phone.match(/[\u0370-\u03FF]/);
+  // Using the simplest approach: just extract digits
+  const digits = phone.replace(/\D/g, '');
   
-  if (greekExtensionMatch) {
-    // If Greek characters exist, only take the part before them
-    const greekIndex = greekExtensionMatch.index || 0;
-    phone = phone.substring(0, greekIndex);
+  // Debug log
+  console.log(`Normalizing phone: "${phone}" → digits only: "${digits}"`);
+  
+  // Special case: Greek mobile numbers - ensure standard 10-digit format
+  // If it's a Greek mobile starting with 69, make sure it has 10 digits
+  if (digits.startsWith('69') && digits.length >= 10) {
+    return digits.substring(0, 10); // Take only first 10 digits for consistency
   }
   
-  // Keep only digits
-  return phone.replace(/\D/g, '').trim();
+  return digits;
 };
 
 /**
- * Calculate similarity between two company names using fuzzball token_sort_ratio
- * This handles different word orders and partial matches effectively
+ * Compare company names with fuzzy matching
  * @param name1 First company name
  * @param name2 Second company name to compare
  * @returns Similarity score 0-100
@@ -92,15 +92,77 @@ const normalizePhone = (phone: string): string => {
 const getNameSimilarity = (name1: string, name2: string): number => {
   if (!name1 || !name2) return 0;
   
-  // Normalize and convert to lowercase
-  name1 = normalizeGreekText(name1.toLowerCase().trim());
-  name2 = normalizeGreekText(name2.toLowerCase().trim());
+  // Normalize Greek text (accents, case, etc.)
+  const normalizedName1 = normalizeGreekText(name1.toLowerCase().trim());
+  const normalizedName2 = normalizeGreekText(name2.toLowerCase().trim());
   
-  if (name1 === name2) return 100;
+  // Add debug logging for important search cases
+  if (normalizedName1 === "aero" || normalizedName2 === "aero") {
+    console.log(`Debug name matching: '${normalizedName1}' vs '${normalizedName2}'`);
+  }
   
-  // Use token_sort_ratio from fuzzball for better company name matching
-  // This handles different word orders effectively
-  return fuzzball.token_sort_ratio(name1, name2);
+  // Check for prefix matches - particularly useful during typing
+  if (normalizedName1.startsWith(normalizedName2) || normalizedName2.startsWith(normalizedName1)) {
+    const minLength = Math.min(normalizedName1.length, normalizedName2.length);
+    const maxLength = Math.max(normalizedName1.length, normalizedName2.length);
+    
+    // Debug log specific case for "aero"
+    if (normalizedName1 === "aero" || normalizedName2 === "aero") {
+      console.log(`Prefix match: minLength=${minLength}, maxLength=${maxLength}, ratio=${minLength/maxLength}`);
+    }
+    
+    // If the shorter string is at least 4 characters and makes up a significant portion of the longer string
+    if (minLength >= 4 && (minLength / maxLength) >= 0.5) {
+      // Score proportionally to how much of the full name is matched
+      return Math.round(60 + ((minLength / maxLength) * 40));
+    }
+    
+    // For shorter matches (2-3 chars), give a higher score if they're the beginning of a word
+    // Especially useful for autocomplete scenarios
+    if (minLength >= 2 && (minLength / maxLength) >= 0.15) {
+      // Increased base score from 40 to 50 to make sure common prefixes reach threshold
+      return Math.round(50 + ((minLength / maxLength) * 30));
+    }
+  }
+  
+  // Check for substring matches (partial words anywhere in the name)
+  if (normalizedName1.includes(normalizedName2) || normalizedName2.includes(normalizedName1)) {
+    const minLength = Math.min(normalizedName1.length, normalizedName2.length);
+    const maxLength = Math.max(normalizedName1.length, normalizedName2.length);
+    
+    // Debug log specific case for "aero"
+    if (normalizedName1 === "aero" || normalizedName2 === "aero") {
+      console.log(`Substring match: minLength=${minLength}, maxLength=${maxLength}`);
+    }
+    
+    // For longer substrings (4+ chars)
+    if (minLength >= 4) {
+      return Math.round(50 + ((minLength / maxLength) * 30));
+    }
+    
+    // For shorter substrings (2-3 chars), give a moderate score
+    if (minLength >= 2) {
+      // Increased base score to get over the 50% threshold
+      return Math.round(45 + ((minLength / maxLength) * 15));
+    }
+  }
+  
+  // Fallback to fuzzy matching for non-prefix cases
+  try {
+    // Use token_sort_ratio for better handling of word order differences
+    // This will match "Company Inc" with "Inc Company"
+    const similarity = fuzzball.token_sort_ratio(normalizedName1, normalizedName2);
+    
+    // Debug log specific case for "aero"
+    if (normalizedName1 === "aero" || normalizedName2 === "aero") {
+      console.log(`Fuzzy match score: ${similarity}`);
+    }
+    
+    return similarity;
+  } catch (error) {
+    console.error('Error in fuzzy matching:', error);
+    return 0;
+  }
 };
 
 /**
@@ -116,15 +178,47 @@ const getPhoneSimilarity = (phone1: string, phone2: string): number => {
   const standardized1 = normalizePhone(phone1);
   const standardized2 = normalizePhone(phone2);
   
+  // For debugging
+  if (standardized1.startsWith('6983') || standardized2.startsWith('6983')) {
+    console.log(`Phone comparison: '${standardized1}' vs '${standardized2}'`);
+  }
+  
   // If either is empty after normalization, return 0
   if (!standardized1 || !standardized2) return 0;
   
   // Exact match
   if (standardized1 === standardized2) return 100;
   
-  // Check if one is a subset of the other (e.g., partial number)
+  // Check if one is contained within the other (partial match)
   if (standardized1.includes(standardized2) || standardized2.includes(standardized1)) {
-    return 80; // Increase from 70 to 80 to give more weight
+    const minLength = Math.min(standardized1.length, standardized2.length);
+    const maxLength = Math.max(standardized1.length, standardized2.length);
+    
+    // Debug log
+    if (standardized1.startsWith('6983') || standardized2.startsWith('6983')) {
+      console.log(`Substring phone match: ${minLength} digits of ${maxLength} total`);
+    }
+    
+    // Give higher scores for more matching digits
+    // For 7+ digits matching - high confidence (mobile numbers in Greece are typically 10 digits)
+    if (minLength >= 7) {
+      // Give a very high score (80-95) for significant partial matches
+      return Math.min(80 + (minLength - 7) * 5, 95);
+    }
+    
+    // For 5-6 digits matching - medium-high confidence
+    if (minLength >= 5) {
+      // Increased score from 60-65 to 70-75 for better matching
+      return 70 + ((minLength - 5) * 5); 
+    }
+    
+    // For fewer than 5 digits - scale confidence based on length
+    // Starting with 40% for 4 digits
+    if (minLength === 4) return 40;
+    if (minLength === 3) return 30;
+    
+    // For 1-2 digits, very low confidence
+    return minLength * 10;
   }
   
   // Check matching prefix - how many starting digits match
@@ -139,14 +233,28 @@ const getPhoneSimilarity = (phone1: string, phone2: string): number => {
     }
   }
   
-  // If at least 3 digits match at the beginning, return a proportional score
-  if (matchingDigits >= 3) {
-    // Calculate score based on how many digits match compared to the longer number
-    const maxLength = Math.max(standardized1.length, standardized2.length);
-    return Math.round((matchingDigits / maxLength) * 100);
+  // Debug log
+  if (standardized1.startsWith('6983') || standardized2.startsWith('6983')) {
+    console.log(`Prefix phone match: ${matchingDigits} matching digits at start`);
   }
   
-  return 0;
+  // If at least 3 digits match at the beginning, return a proportional score
+  if (matchingDigits >= 3) {
+    // For 7+ digits matching prefix - high confidence
+    if (matchingDigits >= 7) {
+      return 70 + ((matchingDigits - 7) * 10); // 70-100% for 7-10 digits
+    }
+    
+    // For 5-6 digits matching prefix - medium-high confidence
+    if (matchingDigits >= 5) {
+      return 50 + ((matchingDigits - 5) * 10); // 50-60% for 5-6 digits
+    }
+    
+    // For 3-4 digits matching prefix - medium confidence
+    return 30 + ((matchingDigits - 3) * 10); // 30-40% for 3-4 digits
+  }
+  
+  return 0; // No significant match
 };
 
 /**
@@ -191,6 +299,321 @@ const calculateSimilarityScore = (
     customer.afm || ''
   );
   
+  // Use our helper function to avoid code duplication
+  return calculateSimilarityScoreWithFields(
+    nameSimilarity,
+    phoneSimilarity,
+    afmSimilarity,
+    searchInput
+  );
+};
+
+/**
+ * Find potential duplicate customers based on fuzzy matching
+ * @param searchInput Object containing company_name, telephone, and afm
+ * @param threshold Minimum similarity score threshold (0-100)
+ * @returns Array of potential duplicate customers with similarity scores
+ */
+export const findPotentialDuplicates = async (
+  searchInput: CustomerSearchInput,
+  threshold: number = 40
+): Promise<Customer[]> => {
+  try {
+    // Skip search if all required fields are empty
+    if (
+      (!searchInput.company_name || searchInput.company_name.trim() === '') &&
+      (!searchInput.telephone || searchInput.telephone.trim() === '') &&
+      (!searchInput.afm || searchInput.afm.trim() === '')
+    ) {
+      return [];
+    }
+    
+    // Clean and prepare search terms
+    const cleanSearchInput = {
+      company_name: searchInput.company_name?.trim() || '',
+      telephone: searchInput.telephone?.trim().replace(/\D/g, '') || '',
+      afm: searchInput.afm?.trim() || ''
+    };
+    
+    // Check if we have valid search terms
+    const hasCompanyName = cleanSearchInput.company_name.length >= 2;
+    const hasPhoneNumber = cleanSearchInput.telephone.length >= 5;
+    const hasAFM = cleanSearchInput.afm.length >= 3;
+    
+    // IMPORTANT: If we're doing a phone-only search, only search by phone
+    if (hasPhoneNumber && !hasCompanyName && !hasAFM) {
+      console.log("Performing PHONE-ONLY search");
+      
+      try {
+        const phoneDigits = cleanSearchInput.telephone;
+        console.log(`Searching for phone containing: ${phoneDigits}`);
+        
+        // Simple query for phone-only search
+        const { data, error } = await supabase
+          .from('customers')
+          .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, deleted')
+          .ilike('telephone', `%${phoneDigits}%`)
+          .is('deleted_at', null);
+          
+        if (error) {
+          console.error('Phone-only search error:', error);
+          return [];
+        }
+        
+        if (!data || data.length === 0) {
+          return [];
+        }
+        
+        console.log(`Found ${data.length} phone-only matches`);
+        
+        // Map results and process them
+        const mappedData = data.map(item => {
+          const { is_deleted, ...rest } = item as any;
+          return { ...rest, deleted: is_deleted };
+        });
+        
+        return processCustomerData(mappedData, cleanSearchInput, threshold);
+      } catch (e) {
+        console.error('Phone-only search error:', e);
+        return [];
+      }
+    }
+    
+    // Continue with normal search for other cases
+    // Build database query with filters to improve performance
+    let customerResults: Customer[] = [];
+    
+    // 1. Handle exact AFM match if provided (highest priority)
+    if (hasAFM) {
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, deleted')
+          .eq('afm', cleanSearchInput.afm)
+          .is('deleted_at', null);
+          
+        if (!error && data && data.length > 0) {
+          const mappedData = data.map(item => {
+            const { is_deleted, ...rest } = item as any;
+            return { ...rest, deleted: is_deleted };
+          });
+          
+          customerResults = [...customerResults, ...mappedData];
+        }
+      } catch (e) {
+        console.error('AFM search error:', e);
+      }
+    }
+    
+    // 2. Handle phone search independently - always perform if phone number is provided
+    if (hasPhoneNumber) {
+      try {
+        const phoneDigits = cleanSearchInput.telephone;
+        console.log(`Searching for phone containing: ${phoneDigits}`);
+        
+        const { data, error } = await supabase
+          .from('customers')
+          .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, deleted')
+          .ilike('telephone', `%${phoneDigits}%`)
+          .is('deleted_at', null);
+          
+        if (!error && data && data.length > 0) {
+          console.log(`Found ${data.length} phone matches in combined search`);
+          
+          const mappedData = data.map(item => {
+            const { is_deleted, ...rest } = item as any;
+            return { ...rest, deleted: is_deleted };
+          });
+          
+          // Add only unique results that aren't already in the customerResults array
+          const uniquePhoneResults = mappedData.filter(item => 
+            !customerResults.some(existing => existing.id === item.id)
+          );
+          
+          customerResults = [...customerResults, ...uniquePhoneResults];
+        } else if (error) {
+          console.error('Phone search error:', error);
+        }
+      } catch (e) {
+        console.error('Phone search error:', e);
+      }
+    }
+    
+    // 3. Handle company name search independently
+    if (hasCompanyName) {
+      try {
+        // For multi-word search, we need to build a complex query
+        // Split the company name into words and search for each
+        const words = cleanSearchInput.company_name
+          .split(/\s+/)
+          .filter(word => word.length >= 2); // Only words with 2+ chars
+        
+        let query = supabase
+          .from('customers')
+          .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, deleted')
+          .is('deleted_at', null);
+        
+        if (words.length === 1) {
+          // Single word search
+          query = query.ilike('company_name', `%${words[0]}%`);
+        } 
+        else if (words.length > 1) {
+          // Multi-word search - find records containing ALL words in any order
+          words.forEach(word => {
+            query = query.ilike('company_name', `%${word}%`);
+          });
+        }
+        
+        const { data, error } = await query;
+        
+        if (!error && data && data.length > 0) {
+          const mappedData = data.map(item => {
+            const { is_deleted, ...rest } = item as any;
+            return { ...rest, deleted: is_deleted };
+          });
+          
+          // Add only unique results that aren't already in the customerResults array
+          const uniqueNameResults = mappedData.filter(item => 
+            !customerResults.some(existing => existing.id === item.id)
+          );
+          
+          customerResults = [...customerResults, ...uniqueNameResults];
+        }
+      } catch (e) {
+        console.error('Name search error:', e);
+      }
+    }
+    
+    // If we found no results with any search, return empty array
+    if (customerResults.length === 0) {
+      return [];
+    }
+    
+    // Process all results through similarity scoring and filtering
+    return processCustomerData(customerResults, cleanSearchInput, threshold);
+  } catch (error) {
+    console.error('Error in duplicate detection:', error);
+    return [];
+  }
+};
+
+/**
+ * Process customer data from Supabase - separate function to avoid code duplication
+ */
+const processCustomerData = (
+  customers: any[],
+  searchInput: CustomerSearchInput,
+  threshold: number
+): Customer[] => {
+  // Apply AFM exact matching filter when applicable
+  if (searchInput.afm && searchInput.afm.trim() !== '') {
+    // This is a secondary filter in case the database query wasn't exact
+    customers = customers.filter(customer =>
+      customer.afm === searchInput.afm.trim()
+    );
+  }
+
+  if (customers.length === 0) {
+    return [];
+  }
+
+  console.log("Processing with threshold:", threshold);
+  
+  // Add extra debug for aero search
+  if (searchInput.company_name?.toLowerCase().includes('aero')) {
+    console.log(`Found ${customers.length} records to check for 'aero' match`);
+    console.log("Customer names in database:", customers.map(c => c.company_name).join(', '));
+  }
+  
+  // Process results with similarity scoring
+  const scoredCustomers = customers.map(customer => {
+    // Calculate similarities once to avoid duplication
+    const nameSimilarity = getNameSimilarity(
+      searchInput.company_name || '',
+      customer.company_name || ''
+    );
+    
+    const phoneSimilarity = getPhoneSimilarity(
+      searchInput.telephone || '',
+      customer.telephone || ''
+    );
+    
+    const afmSimilarity = getAfmSimilarity(
+      searchInput.afm || '',
+      customer.afm || ''
+    );
+    
+    // Calculate total score - using our new fields to avoid recalculating
+    const score = calculateSimilarityScoreWithFields(
+      nameSimilarity, 
+      phoneSimilarity, 
+      afmSimilarity, 
+      searchInput
+    );
+    
+    // Special debug for "aero" search
+    if (searchInput.company_name?.toLowerCase().includes('aero')) {
+      console.log(`Match check for: ${customer.company_name}`);
+      console.log(`Name similarity: ${nameSimilarity}, Total score: ${score}`);
+    }
+    
+    // Log scores for debugging - only log significant matches
+    if (score >= 40 || nameSimilarity >= 40 || phoneSimilarity >= 40) {
+      console.log(`Match: ${customer.company_name}, Phone: ${customer.telephone}`);
+      console.log(`Name similarity: ${nameSimilarity}, Phone similarity: ${phoneSimilarity}, Total score: ${score}`);
+    }
+    
+    return {
+      ...customer,
+      score,
+      matchReasons: {
+        companyName: nameSimilarity >= 50,
+        telephone: phoneSimilarity >= 50,
+        afm: afmSimilarity >= 80
+      }
+    };
+  });
+
+  // Show all scores before filtering - consolidate to a single log
+  console.log("All scores:", 
+    scoredCustomers
+      .filter(c => c.score >= 30) // Only log reasonably close matches
+      .map(c => ({ 
+        company_name: c.company_name, 
+        telephone: c.telephone,
+        score: c.score 
+      }))
+  );
+  
+  // Special debug for "aero" search showing all scores regardless of threshold
+  if (searchInput.company_name?.toLowerCase().includes('aero')) {
+    console.log("All 'aero' related scores:", 
+      scoredCustomers.map(c => ({ 
+        company_name: c.company_name, 
+        score: c.score 
+      }))
+    );
+  }
+  
+  // Filter by threshold and sort by score (highest first)
+  const results = scoredCustomers
+    .filter(customer => (customer.score || 0) >= threshold)
+    .sort((a, b) => (b.score || 0) - (a.score || 0));
+  
+  console.log("Results after filtering:", results.length);
+  return results;
+};
+
+/**
+ * Helper function to calculate similarity score with pre-calculated similarity values
+ * This avoids duplicate calculations between calculateSimilarityScore and processCustomerData
+ */
+const calculateSimilarityScoreWithFields = (
+  nameSimilarity: number,
+  phoneSimilarity: number,
+  afmSimilarity: number,
+  searchInput: CustomerSearchInput
+): number => {
   // Special case: Exact AFM match is a definite match regardless of other fields
   // AFM should be unique per customer in the database
   if (afmSimilarity === 100 && searchInput.afm && searchInput.afm.trim().length >= 3) {
@@ -203,38 +626,73 @@ const calculateSimilarityScore = (
     return 85; // High confidence match based on phone only
   }
   
+  // Special case: High phone similarity (70%+) should be prioritized for phone-only searches
+  // This helps when searching with just a few digits of a phone number
+  const hasOnlyPhone = (
+    (!searchInput.company_name || searchInput.company_name.trim() === '') &&
+    (searchInput.telephone && searchInput.telephone.trim() !== '') &&
+    (!searchInput.afm || searchInput.afm.trim() === '')
+  );
+  
+  if (hasOnlyPhone && phoneSimilarity >= 70) {
+    // Scale based on the phone similarity, but ensure it's at least 60%
+    // to make these results visible to the user
+    return Math.max(60, phoneSimilarity);
+  }
+  
+  // Special case: Even medium phone similarity (40%+) should be returned for
+  // short phone-only searches (4-5 digits) to make results visible
+  if (hasOnlyPhone && 
+      phoneSimilarity >= 40 && 
+      searchInput.telephone.trim().replace(/\D/g, '').length <= 5) {
+    // Return a score just above threshold to ensure visibility
+    return Math.max(40, phoneSimilarity);
+  }
+  
   // Skip completely if no meaningful data to compare
   if (
-    (!searchInput.company_name && !searchInput.telephone && !searchInput.afm) ||
-    (!customer.company_name && !customer.telephone && !customer.afm)
+    (!searchInput.company_name && !searchInput.telephone && !searchInput.afm)
   ) {
     return 0;
   }
   
   // Weighted calculation combining all fields
-  // Weights based on relative importance:
-  // - Company name: 40%
-  // - Phone number: 40% 
-  // - AFM (tax ID): 20%
-  const nameWeight = 0.4;
-  const phoneWeight = 0.4;
-  const afmWeight = 0.2;
+  // Adjust weights based on what data is available:
+  let nameWeight = 0.4;  // Default: 40%
+  let phoneWeight = 0.4; // Default: 40%
+  let afmWeight = 0.2;   // Default: 20%
+  
+  // If only phone, give it 100% weight
+  if (hasOnlyPhone) {
+    nameWeight = 0;
+    phoneWeight = 1.0;
+    afmWeight = 0;
+  }
+  // If only company name, give it 100% weight
+  else if (searchInput.company_name && 
+           searchInput.company_name.trim() !== '' &&
+           (!searchInput.telephone || searchInput.telephone.trim() === '') &&
+           (!searchInput.afm || searchInput.afm.trim() === '')) {
+    nameWeight = 1.0;
+    phoneWeight = 0;
+    afmWeight = 0;
+  }
   
   let weightedScore = 0;
   let appliedWeight = 0;
   
   // Only apply weights for fields that have values to compare
-  if (searchInput.company_name && customer.company_name) {
+  if (searchInput.company_name && searchInput.company_name.trim() !== '') {
     weightedScore += nameSimilarity * nameWeight;
     appliedWeight += nameWeight;
   }
   
-  if (searchInput.telephone && searchInput.telephone.trim() !== '' && customer.telephone) {
+  if (searchInput.telephone && searchInput.telephone.trim() !== '') {
     weightedScore += phoneSimilarity * phoneWeight;
     appliedWeight += phoneWeight;
   }
   
-  if (searchInput.afm && searchInput.afm.trim() !== '' && customer.afm) {
+  if (searchInput.afm && searchInput.afm.trim() !== '') {
     weightedScore += afmSimilarity * afmWeight;
     appliedWeight += afmWeight;
   }
@@ -261,120 +719,6 @@ const calculateSimilarityScore = (
   }
   
   return normalizedScore;
-};
-
-/**
- * Finds potential duplicate customers based on company name, phone, and AFM
- * @param searchInput Customer data to check for duplicates
- * @param threshold Minimum similarity score to consider as a duplicate (default: 70)
- * @returns Array of potential duplicate customers with similarity scores
- */
-export const findPotentialDuplicates = async (
-  searchInput: CustomerSearchInput,
-  threshold: number = 70
-): Promise<Customer[]> => {
-  try {
-    // Skip search if no meaningful data provided
-    if (
-      (!searchInput.company_name || searchInput.company_name.trim() === '') &&
-      (!searchInput.telephone || searchInput.telephone.trim() === '') &&
-      (!searchInput.afm || searchInput.afm.trim() === '')
-    ) {
-      return [];
-    }
-    
-    // Using a try-catch approach to handle potential column-not-exist errors
-    try {
-      // First try with the 'deleted' column
-      const { data, error } = await supabase
-        .from('customers')
-        .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, deleted')
-        .is('deleted_at', null);
-      
-      if (error) {
-        // If there's an error, it might be because the deleted column doesn't exist
-        console.error('Error with deleted column:', error);
-        throw new Error('Column may not exist');
-      }
-      
-      if (!data || data.length === 0) {
-        return [];
-      }
-      
-      // Process data with deleted field
-      return processCustomerData(data, searchInput, threshold);
-    } catch (e) {
-      // Try again with is_deleted column instead
-      console.log('Trying with is_deleted column instead');
-      const { data, error } = await supabase
-        .from('customers')
-        .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, is_deleted')
-        .is('deleted_at', null);
-      
-      if (error) {
-        console.error('Error with is_deleted column:', error);
-        
-        // Last resort - try without any soft delete column
-        const { data: allData, error: allError } = await supabase
-          .from('customers')
-          .select('id, company_name, telephone, afm, doy, email, address, town, postal_code')
-          .is('deleted_at', null);
-        
-        if (allError || !allData) {
-          console.error('Failed to fetch customers:', allError);
-          return [];
-        }
-        
-        return processCustomerData(allData, searchInput, threshold);
-      }
-      
-      if (!data || data.length === 0) {
-        return [];
-      }
-      
-      // Map is_deleted to deleted for consistency
-      const mappedData = data.map(item => {
-        const { is_deleted, ...rest } = item as any;
-        return { ...rest, deleted: is_deleted };
-      });
-      
-      return processCustomerData(mappedData, searchInput, threshold);
-    }
-  } catch (error) {
-    console.error('Error in duplicate detection:', error);
-    return [];
-  }
-};
-
-/**
- * Process customer data from Supabase - separate function to avoid code duplication
- */
-const processCustomerData = (
-  customers: any[],
-  searchInput: CustomerSearchInput,
-  threshold: number
-): Customer[] => {
-  // Apply AFM exact matching filter when applicable
-  if (searchInput.afm && searchInput.afm.trim() !== '') {
-    customers = customers.filter(customer => 
-      customer.afm === searchInput.afm.trim()
-    );
-  }
-  
-  if (customers.length === 0) {
-    return [];
-  }
-  
-  // Process results with similarity scoring
-  const scoredCustomers = customers.map(customer => ({
-    ...customer,
-    score: calculateSimilarityScore(searchInput, customer)
-  }));
-  
-  // Filter by threshold and sort by score (highest first)
-  return scoredCustomers
-    .filter(customer => (customer.score || 0) >= threshold)
-    .sort((a, b) => (b.score || 0) - (a.score || 0));
 };
 
 // Export the service
