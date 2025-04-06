@@ -287,11 +287,27 @@ export class DataService<T extends Record<string, any>> {
         oldData = currentData;
       }
 
-      // Add updated_at timestamp
-      const updateData = {
-        ...data,
-        updated_at: new Date().toISOString()
-      };
+      // Some tables use date_updated instead of updated_at
+      let updateData: any = { ...data };
+      
+      // Handle tables with alternative date field names
+      const useAlternativeDateFieldNames = ['service_categories', 'service_subcategories', 'units'].includes(this.tableName);
+      
+      // Tables using standard created_at/updated_at field names
+      const useStandardDateFieldNames = ['departments'].includes(this.tableName);
+      
+      if (useAlternativeDateFieldNames) {
+        // Don't add updated_at for tables that use date_updated
+        if (!updateData.date_updated) {
+          updateData.date_updated = new Date().toISOString();
+        }
+      } else if (useStandardDateFieldNames) {
+        // Add standard updated_at timestamp
+        updateData.updated_at = new Date().toISOString();
+      } else {
+        // Add updated_at timestamp for other tables
+        updateData.updated_at = new Date().toISOString();
+      }
 
       const { data: updatedData, error } = await supabase
         .from(this.tableName as any)
@@ -348,10 +364,25 @@ export class DataService<T extends Record<string, any>> {
       }
 
       const timestamp = new Date().toISOString();
+      
+      // Handle tables with alternative date field names
+      const useAlternativeDateFieldNames = ['service_categories', 'service_subcategories', 'units'].includes(this.tableName);
+      
+      // Tables using standard created_at/updated_at field names
+      const useStandardDateFieldNames = ['departments'].includes(this.tableName);
+      
       const updateData = {
         deleted_at: timestamp,
-        updated_at: timestamp,
       };
+      
+      // Add the appropriate updated timestamp field
+      if (useAlternativeDateFieldNames) {
+        updateData['date_updated'] = timestamp;
+      } else if (useStandardDateFieldNames) {
+        updateData['updated_at'] = timestamp;
+      } else {
+        updateData['updated_at'] = timestamp;
+      }
 
       const { data: deletedData, error } = await supabase
         .from(this.tableName as any)
@@ -407,10 +438,26 @@ export class DataService<T extends Record<string, any>> {
         oldData = currentData;
       }
 
+      const timestamp = new Date().toISOString();
+      
+      // Handle tables with alternative date field names
+      const useAlternativeDateFieldNames = ['service_categories', 'service_subcategories', 'units'].includes(this.tableName);
+      
+      // Tables using standard created_at/updated_at field names
+      const useStandardDateFieldNames = ['departments'].includes(this.tableName);
+      
       const updateData = {
         deleted_at: null,
-        updated_at: new Date().toISOString(),
       };
+      
+      // Add the appropriate updated timestamp field
+      if (useAlternativeDateFieldNames) {
+        updateData['date_updated'] = timestamp;
+      } else if (useStandardDateFieldNames) {
+        updateData['updated_at'] = timestamp;
+      } else {
+        updateData['updated_at'] = timestamp;
+      }
 
       const { data: restoredData, error } = await supabase
         .from(this.tableName as any)

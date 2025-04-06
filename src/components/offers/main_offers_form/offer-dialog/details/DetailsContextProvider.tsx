@@ -256,6 +256,8 @@ export const DetailsContextProvider: React.FC<DetailsContextProviderProps> = ({ 
         return;
       }
       
+      // Skip confirmation step - process directly
+      
       // Filter out items that already exist in the details or selectedDetails
       const itemsToAdd = selectedItems.filter(item => {
         // Check if this item already exists in the details list
@@ -419,12 +421,16 @@ export const DetailsContextProvider: React.FC<DetailsContextProviderProps> = ({ 
     );
   }, [setSelectedDetails, setDetails]);
 
-  // Handle dialog open change
+  // Handle dialog open/close events
   const handleDialogOpenChange = useCallback((open: boolean) => {
+    console.log(`Dialog open change requested: ${open ? 'OPEN' : 'CLOSE'}`);
     if (!open) {
-      cleanupDialogPortals();
+      // Clean up state when dialog is closed
+      setSelectedItems([]);
+      setCurrentCategoryId(null);
     }
-  }, [cleanupDialogPortals]);
+    setShowSelectionDialog(open);
+  }, [setSelectedItems, setCurrentCategoryId, setShowSelectionDialog]);
 
   // Utility function to truncate text
   const truncateText = useCallback((text: string, maxLength: number = 25): React.ReactNode => {

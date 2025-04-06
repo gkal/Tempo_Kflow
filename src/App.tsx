@@ -8,6 +8,7 @@ import { LoadingProvider } from './lib/LoadingContext';
 import { FormProvider } from './lib/FormContext';
 import ProtectedRoute from "./components/ProtectedRoute";
 import { OfferDialogContainer } from './components/offers/main_offers_form/OfferDialogManager';
+import GlobalDialogProvider from './components/GlobalDialogManager';
 
 // Lazy load components
 const Home = lazy(() => import("./components/home"));
@@ -38,52 +39,54 @@ function App() {
       <MuiThemeProvider>
         <LoadingProvider>
           <FormProvider>
-            <Toaster />
-            <Suspense 
-              fallback={<LoadingSpinner fullScreen={true} />}
-            >
-              <Routes>
-                {/* Public routes */}
-                <Route
-                  path="/"
-                  element={user ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />}
-                />
-                <Route
-                  path="/login"
-                  element={user ? <Navigate to="/dashboard" replace /> : <LoginForm />}
-                />
-                
-                {/* Protected application routes */}
-                {[
-                  "/dashboard/*",
-                  "/customers",
-                  "/customers/new", 
-                  "/customers/:id",
-                  "/tasks",
-                  "/offers",
-                  "/calls",
-                  "/admin/recovery",
-                  "/admin/backup",
-                  "/admin/service-types"
-                ].map(path => (
-                  <Route 
-                    key={path}
-                    path={path}
-                    element={<ProtectedRoute><Home /></ProtectedRoute>}
+            <GlobalDialogProvider>
+              <Toaster />
+              <Suspense 
+                fallback={<LoadingSpinner fullScreen={true} />}
+              >
+                <Routes>
+                  {/* Public routes */}
+                  <Route
+                    path="/"
+                    element={user ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />}
                   />
-                ))}
+                  <Route
+                    path="/login"
+                    element={user ? <Navigate to="/dashboard" replace /> : <LoginForm />}
+                  />
+                  
+                  {/* Protected application routes */}
+                  {[
+                    "/dashboard/*",
+                    "/customers",
+                    "/customers/new", 
+                    "/customers/:id",
+                    "/tasks",
+                    "/offers",
+                    "/calls",
+                    "/admin/recovery",
+                    "/admin/backup",
+                    "/admin/service-types"
+                  ].map(path => (
+                    <Route 
+                      key={path}
+                      path={path}
+                      element={<ProtectedRoute><Home /></ProtectedRoute>}
+                    />
+                  ))}
+                  
+                  {/* Development routes */}
+                  {import.meta.env.VITE_TEMPO === "true" && (
+                    <Route path="/tempobook/*" element={<div />} />
+                  )}
+                  
+                  {/* Fallback route */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
                 
-                {/* Development routes */}
-                {import.meta.env.VITE_TEMPO === "true" && (
-                  <Route path="/tempobook/*" element={<div />} />
-                )}
-                
-                {/* Fallback route */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-              
-              <OfferDialogContainer />
-            </Suspense>
+                <OfferDialogContainer />
+              </Suspense>
+            </GlobalDialogProvider>
           </FormProvider>
         </LoadingProvider>
       </MuiThemeProvider>

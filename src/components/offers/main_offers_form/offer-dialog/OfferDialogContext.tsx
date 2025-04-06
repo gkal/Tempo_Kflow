@@ -1,4 +1,4 @@
-import React, { createContext } from 'react';
+import React, { createContext, useContext } from 'react';
 import { UseFormRegister, UseFormReset, UseFormSetValue, UseFormWatch, FormState, UseFormHandleSubmit, Control } from 'react-hook-form';
 
 // Define the form values type
@@ -19,6 +19,7 @@ export interface OfferFormValues {
   postal_code?: string;
   town?: string;
   status?: string;
+  progress?: number;
 }
 
 // Define the database offer type
@@ -53,7 +54,7 @@ export interface OffersDialogProps {
   onOpenChange: (open: boolean) => void;
   customerId: string;
   offerId?: string;
-  onSave: (offer?: any) => void;
+  onSave?: (data?: any) => void;
   defaultSource?: string;
   tableRef?: React.RefObject<any>; // Use the proper type instead of any if available
 }
@@ -62,6 +63,7 @@ export interface OffersDialogProps {
 export interface OfferDialogContextType {
   offerId: string | null;
   customerId: string;
+  customerName?: string;
   register: UseFormRegister<OfferFormValues>;
   watch: UseFormWatch<OfferFormValues>;
   setValue: UseFormSetValue<OfferFormValues>;
@@ -129,4 +131,12 @@ if (typeof window !== 'undefined') {
 }
 
 // TEMPORARY FIX: Define a hardcoded admin ID as fallback
-export const ADMIN_USER_ID = '3fbf35f7-5730-47d5-b9d2-f742b24c9d26'; 
+export const ADMIN_USER_ID = '3fbf35f7-5730-47d5-b9d2-f742b24c9d26';
+
+export const useOfferDialog = () => {
+  const context = useContext(OfferDialogContext);
+  if (!context) {
+    throw new Error('useOfferDialog must be used within an OfferDialogProvider');
+  }
+  return context;
+}; 

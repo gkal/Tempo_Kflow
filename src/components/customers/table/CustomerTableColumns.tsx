@@ -27,8 +27,6 @@ export const useCustomerColumns = ({
       header: 'Επωνυμία',
       enableSorting: true,
       sortDescFirst: false,
-      enableResizing: true,
-      size: 300,
       cell: ({ row }) => {
         const customer = row;
         const offersCount = customer.offers_count || 0;
@@ -76,8 +74,6 @@ export const useCustomerColumns = ({
       header: 'Τύπος',
       enableSorting: true,
       sortDescFirst: false,
-      enableResizing: true,
-      size: 150,
       cell: ({ row }) => row.customer_type || "—",
       meta: {
         className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
@@ -89,8 +85,6 @@ export const useCustomerColumns = ({
       header: 'Τηλέφωνο',
       enableSorting: true,
       sortDescFirst: false,
-      enableResizing: true,
-      size: 150,
       cell: ({ row }) => row.telephone || "—",
       meta: {
         className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
@@ -102,8 +96,6 @@ export const useCustomerColumns = ({
       header: 'Email',
       enableSorting: true,
       sortDescFirst: false,
-      enableResizing: true,
-      size: 200,
       cell: ({ row }) => row.email || "—",
       meta: {
         className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
@@ -115,8 +107,6 @@ export const useCustomerColumns = ({
       header: 'Διεύθυνση',
       enableSorting: true,
       sortDescFirst: false,
-      enableResizing: true,
-      size: 250,
       cell: ({ row }) => {
         return row.address || "—";
       },
@@ -130,8 +120,6 @@ export const useCustomerColumns = ({
       header: 'Ημερομηνία Δημιουργίας',
       enableSorting: true,
       sortDescFirst: false,
-      enableResizing: true,
-      size: 200,
       cell: ({ row }) => formatDateTime(row.created_at),
       meta: {
         className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
@@ -143,8 +131,6 @@ export const useCustomerColumns = ({
       header: 'Ενεργείες',
       enableSorting: true,
       sortDescFirst: false,
-      enableResizing: true,
-      size: 150,
       cell: ({ row }) => {
         const status = row.status;
         return (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from '@/lib/supabaseClient';
@@ -45,33 +45,31 @@ declare global {
 // Define the service category interface
 interface ServiceCategory {
   id: string;
-  name: string;
-  created_at: string;
   category_name: string;
   date_created: string;
   date_updated: string | null;
-  user_create: string;
+  user_create: string | null;
   user_updated: string | null;
+  deleted_at: string | null;
+  is_deleted: boolean | null;
 }
 
 // Define the service subcategory interface
 interface ServiceSubcategory {
   id: string;
-  name: string;
-  category_id: string;
-  created_at: string;
   subcategory_name: string;
+  category_id: string;
   date_created: string;
   date_updated: string | null;
-  user_create: string;
+  user_create: string | null;
   user_updated: string | null;
+  deleted_at: string | null;
 }
 
 // Define the combined type for display in the table
 interface CategoryWithSubcategories extends ServiceCategory {
   isSubcategory: boolean;
   parentId?: string;
-  category_id?: string;
   subcategory_name?: string;
 }
 
@@ -80,8 +78,19 @@ interface Department {
   id: string;
   name: string;
   created_at: string;
-  column_id?: number; // Add this as it was shown in the SQL output
-  text?: string;      // Add this as it was shown in the SQL output
+  deleted_at: string | null;
+}
+
+// Define units interface to match database structure
+interface Unit {
+  id: string;
+  name: string;
+  date_created: string | null;
+  date_updated: string | null;
+  user_create: string | null;
+  user_updated: string | null;
+  deleted_at: string | null;
+  is_deleted: boolean | null;
 }
 
 // Category Context Menu Props
@@ -341,9 +350,11 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
   } = useDataService<ServiceSubcategory>('service_subcategories');
 
   // Fetch service categories and subcategories
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
+      // Clear any error messages when loading new data
+      setFormMessage(null);
       
       // Fetch categories using DataService
       const categoriesData = await fetchAllCategories({
@@ -366,12 +377,7 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
         combinedData.push({
           ...category,
           isSubcategory: false,
-          category_name: category.category_name || category.name || '',
-          date_created: category.created_at || '',
-          date_updated: '',
-          user_create: '',
-          user_updated: ''
-        } as CategoryWithSubcategories);
+        });
         
         // Find and add subcategories under their parent
         const relatedSubcategories = subcategoriesData?.filter(
@@ -379,18 +385,22 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
         ) || [];
         
         relatedSubcategories.forEach(subcategory => {
-          combinedData.push({
+          // Create a properly typed subcategory entry
+          const subcategoryEntry: CategoryWithSubcategories = {
             id: subcategory.id,
-            name: subcategory.name,
-            created_at: subcategory.created_at,
-            category_name: subcategory.subcategory_name || subcategory.name || '',
-            date_created: subcategory.created_at,
-            date_updated: null,
-            user_create: '',
-            user_updated: null,
+            category_name: subcategory.subcategory_name,
+            date_created: subcategory.date_created,
+            date_updated: subcategory.date_updated,
+            user_create: subcategory.user_create,
+            user_updated: subcategory.user_updated,
+            deleted_at: subcategory.deleted_at,
+            is_deleted: null,
             isSubcategory: true,
-            parentId: subcategory.category_id
-          } as CategoryWithSubcategories);
+            parentId: subcategory.category_id,
+            subcategory_name: subcategory.subcategory_name
+          };
+          
+          combinedData.push(subcategoryEntry);
         });
       });
       
@@ -404,12 +414,22 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchAllCategories, fetchAllSubcategories]);
 
   // Fetch data on component mount or when refresh trigger changes
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories, refreshTrigger]);
+
+  // State to trigger fetches from Supabase subscriptions
+  const [subscriptionTrigger, setSubscriptionTrigger] = useState(0);
+
+  // Fetch when subscription trigger changes
+  useEffect(() => {
+    if (subscriptionTrigger > 0) {
+      fetchCategories();
+    }
+  }, [fetchCategories, subscriptionTrigger]);
 
   // Set up real-time subscriptions using Supabase's built-in capabilities
   useEffect(() => {
@@ -424,7 +444,7 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
           table: 'service_categories'
         },
         () => {
-          fetchCategories(); // Refresh the list
+          setSubscriptionTrigger(prev => prev + 1); // Use trigger instead of direct fetch
         }
       )
       .subscribe();
@@ -440,7 +460,7 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
           table: 'service_subcategories'
         },
         () => {
-          fetchCategories(); // Refresh the list
+          setSubscriptionTrigger(prev => prev + 1); // Use trigger instead of direct fetch
         }
       )
       .subscribe();
@@ -489,6 +509,7 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
         });
       } else if (currentCategory && currentCategory.isSubcategory) {
         // Update existing subcategory using DataService
+        // Note: Avoid using updated_at since the DataService will add it automatically
         const updatedSubcategory = await updateSubcategory(currentCategory.id, {
           subcategory_name: formData.category_name,
           date_updated: new Date().toISOString(),
@@ -600,6 +621,9 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
     }
     
     setCurrentCategory(category);
+    // Clear any previous error messages
+    setFormMessage(null);
+    
     // Add a small delay before setting form data to prevent auto-selection
     setTimeout(() => {
       setFormData({
@@ -767,7 +791,16 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
         />
 
         {/* Category Form Dialog */}
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <Dialog 
+          open={showDialog} 
+          onOpenChange={(open) => {
+            // Clear form message and update the dialog state
+            if (!open) {
+              setFormMessage(null);
+            }
+            setShowDialog(open);
+          }}
+        >
           <DialogContent 
             className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
             aria-labelledby="category-dialog-title"
@@ -855,8 +888,10 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
           onOpenChange={(open) => {
             setShowSubcategoryDialog(open);
             // If dialog is closing, reset the current parent category
+            // and clear any form messages
             if (!open) {
               setCurrentParentCategory(null);
+              setFormMessage(null);
             }
           }}
         >
@@ -867,9 +902,14 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
             <DialogHeader>
               <DialogTitle id="subcategory-dialog-title" className="text-[#84a98c] text-xl font-medium">
                 {currentParentCategory?.category_name 
-                  ? (currentParentCategory.category_name.length > 40 
-                      ? <TruncateWithTooltip text={currentParentCategory.category_name} maxLength={40} tooltipPosition="top" />
-                      : currentParentCategory.category_name)
+                  ? (
+                    <>
+                      Επεξεργασία Περιγραφής: {' '}
+                      {currentParentCategory.category_name.length > 30 
+                        ? <TruncateWithTooltip text={currentParentCategory.category_name} maxLength={30} tooltipPosition="top" />
+                        : currentParentCategory.category_name}
+                    </>
+                  )
                   : "Προσθήκη Περιγραφής"
                 }
               </DialogTitle>
@@ -937,7 +977,16 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
         </Dialog>
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialog 
+          open={showDeleteDialog} 
+          onOpenChange={(open) => {
+            setShowDeleteDialog(open);
+            // Clear any form messages when dialog is closing
+            if (!open) {
+              setFormMessage(null);
+            }
+          }}
+        >
           <AlertDialogContent 
             className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
             aria-labelledby="delete-dialog-title"
@@ -977,11 +1026,11 @@ function CategoriesTab({ refreshTrigger }: { refreshTrigger: number }) {
 
 function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
   const { user } = useAuth();
-  const [units, setUnits] = useState<any[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [currentUnit, setCurrentUnit] = useState<any | null>(null);
+  const [currentUnit, setCurrentUnit] = useState<Unit | null>(null);
   const [formData, setFormData] = useState({
     name: "",
   });
@@ -996,14 +1045,16 @@ function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
     create: createUnit,
     update: updateUnit,
     softDelete: removeUnit
-  } = useDataService<any>('units');
+  } = useDataService<Unit>('units');
 
-  // Fetch units
-  const fetchUnits = async () => {
+  // Fetch all units
+  const fetchUnits = useCallback(async () => {
     try {
       setLoading(true);
+      // Clear any error messages when loading new data
+      setFormMessage(null);
       
-      // Use DataService to fetch units
+      // Fetch units using DataService
       const unitsData = await fetchAllUnits({
         order: { column: "name", ascending: true }
       });
@@ -1018,15 +1069,26 @@ function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchAllUnits]);
 
   // Fetch data on component mount or when refresh trigger changes
   useEffect(() => {
     fetchUnits();
   }, [fetchUnits, refreshTrigger]);
 
-  // Set up real-time subscription using Supabase's built-in capabilities
+  // State to trigger fetches from Supabase subscriptions
+  const [subscriptionTrigger, setSubscriptionTrigger] = useState(0);
+
+  // Fetch when subscription trigger changes
   useEffect(() => {
+    if (subscriptionTrigger > 0) {
+      fetchUnits();
+    }
+  }, [fetchUnits, subscriptionTrigger]);
+
+  // Set up real-time subscriptions using Supabase's built-in capabilities
+  useEffect(() => {
+    // Units subscription
     const unitsSubscription = supabase
       .channel('units-changes')
       .on(
@@ -1037,7 +1099,7 @@ function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
           table: 'units'
         },
         () => {
-          fetchUnits(); // Refresh the list
+          setSubscriptionTrigger(prev => prev + 1); // Use trigger instead of direct fetch
         }
       )
       .subscribe();
@@ -1069,9 +1131,11 @@ function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
     try {
       if (currentUnit) {
         // Update existing unit using DataService
+        // For units, we need to update date_updated and user_updated
         const updatedUnit = await updateUnit(currentUnit.id, { 
           name: formData.name,
-          date_updated: new Date().toISOString()
+          date_updated: new Date().toISOString(),
+          user_updated: user?.id
         });
           
         if (!updatedUnit) {
@@ -1084,9 +1148,11 @@ function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
         });
       } else {
         // Create new unit using DataService
+        // For new units, we need to set date_created and user_create
         const newUnit = await createUnit({
           name: formData.name,
-          date_created: new Date().toISOString()
+          date_created: new Date().toISOString(),
+          user_create: user?.id
         });
 
         if (!newUnit) {
@@ -1119,8 +1185,11 @@ function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
   };
 
   // Handle edit button click
-  const handleEdit = (unit: any) => {
+  const handleEdit = (unit: Unit) => {
     setCurrentUnit(unit);
+    // Clear any previous error messages
+    setFormMessage(null);
+    
     // Add a small delay before setting form data to prevent auto-selection
     setTimeout(() => {
       setFormData({
@@ -1131,7 +1200,7 @@ function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
   };
 
   // Handle delete button click
-  const handleDeleteClick = (unit: any) => {
+  const handleDeleteClick = (unit: Unit) => {
     setCurrentUnit(unit);
     setShowDeleteDialog(true);
   };
@@ -1216,7 +1285,16 @@ function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
         />
 
         {/* Unit Form Dialog */}
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <Dialog 
+          open={showDialog} 
+          onOpenChange={(open) => {
+            // Clear form message and update the dialog state
+            if (!open) {
+              setFormMessage(null);
+            }
+            setShowDialog(open);
+          }}
+        >
           <DialogContent 
             className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
             aria-labelledby="unit-dialog-title"
@@ -1281,7 +1359,16 @@ function UnitsTab({ refreshTrigger }: { refreshTrigger: number }) {
       </Dialog>
       
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialog 
+          open={showDeleteDialog} 
+          onOpenChange={(open) => {
+            setShowDeleteDialog(open);
+            // Clear any form messages when dialog is closing
+            if (!open) {
+              setFormMessage(null);
+            }
+          }}
+        >
           <AlertDialogContent 
             className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
             aria-labelledby="delete-unit-dialog-title"
@@ -1337,12 +1424,14 @@ function DepartmentsTab({ refreshTrigger }: { refreshTrigger: number }) {
     softDelete: removeDepartment
   } = useDataService<Department>('departments');
 
-  // Fetch departments
-  const fetchDepartments = async () => {
+  // Fetch all departments
+  const fetchDepartments = useCallback(async () => {
     try {
       setLoading(true);
+      // Clear any error messages when loading new data
+      setFormMessage(null);
       
-      // Use DataService to fetch departments
+      // Fetch departments using DataService
       const departmentsData = await fetchAllDepartments({
         order: { column: "name", ascending: true }
       });
@@ -1357,15 +1446,26 @@ function DepartmentsTab({ refreshTrigger }: { refreshTrigger: number }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchAllDepartments]);
 
   // Fetch data on component mount or when refresh trigger changes
   useEffect(() => {
     fetchDepartments();
   }, [fetchDepartments, refreshTrigger]);
 
-  // Set up real-time subscription using Supabase's built-in capabilities
+  // State to trigger fetches from Supabase subscriptions
+  const [subscriptionTrigger, setSubscriptionTrigger] = useState(0);
+
+  // Fetch when subscription trigger changes
   useEffect(() => {
+    if (subscriptionTrigger > 0) {
+      fetchDepartments();
+    }
+  }, [fetchDepartments, subscriptionTrigger]);
+
+  // Set up real-time subscriptions using Supabase's built-in capabilities
+  useEffect(() => {
+    // Departments subscription
     const departmentsSubscription = supabase
       .channel('departments-changes')
       .on(
@@ -1376,7 +1476,7 @@ function DepartmentsTab({ refreshTrigger }: { refreshTrigger: number }) {
           table: 'departments'
         },
         () => {
-          fetchDepartments(); // Refresh the list
+          setSubscriptionTrigger(prev => prev + 1); // Use trigger instead of direct fetch
         }
       )
       .subscribe();
@@ -1408,6 +1508,8 @@ function DepartmentsTab({ refreshTrigger }: { refreshTrigger: number }) {
     try {
       if (currentDepartment) {
         // Update existing department using DataService
+        // Only update the name field for existing departments
+        // Don't try to update created_at as that's handled by the database
         const updatedDepartment = await updateDepartment(currentDepartment.id, { 
           name: formData.name 
         });
@@ -1422,8 +1524,9 @@ function DepartmentsTab({ refreshTrigger }: { refreshTrigger: number }) {
         });
       } else {
         // Create new department using DataService
+        // For new departments, let the database handle the created_at timestamp
         const newDepartment = await createDepartment({
-          name: formData.name,
+          name: formData.name
         });
 
         if (!newDepartment) {
@@ -1458,6 +1561,9 @@ function DepartmentsTab({ refreshTrigger }: { refreshTrigger: number }) {
   // Handle edit button click
   const handleEdit = (department: Department) => {
     setCurrentDepartment(department);
+    // Clear any previous error messages
+    setFormMessage(null);
+    
     // Add a small delay before setting form data to prevent auto-selection
     setTimeout(() => {
       setFormData({
@@ -1547,7 +1653,16 @@ function DepartmentsTab({ refreshTrigger }: { refreshTrigger: number }) {
         />
 
         {/* Department Form Dialog */}
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <Dialog 
+          open={showDialog} 
+          onOpenChange={(open) => {
+            // Clear form message and update the dialog state
+            if (!open) {
+              setFormMessage(null);
+            }
+            setShowDialog(open);
+          }}
+        >
           <DialogContent 
             className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-xl h-auto max-h-[90vh] overflow-auto shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
             aria-labelledby="department-dialog-title"
@@ -1612,7 +1727,16 @@ function DepartmentsTab({ refreshTrigger }: { refreshTrigger: number }) {
       </Dialog>
       
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialog 
+          open={showDeleteDialog} 
+          onOpenChange={(open) => {
+            setShowDeleteDialog(open);
+            // Clear any form messages when dialog is closing
+            if (!open) {
+              setFormMessage(null);
+            }
+          }}
+        >
           <AlertDialogContent 
             className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in-90 zoom-in-90 slide-in-from-bottom-10"
             aria-labelledby="delete-department-dialog-title"

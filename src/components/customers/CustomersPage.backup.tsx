@@ -200,7 +200,7 @@ const getResultClass = (result: string): string => {
 };
 
 // Main component
-const CustomersPage: React.FC = () => {
+const CustomersPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
@@ -259,4 +259,6 @@ const CustomersPage: React.FC = () => {
 
   // Rest of the component code...
   // (The rest of the file content would go here)
-} 
+}
+
+export default CustomersPage; 

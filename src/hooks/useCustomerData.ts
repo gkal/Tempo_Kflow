@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Customer } from '@/types/CustomerTypes';
+import { Customer, CustomerFilter } from '@/types/CustomerTypes';
 
 interface CustomerDataState {
   customers: Customer[];
   isLoading: boolean;
-  activeFilter: string;
+  activeFilter: CustomerFilter;
   searchTerm: string;
   searchColumn: string;
   selectedCustomerTypes: string[];
@@ -46,16 +46,33 @@ export const useCustomerData = () => {
       }
 
       if (state.selectedCustomerTypes.length > 0) {
-        query = query.in('type', state.selectedCustomerTypes);
+        // Using alternative query approach to avoid deep instantiation error
+        const typeFilter = state.selectedCustomerTypes.map(type => `type.eq.${type}`).join(',');
+        query = query.or(typeFilter);
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
 
+      // Map database rows to Customer type
+      const customers = data?.map(item => ({
+        id: item.id,
+        name: item.company_name || '',
+        email: item.email || '',
+        phone: item.telephone || '',
+        type: item.customer_type || '',
+        status: item.status || 'active',
+        created_at: item.created_at || '',
+        updated_at: item.updated_at || null,
+        address: item.address || null,
+        notes: item.notes || null,
+        ...item // Include remaining fields
+      })) || [];
+
       setState(prev => ({
         ...prev,
-        customers: data || [],
+        customers,
         isLoading: false
       }));
     } catch (error) {
@@ -64,7 +81,7 @@ export const useCustomerData = () => {
     }
   }, [state.activeFilter, state.searchTerm, state.searchColumn, state.selectedCustomerTypes]);
 
-  const setFilter = useCallback((filter: string) => {
+  const setFilter = useCallback((filter: CustomerFilter) => {
     setState(prev => ({ ...prev, activeFilter: filter }));
   }, []);
 

@@ -40,7 +40,9 @@ export type TableName =
   | 'brands'
   | 'comments'
   | 'resource_locks'
-  | 'history_logs';
+  | 'history_logs'
+  | 'system_settings'
+  | 'document_references';
 
 /**
  * Customer table row type
@@ -220,43 +222,42 @@ export interface User {
 }
 
 /**
- * Service category table row type
+ * Service category table row type - matches database structure exactly
  */
 export interface ServiceCategory {
   id: string;
-  name: string;
-  created_at: string;
-  date_created?: string;
-  date_updated?: string;
-  user_create?: string;
-  user_updated?: string;
-  category_name?: string;
-  deleted_at?: string | null;
+  category_name: string;
+  date_created: string;
+  date_updated: string | null;
+  user_create: string | null;
+  user_updated: string | null;
+  deleted_at: string | null;
+  is_deleted: boolean | null;
 }
 
 /**
- * Service subcategory table row type
+ * Service subcategory table row type - matches database structure exactly
  */
 export interface ServiceSubcategory {
   id: string;
-  name: string;
+  subcategory_name: string;
   category_id: string;
-  subcategory_name?: string;
-  created_at: string;
-  date_created?: string;
-  date_updated?: string;
-  user_create?: string;
-  user_updated?: string;
-  deleted_at?: string | null;
+  date_created: string;
+  date_updated: string | null;
+  user_create: string | null;
+  user_updated: string | null;
+  deleted_at: string | null;
 }
 
 /**
- * Category with subcategories type
+ * Category with subcategories type - used for display in the UI
  */
 export interface CategoryWithSubcategories extends ServiceCategory {
   isSubcategory: boolean;
-  category_id?: string;
-  subcategory_name?: string;
+  parentId?: string;
+  name?: string; // For backwards compatibility
+  created_at?: string; // For backwards compatibility
+  subcategory_name?: string; // When representing a subcategory
 }
 
 /**

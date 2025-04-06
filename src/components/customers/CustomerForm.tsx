@@ -47,8 +47,9 @@ import { createPrefixedLogger, logDebug, logError, logInfo, logWarning } from "@
 import { useLoading } from '@/lib/LoadingContext';
 import { useDataService } from "@/hooks/useDataService";
 import { useNavigate } from "react-router-dom";
-import { findPotentialDuplicates } from '@/services/duplicateDetectionService';
+import duplicateDetectionService from '@/services/duplicateDetectionService';
 import CustomerDetailDialog from './CustomerDetailDialog';
+import * as fuzzball from 'fuzzball';
 
 // Map of normalized customer types that match the database constraint
 const CUSTOMER_TYPE_MAP = {
@@ -249,6 +250,9 @@ const CustomerForm = ({
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [selectedCustomerScore, setSelectedCustomerScore] = useState<number | undefined>(undefined);
+
+  // Add state to track which field is currently active/focused
+  const [activeField, setActiveField] = useState<string | null>(null);
 
   // Fetch customer data if editing
   useEffect(() => {
@@ -702,187 +706,162 @@ const CustomerForm = ({
     }
   };
 
-  // Add useEffect for duplicate detection
-  useEffect(() => {
-    // Check if this is a phone-only search - for phone numbers, we need at least 5 digits
-    const isPhoneOnlySearch = phoneValue && phoneValue.replace(/\D/g, '').length >= 5;
+  // Use the duplicateDetectionService to find exact phone matches using database normalization
+  // Now also includes company name for combined scoring (name + phone)
+  const phoneSearch = async () => {
+
     
-    // For company name, we need at least 2 characters
-    const hasMinCompanyNameChars = formData.company_name && formData.company_name.trim().length >= 2;
-    
-    // If neither condition is met, clear matches and return
-    if (!isPhoneOnlySearch && !hasMinCompanyNameChars) {
+    if (!phoneValue || phoneValue.trim() === '') {
+
       setPotentialMatches([]);
       return;
     }
 
-    // Log what triggered the search for debugging
-    if (isPhoneOnlySearch && !hasMinCompanyNameChars) {
-      console.log("Phone-only search triggered with", phoneValue.replace(/\D/g, '').length, "digits");
-    } else if (hasMinCompanyNameChars) {
-      console.log("Company name search triggered with", formData.company_name.trim().length, "chars");
+    // Basic client-side check for minimum digits before hitting the DB
+    const cleanedPhoneForCheck = phoneValue.replace(/\D/g, '');
+    if (cleanedPhoneForCheck.length < 7) {
+
+      setPotentialMatches([]);
+      return;
     }
 
-    const debounceTimeout = setTimeout(() => {
-      // Call search logic directly in this function to avoid an infinite loop
-      (async () => {
-        try {
-          // Check if this is a phone-only search (phone entered but no company name or AFM)
-          const isPhoneOnlySearch = (
-            phoneValue && phoneValue.replace(/\D/g, '').length >= 5 &&
-            (!formData.company_name || formData.company_name.trim() === '') &&
-            (!formData.afm || formData.afm.trim() === '')
-          );
-          
-          // For phone-only searches, we want to bypass the regular duplicate detection
-          if (isPhoneOnlySearch) {
-            const cleanedPhone = phoneValue.replace(/\D/g, '');
-            
-            console.log("DIRECT PHONE-ONLY SEARCH. Raw value:", phoneValue);
-            console.log("Cleaned phone digits for search:", cleanedPhone);
-            
-            try {
-              // Simple direct query using ILIKE
-              const { data, error } = await supabase
-                .from('customers')
-                .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, deleted')
-                .filter('deleted_at', 'is', null)
-                .ilike('telephone', `%${cleanedPhone}%`);
-                
-              if (error) {
-                console.error("Phone search error:", error);
-                setPotentialMatches([]);
-                return;
-              }
-              
-              if (data && data.length > 0) {
-                // JavaScript filtering to mimic normalize_phone function
-                const filteredData = (data as any[]).filter(item => {
-                  const itemDigits = item.telephone ? item.telephone.replace(/\D/g, '') : '';
-                  return itemDigits.includes(cleanedPhone);
-                });
-                
-                console.log(`Phone search found ${filteredData.length} matches out of ${data.length} results`);
-                
-                const matches = filteredData.map((item: any) => ({
-                  ...item,
-                  score: 60,
-                  matchReasons: { telephone: true, companyName: false, afm: false }
-                })) as Customer[];
-                
-                setPotentialMatches(matches);
-              } else {
-                console.log("No matches found for phone search");
-                setPotentialMatches([]);
-              }
-            } catch (e) {
-              console.error("Phone search failed:", e);
-              setPotentialMatches([]);
-            }
-            return;
-          }
+    try {
+      // Use the duplicateDetectionService's findExactPhoneMatches function with company name
+      // This will calculate combined scores based on both phone and name similarity
+      const matches = await duplicateDetectionService.findExactPhoneMatches(phoneValue, formData.company_name);
 
-          // Normal duplicate detection for other cases
-          const matches = await findPotentialDuplicates({
-            company_name: formData.company_name,
-            telephone: phoneValue,
-            afm: formData.afm || ''
-          }, 40); // Default threshold
-          
-          setPotentialMatches(matches);
-        } catch (error) {
-          console.error('Error detecting duplicates:', error);
+      setPotentialMatches(matches);
+    } catch (e) {
+      console.error("Phone search failed:", e);
+      setPotentialMatches([]);
+    }
+  };
+
+  // Handle field focus events
+  const handleFieldFocus = (fieldName: string) => {
+    setActiveField(fieldName);
+  };
+
+  // Handle key field blur events to perform search
+  const handleKeyFieldBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const fieldId = e.target.id;
+    
+    // Set the active field
+    setActiveField(fieldId);
+    
+    // Skip search if we're navigating to a customer or in edit mode
+    if (navigatingToCustomer || customerId) {
+      return;
+    }
+    
+    // For phone field with minimum digits, trigger phone search
+    if (fieldId === 'telephone') {
+      const phoneDigits = phoneValue ? phoneValue.replace(/\D/g, '').length : 0;
+      
+      if (phoneDigits >= 7) { // Keep phone at 7 digits minimum
+
+        phoneSearch();
+      }
+    }
+    // For company name with minimum chars, trigger company search
+    else if (fieldId === 'company_name') {
+      if (formData.company_name && formData.company_name.trim().length >= 2) { // Keep company name at 2 chars minimum
+
+        findMatches();
+      }
+    }
+    // For AFM field with minimum chars, trigger search with AFM
+    else if (fieldId === 'afm') {
+      if (formData.afm && formData.afm.trim().length >= 5) {
+
+        findMatches();
+      }
+    }
+  };
+
+  // Helper function to find matches using company name and AFM
+  const findMatches = async () => {
+    const matches = await duplicateDetectionService.findPotentialDuplicates({
+      company_name: formData.company_name,
+      telephone: '', // Don't include phone in company search
+      afm: formData.afm || ''
+    }, 65); // Using 65% threshold for potential duplicates
+    
+    setPotentialMatches(matches);
+  };
+
+  // Effect for debounced search
+  useEffect(() => {
+    // Skip search if either we don't have minimum input or we have an existing customer
+    const phoneDigits = phoneValue.replace(/\D/g, '').length;
+    const companyNameChars = formData.company_name.length;
+    
+
+    
+    // Only search if we're not navigating to a customer and not in edit mode (no customerId)
+    if (!navigatingToCustomer && !customerId) {
+      // Only search if one of the fields has minimum required input
+      const hasMinCompany = companyNameChars >= 3; // Start search with 3+ characters
+      const hasMinPhone = phoneDigits >= 7; // Keep phone at 7 digits minimum
+      // Only consider AFM if it's a complete AFM (8 digits) to avoid disrupting other matches
+      const hasCompleteAfm = formData.afm.replace(/\D/g, '').length === 8;
+      
+      const searchTimeout = setTimeout(async () => {
+        // Clean up search if all fields are empty or below minimum threshold
+        if (!hasMinCompany && !hasMinPhone && !hasCompleteAfm) {
+          setPotentialMatches([]);
+          return;
         }
-      })();
-    }, 300);
+        
+        // If phone field is focused and has digits, prioritize phone search
+        if (activeField === 'telephone' && hasMinPhone) {
 
-    return () => clearTimeout(debounceTimeout);
-  }, [formData.company_name, formData.afm, phoneValue]); // Dependencies include all 3 fields
-  
+          await phoneSearch();
+          return;
+        }
+        
+        // Otherwise use company name search or complete AFM
+        if (hasMinCompany || hasCompleteAfm) {
+
+          await findMatches();
+        } else if (hasMinPhone) {
+          // Fallback to phone search if company not provided but phone is
+
+          await phoneSearch();
+        }
+      }, 300); // Reduced debounce delay from 500ms to 300ms for faster response
+      
+      return () => clearTimeout(searchTimeout);
+    } else {
+      // Clear matches if we're navigating or in edit mode
+      setPotentialMatches([]);
+    }
+  }, [phoneValue, formData.company_name, formData.afm, navigatingToCustomer, customerId, activeField]);
+
+  // Update the handlePhoneFieldFocus function
+  const handlePhoneFieldFocus = () => {
+    handleFieldFocus('telephone');
+    // When focusing on phone field, if user wants to do phone-only search,
+    // provide a way to clear the company name
+    if (formData.company_name && formData.company_name.trim() !== '') {
+
+    }
+  };
+
+  // Add similar focus handlers for company name and AFM
+  const handleCompanyNameFieldFocus = () => {
+    handleFieldFocus('company_name');
+  };
+
+  const handleAfmFieldFocus = () => {
+    handleFieldFocus('afm');
+  };
+
   // Add onSelectMatch function
   const onSelectMatch = (customerId: string, score?: number) => {
     setSelectedCustomerId(customerId);
     setSelectedCustomerScore(score);
     setDetailDialogOpen(true);
-  };
-
-  // Add a function to handle general blur event for key fields
-  const handleKeyFieldBlur = async () => {
-    // Check if we have enough data to perform a meaningful search
-    const hasValidCompanyName = formData.company_name && formData.company_name.trim().length >= 2;
-    const hasValidPhone = phoneValue && phoneValue.replace(/\D/g, '').length >= 5;
-    const hasValidAFM = formData.afm && formData.afm.trim().length >= 3;
-    
-    // Only trigger if at least one field has valid data
-    if (hasValidCompanyName || hasValidPhone || hasValidAFM) {
-      // We'll manually trigger the same search logic that's in the useEffect
-      try {
-        // Check if this is a phone-only search
-        const isPhoneOnlySearch = (
-          phoneValue && phoneValue.replace(/\D/g, '').length >= 5 &&
-          (!formData.company_name || formData.company_name.trim() === '') &&
-          (!formData.afm || formData.afm.trim() === '')
-        );
-        
-        if (isPhoneOnlySearch) {
-          const cleanedPhone = phoneValue.replace(/\D/g, '');
-          
-          console.log("BLUR: DIRECT PHONE-ONLY SEARCH. Raw value:", phoneValue);
-          console.log("BLUR: Cleaned phone digits for search:", cleanedPhone);
-          
-          try {
-            // Simple direct query using ILIKE
-            const { data, error } = await supabase
-              .from('customers')
-              .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, deleted')
-              .filter('deleted_at', 'is', null)
-              .ilike('telephone', `%${cleanedPhone}%`);
-            
-            if (error) {
-              console.error("Phone search error:", error);
-              setPotentialMatches([]);
-              return;
-            }
-            
-            if (data && data.length > 0) {
-              // JavaScript filtering to mimic normalize_phone function
-              const filteredData = (data as any[]).filter(item => {
-                const itemDigits = item.telephone ? item.telephone.replace(/\D/g, '') : '';
-                return itemDigits.includes(cleanedPhone);
-              });
-              
-              console.log(`Phone search found ${filteredData.length} matches out of ${data.length} results`);
-              
-              const matches = filteredData.map((item: any) => ({
-                ...item,
-                score: 60,
-                matchReasons: { telephone: true, companyName: false, afm: false }
-              })) as Customer[];
-              
-              setPotentialMatches(matches);
-            } else {
-              console.log("No matches found for phone search");
-              setPotentialMatches([]);
-            }
-          } catch (e) {
-            console.error("Phone search failed:", e);
-            setPotentialMatches([]);
-          }
-          return;
-        } else {
-          // Normal duplicate detection for other cases
-          const matches = await findPotentialDuplicates({
-            company_name: formData.company_name,
-            telephone: phoneValue,
-            afm: formData.afm || ''
-          }, 40); // Default threshold
-          
-          setPotentialMatches(matches);
-        }
-      } catch (error) {
-        console.error('BLUR: Error detecting duplicates:', error);
-      }
-    }
   };
 
   // First, let's find where potential matches are rendered in the file
@@ -944,6 +923,7 @@ const CustomerForm = ({
                       value={formData.company_name}
                       onChange={handleInputChange}
                       onBlur={handleKeyFieldBlur}
+                      onFocus={() => handleFieldFocus('company_name')}
                       className="app-input"
                       disabled={viewOnly || navigatingToCustomer}
                       required
@@ -969,6 +949,7 @@ const CustomerForm = ({
                       value={phoneValue}
                       onChange={handleInputChange}
                       onBlur={handleKeyFieldBlur}
+                      onFocus={handlePhoneFieldFocus}
                       className="app-input"
                       disabled={viewOnly || navigatingToCustomer}
                       required
@@ -989,6 +970,7 @@ const CustomerForm = ({
                       value={formData.afm}
                       onChange={handleInputChange}
                       onBlur={handleKeyFieldBlur}
+                      onFocus={() => handleFieldFocus('afm')}
                       className="app-input"
                       disabled={viewOnly || navigatingToCustomer}
                       autoComplete="off"
@@ -999,6 +981,12 @@ const CustomerForm = ({
                       placeholder="8 ψηφία"
                       onInvalid={(e) => e.currentTarget.setCustomValidity('Το ΑΦΜ πρέπει να αποτελείται από 8 ψηφία')}
                       onInput={(e) => e.currentTarget.setCustomValidity('')}
+                      // Restrict input to digits only
+                      onKeyPress={(e) => {
+                        if (!/[0-9]/.test(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -1222,16 +1210,22 @@ const CustomerForm = ({
                         >
                           <td className="px-3 py-1 whitespace-nowrap text-xs">
                             <span className={`inline-block px-1.5 py-0.5 rounded-full ${
-                              match.score && match.score >= 80
-                                ? 'bg-red-200 text-red-800 dark:bg-red-700/50 dark:text-red-200'
-                                : 'bg-amber-200 text-amber-800 dark:bg-amber-700/50 dark:text-amber-200'
+                              match.score && match.score >= 86
+                                ? 'bg-red-600 text-white' /* High confidence match (≥86%): red background, white text */
+                                : 'bg-yellow-400 text-black' /* Lower confidence match (<86%): yellow background, black text */
                             }`}>
                               {match.score}%
                             </span>
                           </td>
                           <td className="px-3 py-1 whitespace-nowrap text-xs">
                             <div className="flex items-center">
-                              <span className={`font-medium ${match.matchReasons?.companyName ? 'border-b-2 border-yellow-300' : ''}`}>
+                              <span className={`font-medium ${
+                                match.matchReasons?.companyName 
+                                  ? match.score >= 80
+                                    ? 'border-b-2 border-red-600' /* High score: red underline */
+                                    : 'border-b-2 border-yellow-400' /* Low score: yellow underline */
+                                  : '' /* No underline if company name didn't match */
+                              }`}>
                                 {match.company_name}
                               </span>
                               {match.deleted && (
@@ -1243,12 +1237,22 @@ const CustomerForm = ({
                             </div>
                           </td>
                           <td className="px-3 py-1 whitespace-nowrap text-xs">
-                            <span className={match.matchReasons?.afm ? 'border-b-2 border-yellow-300' : ''}>
+                            <span className={match.matchReasons?.afm 
+                              ? match.score >= 80
+                                ? 'border-b-2 border-red-600' /* High score: red underline */
+                                : 'border-b-2 border-yellow-400' /* Low score: yellow underline */
+                              : '' /* No underline if AFM didn't match */
+                            }>
                               {match.afm}
                             </span>
                           </td>
                           <td className="px-3 py-1 whitespace-nowrap text-xs">
-                            <span className={match.matchReasons?.telephone ? 'border-b-2 border-yellow-300' : ''}>
+                            <span className={match.matchReasons?.telephone 
+                              ? match.score >= 80
+                                ? 'border-b-2 border-red-600' /* High score: red underline */
+                                : 'border-b-2 border-yellow-400' /* Low score: yellow underline */
+                              : '' /* No underline if telephone didn't match */
+                            }>
                               {match.telephone}
                             </span>
                           </td>
@@ -1353,3 +1357,4 @@ const CustomerForm = ({
 };
 
 export default CustomerForm;
+

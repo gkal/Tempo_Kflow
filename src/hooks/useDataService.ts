@@ -21,6 +21,29 @@ const TABLES: TableName[] = [
   'notifications'
 ];
 
+// Map snake_case table names to camelCase db service names
+const TABLE_TO_SERVICE_MAP: Record<string, string> = {
+  'customers': 'customers',
+  'contacts': 'contacts',
+  'offers': 'offers',
+  'offer_details': 'offerDetails', 
+  'tasks': 'tasks',
+  'departments': 'departments',
+  'service_categories': 'serviceCategories',
+  'service_subcategories': 'serviceSubcategories',
+  'units': 'units',
+  'materials': 'materials',
+  'brands': 'brands',
+  'contact_positions': 'contactPositions',
+  'users': 'users',
+  'comments': 'comments',
+  'notifications': 'notifications',
+  'offer_history': 'offerHistory',
+  'task_history': 'taskHistory',
+  'resource_locks': 'resourceLocks',
+  'history_logs': 'historyLogs'
+};
+
 /**
  * Hook for easy data service access in components
  * 
@@ -106,7 +129,10 @@ export function useDataService<T extends Record<string, any>>(
     try {
       console.log(`[DataService] Fetching all records from table: ${tableName}`, { queryOptions });
       
-      const service = db[tableName as keyof typeof db];
+      // Get the correct service name using the mapping
+      const serviceName = TABLE_TO_SERVICE_MAP[tableName] || tableName;
+      const service = db[serviceName as keyof typeof db];
+      
       if (!service) {
         throw new Error(`No service found for table: ${tableName}`);
       }
@@ -148,7 +174,10 @@ export function useDataService<T extends Record<string, any>>(
     resetError();
 
     try {
-      const service = db[tableName as keyof typeof db];
+      // Get the correct service name using the mapping
+      const serviceName = TABLE_TO_SERVICE_MAP[tableName] || tableName;
+      const service = db[serviceName as keyof typeof db];
+      
       const response = await service.getById(id, {
         ...queryOptions,
         language: queryOptions?.language || defaultLanguage
@@ -182,7 +211,10 @@ export function useDataService<T extends Record<string, any>>(
     resetError();
 
     try {
-      const service = db[tableName as keyof typeof db];
+      // Get the correct service name using the mapping
+      const serviceName = TABLE_TO_SERVICE_MAP[tableName] || tableName;
+      const service = db[serviceName as keyof typeof db];
+      
       const response = await service.create(record, {
         language: createOptions?.language || defaultLanguage
       });
@@ -219,7 +251,10 @@ export function useDataService<T extends Record<string, any>>(
     resetError();
 
     try {
-      const service = db[tableName as keyof typeof db];
+      // Get the correct service name using the mapping
+      const serviceName = TABLE_TO_SERVICE_MAP[tableName] || tableName;
+      const service = db[serviceName as keyof typeof db];
+      
       const response = await service.update(id, record, {
         language: updateOptions?.language || defaultLanguage
       });
@@ -262,7 +297,10 @@ export function useDataService<T extends Record<string, any>>(
     resetError();
 
     try {
-      const service = db[tableName as keyof typeof db];
+      // Get the correct service name using the mapping
+      const serviceName = TABLE_TO_SERVICE_MAP[tableName] || tableName;
+      const service = db[serviceName as keyof typeof db];
+      
       const response = await service.softDelete(id, {
         language: deleteOptions?.language || defaultLanguage
       });
@@ -301,7 +339,10 @@ export function useDataService<T extends Record<string, any>>(
     resetError();
 
     try {
-      const service = db[tableName as keyof typeof db];
+      // Get the correct service name using the mapping
+      const serviceName = TABLE_TO_SERVICE_MAP[tableName] || tableName;
+      const service = db[serviceName as keyof typeof db];
+      
       // Check if the service has a search method
       if (!service.search) {
         throw new Error('Search is not supported for this table');
@@ -336,6 +377,7 @@ export function useDataService<T extends Record<string, any>>(
     }
   }, [tableName, resetError, defaultLanguage]);
 
+  // Return the hook interface
   return {
     data,
     loading,
@@ -347,5 +389,7 @@ export function useDataService<T extends Record<string, any>>(
     update,
     softDelete,
     search,
+    // Allow refetching with the last query
+    refetch: async () => lastQueryRef.current ? fetchAll(lastQueryRef.current) : fetchAll()
   };
 } 

@@ -1,13 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, X } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogClose
-} from "@/components/ui/dialog";
+import { Plus, X, ArrowLeft } from 'lucide-react';
 import { useDetailsContext } from './DetailsContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ServiceCategory, ServiceSubcategory } from '@/types/offer-details';
@@ -20,6 +13,8 @@ import {
 } from "@/components/ui/GlobalTooltip";
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { fetchSubcategories } from './DetailsService';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { CloseButton } from '@/components/ui/close-button';
 
 const CategorySelectionDialog: React.FC = () => {
   const {
@@ -120,29 +115,61 @@ const CategorySelectionDialog: React.FC = () => {
     }
   };
 
+  // If the dialog is not open, don't render anything
+  if (!showSelectionDialog) {
+    return null;
+  }
+
   return (
-    <Dialog 
-      open={showSelectionDialog} 
-      onOpenChange={(open) => {
-        if (!open) {
+    <div 
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 pointer-events-auto"
+      onClick={(e) => {
+        // Only close if clicking the backdrop (not the card)
+        if (e.target === e.currentTarget) {
           handleClose();
         }
       }}
-      aria-labelledby="details-selection-dialog-title"
+      style={{ 
+        zIndex: 9999,
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
     >
-      <DialogContent 
-        className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] max-w-5xl w-[90vw] max-h-[80vh] h-[550px] flex flex-col rounded-lg shadow-lg"
-        onEscapeKeyDown={(e) => {
-          // Prevent default escape key behavior and handle manually
-          e.preventDefault();
-          handleClose();
+      <Card className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] max-w-5xl w-[90vw] max-h-[80vh] h-[550px] flex flex-col rounded-lg shadow-lg pointer-events-auto"
+        style={{ 
+          zIndex: 10000,
+          position: 'relative',
+          marginTop: 0
         }}
       >
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle id="details-selection-dialog-title" className="text-[#a8c5b5] text-left">Επιλογή Λεπτομερειών</DialogTitle>
-        </DialogHeader>
+        <CardHeader className="flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="mr-2"
+                onClick={handleClose}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <CardTitle id="details-selection-dialog-title" className="text-[#a8c5b5] text-left">
+                Επιλογή Λεπτομερειών
+              </CardTitle>
+            </div>
+            <div className="relative" style={{ zIndex: 10002 }}>
+              <CloseButton onClick={handleClose} />
+            </div>
+          </div>
+        </CardHeader>
         
-        <div className="flex flex-col space-y-4 py-4 flex-grow overflow-hidden px-4">
+        <CardContent className="flex flex-col space-y-4 flex-grow overflow-hidden px-4">
           <div className="flex space-x-6 h-[350px] flex-shrink-0">
             {/* Categories List */}
             <div className="w-[38%] border border-[#52796f] rounded-md overflow-hidden flex-shrink-0 shadow-md">
@@ -248,26 +275,34 @@ const CategorySelectionDialog: React.FC = () => {
           <div className="text-center text-sm text-[#84a98c] flex-shrink-0">
             {selectedItems.length > 0 
               ? `${selectedItems.length} επιλεγμένα στοιχεία` 
-              : "Δεν έχετε επιλέξει κανένα στοιχείο"}
+              : 'Δεν έχετε επιλέξει στοιχεία'}
           </div>
-        </div>
+        </CardContent>
         
-        <div className="flex justify-end p-4 border-t border-[#52796f] mt-2">
-          <button
-            onClick={handleSelectionConfirm}
-            disabled={selectedItems.length === 0}
-            className={`flex items-center gap-2 h-10 px-4 text-sm font-medium rounded-md ${
-              selectedItems.length === 0 
-                ? 'bg-[#52796f]/50 text-white/70 cursor-not-allowed' 
-                : 'bg-[#84a98c] text-white hover:bg-[#52796f] focus:outline-none focus:ring-2 focus:ring-[#52796f] focus:ring-offset-2 focus:ring-offset-[#2f3e46]'
-            }`}
-          >
-            <Plus className="w-4 h-4" />
-            <span>Προσθήκη στην Προσφορά</span>
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        <CardFooter className="border-t border-[#52796f] bg-[#2f3e46]/80 p-4 flex-shrink-0">
+          <div className="flex justify-between w-full">
+            <Button 
+              variant="outline" 
+              className="text-[#cad2c5] border-[#52796f]"
+              onClick={handleClose}
+            >
+              Ακύρωση
+            </Button>
+            
+            <Button 
+              variant="default" 
+              className={`bg-[#52796f] hover:bg-[#354f52] text-white ${
+                selectedItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              onClick={handleSelectionConfirm}
+              disabled={selectedItems.length === 0}
+            >
+              Προσθήκη ({selectedItems.length})
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+    </div>
   );
 };
 

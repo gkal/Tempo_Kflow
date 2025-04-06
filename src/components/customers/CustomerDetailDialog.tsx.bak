@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Loader2, User, Calendar, Clock, Archive, Phone, FileText, CheckCircle, AlertTriangle, Info, FilesIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
-import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
+import { AppTabs, AppTabsContent, AppTabsList, AppTabsTrigger } from "@/components/ui/app-tabs";
 import DocumentViewer from '@/components/documents/DocumentViewer';
 
 interface CustomerDetailDialogProps {

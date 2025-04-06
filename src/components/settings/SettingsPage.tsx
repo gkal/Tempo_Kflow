@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, EyeOff } from "lucide-react";
+import { Plus, Eye, EyeOff, Settings as SettingsIcon, File } from "lucide-react";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
@@ -9,6 +9,8 @@ import { checkPermission } from "@/lib/permissions";
 import SimpleUserDialog from "./SimpleUserDialog";
 import './settings-cursor-fix.css'; // Import the CSS fix
 import { toast } from "@/components/ui/use-toast";
+import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
+import { DocumentSettingsTab } from "./DocumentSettingsTab";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -18,6 +20,7 @@ export default function SettingsPage() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchColumn, setSearchColumn] = useState("fullname");
+  const [activeTab, setActiveTab] = useState("users");
 
   const isAdmin = user?.role?.toLowerCase() === "admin";
   const isSuperUser = user?.role === "Super User" || user?.role?.toLowerCase() === "super user";
@@ -48,56 +51,38 @@ export default function SettingsPage() {
   // Add a flag to prevent notifications
   const preventNotifications = true;
 
-  // Define the full columns array for the admin view
+  // Define the base columns for the table
   const columns = [
-    { header: "Όνομα Χρήστη", accessor: "username" },
-    { header: "Ονοματεπώνυμο", accessor: "fullname" },
-    { header: "Email", accessor: "email" },
-    { header: "Τμήμα", accessor: "department" },
-    { 
-      header: "Ρόλος", 
+    {
+      header: "Όνομα χρήστη",
+      accessor: "username",
+      sortable: true,
+    },
+    {
+      header: "Πλήρες όνομα",
+      accessor: "fullname",
+      sortable: true,
+    },
+    {
+      header: "Email",
+      accessor: "email",
+      sortable: true,
+    },
+    {
+      header: "Τηλέφωνο",
+      accessor: "phone",
+      sortable: true,
+    },
+    {
+      header: "Ρόλος",
       accessor: "role",
-      cell: (value) => {
-        // Map 'readonly' to 'Μόνο ανάγνωση'
-        return value?.toLowerCase() === 'readonly' ? 'Μόνο ανάγνωση' : value;
-      }
+      sortable: true,
     },
     {
-      header: "Ημ/νία Δημιουργίας",
-      accessor: "created_at",
-      cell: (value) =>
-        value
-          ? new Date(value).toLocaleDateString("el-GR", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }) +
-            " " +
-            new Date(value).toLocaleTimeString("el-GR", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })
-          : "-",
+      header: "Τμήμα",
+      accessor: "department",
+      sortable: true,
     },
-    {
-      header: "Τελευταία Σύνδεση",
-      accessor: "last_login_at",
-      cell: (value) =>
-        value
-          ? new Date(value).toLocaleDateString("el-GR", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            }) +
-            " " +
-            new Date(value).toLocaleTimeString("el-GR", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })
-          : "-",
-    }
   ];
 
   // Add a new function to directly toggle user status
@@ -244,7 +229,7 @@ export default function SettingsPage() {
     );
   }
 
-  // Admin view
+  // Admin view with tabs
   return (
     <>
       <style>
@@ -273,56 +258,66 @@ export default function SettingsPage() {
       </style>
       
       <div className="p-4 settings-page-container">
-        <div className="mb-2">
-          <h1 className="text-2xl font-bold text-[#cad2c5] mb-2">
-            Διαχείριση Χρηστών
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-[#cad2c5] mb-4">
+            Γενικές Ρυθμίσεις
           </h1>
-          {isAdmin && (
-            <Button
-              onClick={() => {
-                setSelectedUser(null);
-                setShowUserDialog(true);
-              }}
-              className="bg-transparent hover:bg-[#52796f] text-[#84a98c] hover:text-[#cad2c5] flex items-center gap-2 transition-colors font-normal"
-            >
-              <Plus className="h-4 w-4 text-white" />
-              Νέος Χρήστης
-            </Button>
-          )}
-        </div>
-
-        <div className="flex justify-between mb-4">
-          <div className="w-1/4">
-            {/* Empty div to maintain layout */}
-          </div>
           
-          <div className="flex-1 flex justify-center">
-            <SearchBar
-              onChange={setSearchTerm}
-              value={searchTerm}
-              options={columns.map(col => ({ value: col.accessor, label: col.header }))}
-              selectedColumn={searchColumn}
-              onColumnChange={setSearchColumn}
-            />
-          </div>
-          
-          <div className="w-1/4">
-            {/* Empty div to maintain layout */}
-          </div>
-        </div>
-
-        <div className="settings-page-table">
-          <DataTableBase
-            columns={columnsWithActions}
-            data={users}
-            defaultSortColumn="fullname"
-            searchTerm={searchTerm}
-            searchColumn={searchColumn}
-            onRowClick={handleRowClick}
-            containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
-            rowClassName={`hover:bg-[#354f52]/50 ${isSuperUser ? '[&[data-role="Admin"]]:cursor-not-allowed [&[data-role="Admin"]]:opacity-50' : ""}`}
-            isLoading={loading}
-          />
+          <AppTabs defaultValue="users" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <AppTabsList className="mb-6">
+              <AppTabsTrigger value="users" className="flex items-center gap-2">
+                <SettingsIcon className="h-4 w-4" />
+                Ρυθμίσεις Χρηστών
+              </AppTabsTrigger>
+              <AppTabsTrigger value="documents" className="flex items-center gap-2">
+                <File className="h-4 w-4" />
+                Ρυθμίσεις Εγγράφων
+              </AppTabsTrigger>
+            </AppTabsList>
+            
+            <AppTabsContent value="users" className="mt-0">
+              <div className="flex justify-between items-center mb-4">
+                {isAdmin && (
+                  <Button
+                    onClick={() => {
+                      setSelectedUser(null);
+                      setShowUserDialog(true);
+                    }}
+                    className="bg-transparent hover:bg-[#52796f] text-[#84a98c] hover:text-[#cad2c5] flex items-center gap-2 transition-colors font-normal"
+                  >
+                    <Plus className="h-4 w-4 text-white" />
+                    Νέος Χρήστης
+                  </Button>
+                )}
+                
+                <SearchBar
+                  onChange={setSearchTerm}
+                  value={searchTerm}
+                  options={columns.map(col => ({ value: col.accessor, label: col.header }))}
+                  selectedColumn={searchColumn}
+                  onColumnChange={setSearchColumn}
+                />
+              </div>
+              
+              <div className="settings-page-table">
+                <DataTableBase
+                  columns={columnsWithActions}
+                  data={users}
+                  defaultSortColumn="fullname"
+                  searchTerm={searchTerm}
+                  searchColumn={searchColumn}
+                  onRowClick={handleRowClick}
+                  containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
+                  rowClassName={`hover:bg-[#354f52]/50 ${isSuperUser ? '[&[data-role="Admin"]]:cursor-not-allowed [&[data-role="Admin"]]:opacity-50' : ""}`}
+                  isLoading={loading}
+                />
+              </div>
+            </AppTabsContent>
+            
+            <AppTabsContent value="documents" className="mt-0">
+              <DocumentSettingsTab />
+            </AppTabsContent>
+          </AppTabs>
         </div>
 
         <SimpleUserDialog

@@ -1,5 +1,114 @@
 # Project Tasks
 
+## 🚨 LOCAL DOCUMENT MANAGEMENT SYSTEM [TOP PRIORITY]
+**Started**: 05-04-2025  
+**Status**: In Progress  
+**Owner**: Development Team
+
+### Objective
+Implement a local file system-based document management solution that allows users to associate documents with customers without storing files on the server.
+
+### Tasks
+1. [x] Database Updates
+   - [x] Create new `system_settings` table
+     - [x] Add schema with key-value pair structure
+     - [x] Add initial record for document base path
+   - [x] Create new `document_references` table
+     - [x] Create schema with customer_id, file_path, file_name, file_type, description, created_at, created_by fields
+     - [x] Add thumbnail storage field (base64 or thumbnail path)
+     - [x] Implement proper indexing strategy
+     - [x] Ensure soft delete compatibility (is_deleted, deleted_at columns)
+   - [x] Create new `docu_characteristics` table
+     - [x] Define schema for document type classifications
+     - [x] Add support for ordering and descriptions
+   - [x] Create new `docu_status` table
+     - [x] Define schema for document status tracking
+     - [x] Add color support for visual status representation
+   - [x] Create new `offers_documents` table
+     - [x] Define schema for linking documents to offers
+     - [x] Add metadata fields for filesystem information
+     - [x] Link to characteristics and status tables
+
+2. [x] Backend Services
+   - [x] Create documentService.ts in src/services/
+     - [x] Implement file system operations (folder creation, listing)
+     - [x] Add file metadata extraction functionality
+     - [x] Implement thumbnail generation for common file types
+     - [x] Add CRUD operations for document references
+   - [x] Create documentSettingsService.ts in src/services/
+     - [x] Implement CRUD operations for document characteristics
+     - [x] Implement CRUD operations for document statuses
+     - [x] Add path validation and management
+   - [x] Create offerDocumentService.ts in src/services/
+     - [x] Implement document upload and metadata extraction
+     - [x] Add document classification functionality
+     - [x] Implement document statistics and reporting
+
+3. [x] UI Components
+   - [x] Update General Settings UI
+     - [x] Rename "Rithiseis Xriston" to "Genikes Rithiseis"
+     - [x] Consolidated into Document Settings tab
+     - [x] Add document base path configuration field with folder selection
+   - [x] Create DocumentViewerComponent
+     - [x] Implement grid/list view of documents with thumbnails
+     - [x] Add file metadata display (name, type, size, date)
+     - [x] Implement double-click to open with system default application
+     - [x] Add right-click context menu for common operations
+   - [x] Add "Documents" tab to customer details
+     - [x] Implement file upload functionality that copies to local folder
+     - [x] Show list of associated documents with previews
+     - [x] Enable sorting and filtering of documents
+   - [x] Create DocumentSettingsTab component
+     - [x] Build interface for managing document types
+     - [x] Build interface for managing document statuses
+     - [x] Add path configuration options
+     - [x] Integrate document base path settings (moved from General Settings)
+
+4. [x] Integration
+   - [x] Connect document viewer to customer details view
+   - [x] Integrate base path setting with the general settings UI
+   - [x] Implement error handling for file system operations
+   - [x] Add validation for base path existence and permissions
+   - [x] Integrate document types and statuses with document viewer
+
+5. [ ] Testing
+   - [ ] Test folder creation/management
+   - [ ] Test file previews for various file types
+   - [ ] Verify system program associations work correctly
+   - [ ] Test performance with many files
+   - [ ] Test document type and status management
+   - [ ] Verify document statistics accuracy
+
+### Implementation Details
+- Local storage structure:
+  - Base path from system settings (e.g., C:\Customers Data)
+  - Subfolders by customer name (e.g., C:\Customers Data\Alpha Baby\)
+  - Files stored in respective customer folders
+- Preview system:
+  - Generate thumbnails for common file types (PDF, DOCX, XLSX, images)
+  - Store thumbnail data in the database (as small base64 images or paths)
+  - Show grid/list of file previews with metadata
+- Document classification:
+  - User-defined document types stored in `docu_characteristics` table
+  - Document status tracking via `docu_status` table
+  - Visual indicators for document status (color coding)
+- User experience:
+  - Simple "upload" interface that copies files to the local structure
+  - File preview grid with thumbnails and metadata
+  - Double-click to open with system default application
+  - Right-click context menu for common operations
+  - Document management settings in the general settings area
+
+### Technical Considerations
+- No server-side storage requirements
+- Leverages system's default applications for opening files
+- Files remain accessible even when application is offline
+- Thumbnail generation may require specific libraries for different file types
+- Fixed issues with authentication and user ID in the document service
+- Implemented soft delete throughout all document operations
+- Used type-safe interfaces for all document operations
+- Optimized database queries with proper indexing
+
 ## 🚨 URGENT Database Schema Updates
 **Started**: 01-04-2025
 **Status**: Pending
@@ -149,3 +258,57 @@ Implement a real-time duplicate detection system for customers to prevent creati
 - [ ] Consider address fuzzy matching
 - [ ] Generate monthly duplicate detection reports
 - [ ] Create merge functionality for true duplicates
+
+## LOCAL DOCUMENT MANAGEMENT SYSTEM
+
+- [x] **Create SQL tables for document management**
+  - [x] system_settings table for document_path
+  - [x] docu_characteristics for document types with emoji
+  - [x] docu_status for document statuses with emoji
+  - [x] offer_documents for linking documents to offers with metadata
+
+- [x] **Update Supabase type definitions**
+  - [x] Add new table types to src/types/supabase.ts
+
+- [x] **Update document settings service**
+  - [x] Update interface definitions (DocuCharacteristic, DocuStatus)
+  - [x] Update CRUD functions
+  - [x] Rename getCustomerOffersPath to getDocumentPath
+
+- [x] **Update DocumentSettingsTab component**
+  - [x] Simplify UI to remove color and sort order
+  - [x] Add emoji support for document types and statuses
+  - [x] Update translations and error messages
+
+- [x] **Create document upload service**
+  - [x] Create offerDocumentService.ts
+  - [x] Implement file upload, download, and management functions
+
+- [x] **Integrate document management with offer details**
+  - [x] Create DocumentsTab component for OffersDialog
+  - [x] Add upload, view, edit, and delete functionality
+  - [x] Add document type and status selection
+
+## USER REQUESTS
+
+- [x] **Remove toast notifications from settings** - Replaced with inline status messages.
+- [x] **Fix settings dialog close behavior** - Now properly refreshes data on close.
+- [x] **Add emoji support to document types and statuses** - Now uses emoji instead of colors and descriptions.
+- [x] **Simplify document path handling** - No longer needs separate offer ID subdirectories.
+
+## COMPLETED
+
+- [x] Create SQL tables for document management
+- [x] Update Supabase type definitions 
+- [x] Update document settings service
+- [x] Update DocumentSettingsTab component
+- [x] Create document upload service
+- [x] Integrate document management with offer details
+
+## TODO
+
+- [ ] Add file browser integration for selecting document paths
+- [ ] Implement document search and filtering
+- [ ] Add document preview functionality
+- [ ] Create document report generation
+- [ ] Add batch document operations (download multiple, etc.)

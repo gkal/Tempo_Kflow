@@ -695,6 +695,295 @@ export type Database = {
           }
         ]
       }
+      system_settings: {
+        Row: {
+          id: string
+          document_path: string | null
+          created_at: string
+          created_by: string | null
+          modified_at: string | null
+          modified_by: string | null
+          is_deleted: boolean
+          deleted_at: string | null
+          deleted_by: string | null
+        }
+        Insert: {
+          id?: string
+          document_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          modified_at?: string | null
+          modified_by?: string | null
+          is_deleted?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
+        }
+        Update: {
+          id?: string
+          document_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          modified_at?: string | null
+          modified_by?: string | null
+          is_deleted?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_settings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_settings_modified_by_fkey"
+            columns: ["modified_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_settings_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      docu_characteristics: {
+        Row: {
+          id: string
+          name: string
+          emoji: string | null
+          created_at: string
+          created_by: string | null
+          modified_at: string | null
+          modified_by: string | null
+          is_deleted: boolean
+          deleted_at: string | null
+          deleted_by: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          emoji?: string | null
+          created_at?: string
+          created_by?: string | null
+          modified_at?: string | null
+          modified_by?: string | null
+          is_deleted?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          emoji?: string | null
+          created_at?: string
+          created_by?: string | null
+          modified_at?: string | null
+          modified_by?: string | null
+          is_deleted?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "docu_characteristics_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "docu_characteristics_modified_by_fkey"
+            columns: ["modified_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "docu_characteristics_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      docu_status: {
+        Row: {
+          id: string
+          name: string
+          emoji: string | null
+          created_at: string
+          created_by: string | null
+          modified_at: string | null
+          modified_by: string | null
+          is_deleted: boolean
+          deleted_at: string | null
+          deleted_by: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          emoji?: string | null
+          created_at?: string
+          created_by?: string | null
+          modified_at?: string | null
+          modified_by?: string | null
+          is_deleted?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          emoji?: string | null
+          created_at?: string
+          created_by?: string | null
+          modified_at?: string | null
+          modified_by?: string | null
+          is_deleted?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "docu_status_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "docu_status_modified_by_fkey"
+            columns: ["modified_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "docu_status_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      offer_documents: {
+        Row: {
+          id: string
+          offer_id: string
+          file_path: string
+          file_name: string
+          file_size: number | null
+          document_category: string | null
+          description: string | null
+          fs_created_at: string | null
+          fs_modified_at: string | null
+          not_found: boolean
+          created_at: string
+          created_by: string | null
+          modified_at: string | null
+          modified_by: string | null
+          is_deleted: boolean
+          deleted_at: string | null
+          deleted_by: string | null
+          docu_characteristic_id: string | null
+          docu_status_id: string | null
+        }
+        Insert: {
+          id?: string
+          offer_id: string
+          file_path: string
+          file_name: string
+          file_size?: number | null
+          document_category?: string | null
+          description?: string | null
+          fs_created_at?: string | null
+          fs_modified_at?: string | null
+          not_found?: boolean
+          created_at?: string
+          created_by?: string | null
+          modified_at?: string | null
+          modified_by?: string | null
+          is_deleted?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
+          docu_characteristic_id?: string | null
+          docu_status_id?: string | null
+        }
+        Update: {
+          id?: string
+          offer_id?: string
+          file_path?: string
+          file_name?: string
+          file_size?: number | null
+          document_category?: string | null
+          description?: string | null
+          fs_created_at?: string | null
+          fs_modified_at?: string | null
+          not_found?: boolean
+          created_at?: string
+          created_by?: string | null
+          modified_at?: string | null
+          modified_by?: string | null
+          is_deleted?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
+          docu_characteristic_id?: string | null
+          docu_status_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_documents_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "offers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_documents_modified_by_fkey"
+            columns: ["modified_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_documents_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_documents_docu_characteristic_id_fkey"
+            columns: ["docu_characteristic_id"]
+            isOneToOne: false
+            referencedRelation: "docu_characteristics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_documents_docu_status_id_fkey"
+            columns: ["docu_status_id"]
+            isOneToOne: false
+            referencedRelation: "docu_status"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

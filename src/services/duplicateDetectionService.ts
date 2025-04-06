@@ -71,8 +71,7 @@ const normalizePhone = (phone: string): string => {
   // Using the simplest approach: just extract digits
   const digits = phone.replace(/\D/g, '');
   
-  // Debug log
-  console.log(`Normalizing phone: "${phone}" → digits only: "${digits}"`);
+
   
   // Special case: Greek mobile numbers - ensure standard 10-digit format
   // If it's a Greek mobile starting with 69, make sure it has 10 digits
@@ -96,9 +95,9 @@ const getNameSimilarity = (name1: string, name2: string): number => {
   const normalizedName1 = normalizeGreekText(name1.toLowerCase().trim());
   const normalizedName2 = normalizeGreekText(name2.toLowerCase().trim());
   
-  // Add debug logging for important search cases
-  if (normalizedName1 === "aero" || normalizedName2 === "aero") {
-    console.log(`Debug name matching: '${normalizedName1}' vs '${normalizedName2}'`);
+  // Check for exact matches first
+  if (normalizedName1 === normalizedName2) {
+    return 100; // Perfect match
   }
   
   // Check for prefix matches - particularly useful during typing
@@ -106,10 +105,7 @@ const getNameSimilarity = (name1: string, name2: string): number => {
     const minLength = Math.min(normalizedName1.length, normalizedName2.length);
     const maxLength = Math.max(normalizedName1.length, normalizedName2.length);
     
-    // Debug log specific case for "aero"
-    if (normalizedName1 === "aero" || normalizedName2 === "aero") {
-      console.log(`Prefix match: minLength=${minLength}, maxLength=${maxLength}, ratio=${minLength/maxLength}`);
-    }
+
     
     // If the shorter string is at least 4 characters and makes up a significant portion of the longer string
     if (minLength >= 4 && (minLength / maxLength) >= 0.5) {
@@ -120,8 +116,8 @@ const getNameSimilarity = (name1: string, name2: string): number => {
     // For shorter matches (2-3 chars), give a higher score if they're the beginning of a word
     // Especially useful for autocomplete scenarios
     if (minLength >= 2 && (minLength / maxLength) >= 0.15) {
-      // Increased base score from 40 to 50 to make sure common prefixes reach threshold
-      return Math.round(50 + ((minLength / maxLength) * 30));
+      // Increased base score from 50 to 65 to ensure it passes the threshold
+      return Math.round(65 + ((minLength / maxLength) * 30));
     }
   }
   
@@ -130,20 +126,17 @@ const getNameSimilarity = (name1: string, name2: string): number => {
     const minLength = Math.min(normalizedName1.length, normalizedName2.length);
     const maxLength = Math.max(normalizedName1.length, normalizedName2.length);
     
-    // Debug log specific case for "aero"
-    if (normalizedName1 === "aero" || normalizedName2 === "aero") {
-      console.log(`Substring match: minLength=${minLength}, maxLength=${maxLength}`);
-    }
+
     
     // For longer substrings (4+ chars)
     if (minLength >= 4) {
-      return Math.round(50 + ((minLength / maxLength) * 30));
+      return Math.round(65 + ((minLength / maxLength) * 30));
     }
     
-    // For shorter substrings (2-3 chars), give a moderate score
+    // For shorter substrings (2-3 chars), give a score that exceeds the threshold
     if (minLength >= 2) {
-      // Increased base score to get over the 50% threshold
-      return Math.round(45 + ((minLength / maxLength) * 15));
+      // Increased base score to get over the 65% threshold
+      return Math.round(65 + ((minLength / maxLength) * 15));
     }
   }
   
@@ -153,10 +146,7 @@ const getNameSimilarity = (name1: string, name2: string): number => {
     // This will match "Company Inc" with "Inc Company"
     const similarity = fuzzball.token_sort_ratio(normalizedName1, normalizedName2);
     
-    // Debug log specific case for "aero"
-    if (normalizedName1 === "aero" || normalizedName2 === "aero") {
-      console.log(`Fuzzy match score: ${similarity}`);
-    }
+
     
     return similarity;
   } catch (error) {
@@ -316,7 +306,7 @@ const calculateSimilarityScore = (
  */
 export const findPotentialDuplicates = async (
   searchInput: CustomerSearchInput,
-  threshold: number = 40
+  threshold: number = 65 // Increased default threshold from 40% to 65%
 ): Promise<Customer[]> => {
   try {
     // Skip search if all required fields are empty
@@ -336,13 +326,14 @@ export const findPotentialDuplicates = async (
     };
     
     // Check if we have valid search terms
-    const hasCompanyName = cleanSearchInput.company_name.length >= 2;
+    const hasCompanyName = cleanSearchInput.company_name.length >= 3;
     const hasPhoneNumber = cleanSearchInput.telephone.length >= 5;
-    const hasAFM = cleanSearchInput.afm.length >= 3;
+    // Only consider AFM if it's a complete AFM (8 digits)
+    const hasCompleteAFM = cleanSearchInput.afm.length === 8;
     
     // IMPORTANT: If we're doing a phone-only search, only search by phone
-    if (hasPhoneNumber && !hasCompanyName && !hasAFM) {
-      console.log("Performing PHONE-ONLY search");
+    if (hasPhoneNumber && !hasCompanyName && !hasCompleteAFM) {
+      // Phone-only search
       
       try {
         const phoneDigits = cleanSearchInput.telephone;
@@ -364,7 +355,7 @@ export const findPotentialDuplicates = async (
           return [];
         }
         
-        console.log(`Found ${data.length} phone-only matches`);
+
         
         // Map results and process them
         const mappedData = data.map(item => {
@@ -384,7 +375,8 @@ export const findPotentialDuplicates = async (
     let customerResults: Customer[] = [];
     
     // 1. Handle exact AFM match if provided (highest priority)
-    if (hasAFM) {
+    // Only search by AFM if it's a complete 9-digit AFM
+    if (hasCompleteAFM) {
       try {
         const { data, error } = await supabase
           .from('customers')
@@ -418,7 +410,7 @@ export const findPotentialDuplicates = async (
           .is('deleted_at', null);
           
         if (!error && data && data.length > 0) {
-          console.log(`Found ${data.length} phone matches in combined search`);
+
           
           const mappedData = data.map(item => {
             const { is_deleted, ...rest } = item as any;
@@ -448,6 +440,27 @@ export const findPotentialDuplicates = async (
           .split(/\s+/)
           .filter(word => word.length >= 2); // Only words with 2+ chars
         
+        // First, try to find an exact match (case insensitive)
+        let exactMatchQuery = supabase
+          .from('customers')
+          .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, deleted')
+          .is('deleted_at', null)
+          .ilike('company_name', cleanSearchInput.company_name.trim());
+          
+        const exactMatchResult = await exactMatchQuery;
+        
+        // If we found exact matches, add them to results but continue with fuzzy search
+        if (!exactMatchResult.error && exactMatchResult.data && exactMatchResult.data.length > 0) {
+          const mappedExactMatches = exactMatchResult.data.map(item => {
+            const { is_deleted, ...rest } = item as any;
+            return { ...rest, deleted: is_deleted };
+          });
+          
+          // Add exact matches to results
+          customerResults = [...customerResults, ...mappedExactMatches];
+        }
+        
+        // If no exact matches, proceed with fuzzy search
         let query = supabase
           .from('customers')
           .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, deleted')
@@ -506,24 +519,21 @@ const processCustomerData = (
   threshold: number
 ): Customer[] => {
   // Apply AFM exact matching filter when applicable
-  if (searchInput.afm && searchInput.afm.trim() !== '') {
+  // Only filter by AFM if it's a complete 8-digit AFM
+  const cleanedAFM = searchInput.afm?.trim().replace(/\D/g, '') || '';
+  if (cleanedAFM.length === 8) {
     // This is a secondary filter in case the database query wasn't exact
-    customers = customers.filter(customer =>
-      customer.afm === searchInput.afm.trim()
-    );
+    customers = customers.filter(customer => {
+      const customerAFM = (customer.afm || '').replace(/\D/g, '');
+      return customerAFM === cleanedAFM;
+    });
   }
 
   if (customers.length === 0) {
     return [];
   }
 
-  console.log("Processing with threshold:", threshold);
-  
-  // Add extra debug for aero search
-  if (searchInput.company_name?.toLowerCase().includes('aero')) {
-    console.log(`Found ${customers.length} records to check for 'aero' match`);
-    console.log("Customer names in database:", customers.map(c => c.company_name).join(', '));
-  }
+
   
   // Process results with similarity scoring
   const scoredCustomers = customers.map(customer => {
@@ -551,17 +561,9 @@ const processCustomerData = (
       searchInput
     );
     
-    // Special debug for "aero" search
-    if (searchInput.company_name?.toLowerCase().includes('aero')) {
-      console.log(`Match check for: ${customer.company_name}`);
-      console.log(`Name similarity: ${nameSimilarity}, Total score: ${score}`);
-    }
+
     
-    // Log scores for debugging - only log significant matches
-    if (score >= 40 || nameSimilarity >= 40 || phoneSimilarity >= 40) {
-      console.log(`Match: ${customer.company_name}, Phone: ${customer.telephone}`);
-      console.log(`Name similarity: ${nameSimilarity}, Phone similarity: ${phoneSimilarity}, Total score: ${score}`);
-    }
+
     
     return {
       ...customer,
@@ -574,33 +576,16 @@ const processCustomerData = (
     };
   });
 
-  // Show all scores before filtering - consolidate to a single log
-  console.log("All scores:", 
-    scoredCustomers
-      .filter(c => c.score >= 30) // Only log reasonably close matches
-      .map(c => ({ 
-        company_name: c.company_name, 
-        telephone: c.telephone,
-        score: c.score 
-      }))
-  );
+
   
-  // Special debug for "aero" search showing all scores regardless of threshold
-  if (searchInput.company_name?.toLowerCase().includes('aero')) {
-    console.log("All 'aero' related scores:", 
-      scoredCustomers.map(c => ({ 
-        company_name: c.company_name, 
-        score: c.score 
-      }))
-    );
-  }
+
   
   // Filter by threshold and sort by score (highest first)
   const results = scoredCustomers
     .filter(customer => (customer.score || 0) >= threshold)
     .sort((a, b) => (b.score || 0) - (a.score || 0));
   
-  console.log("Results after filtering:", results.length);
+
   return results;
 };
 
@@ -721,5 +706,116 @@ const calculateSimilarityScoreWithFields = (
   return normalizedScore;
 };
 
+/**
+ * Find customers with phone numbers matching the search input and calculate combined scores
+ * with both name and phone similarity
+ * @param phone Phone number to search for
+ * @param companyName Optional company name to include in scoring
+ * @returns Promise<Customer[]> Array of matching customers with combined scores
+ */
+const findExactPhoneMatches = async (phone: string, companyName?: string): Promise<Customer[]> => {
+  if (!phone || phone.trim() === '') return [];
+
+  try {
+    // Clean the phone number by removing non-digit characters
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.length === 0) return [];
+    
+
+    
+    // Create a pattern with wildcards between each digit
+    const likePattern = cleanPhone.split('').join('%');
+    
+    // Use server-side filtering with LIKE patterns
+    const { data: matches, error } = await supabase
+      .from('customers')
+      .select('id, company_name, telephone, afm, doy, email, address, town, postal_code, deleted_at')
+      .or(`telephone.ilike.%${cleanPhone}%, telephone.ilike.%${likePattern}%`)
+      .order('company_name');
+
+    if (error) {
+      console.error('Error in findExactPhoneMatches:', error);
+      return [];
+    }
+
+    if (!matches || !Array.isArray(matches)) {
+      console.error('Invalid response format in findExactPhoneMatches');
+      return [];
+    }
+
+    // Calculate phone match score based on how much of the search phone is matched
+    const calculatePhoneScore = (customerPhone: string) => {
+      if (!customerPhone) return 0;
+      const cleanCustomerPhone = customerPhone.replace(/\D/g, '');
+      
+      // Perfect match - both numbers are identical
+      if (cleanCustomerPhone === cleanPhone) {
+        return 100;
+      }
+      
+      // Calculate what percentage of the search phone is contained in the customer phone
+      if (cleanCustomerPhone.includes(cleanPhone)) {
+        // Phone is fully contained - calculate score based on how much of the full number it represents
+        // Cap at 85 to ensure only exact matches get 100
+        return Math.min(85, Math.round((cleanPhone.length / cleanCustomerPhone.length) * 100));
+      }
+      
+      // Partial match - calculate longest common substring
+      let maxCommonLength = 0;
+      for (let i = 0; i < cleanPhone.length; i++) {
+        for (let j = i + 1; j <= cleanPhone.length; j++) {
+          const substring = cleanPhone.substring(i, j);
+          if (cleanCustomerPhone.includes(substring) && substring.length > maxCommonLength) {
+            maxCommonLength = substring.length;
+          }
+        }
+      }
+      
+      // Cap partial matches at 75 to ensure they don't score too high
+      return Math.min(75, Math.round((maxCommonLength / cleanPhone.length) * 100));
+    };
+    
+    return matches.map(customer => {
+      // Calculate phone match score
+      const phoneScore = calculatePhoneScore(customer.telephone);
+      
+      // Calculate name match score if company name is provided
+      let nameScore = 0;
+      let combinedScore = phoneScore;
+      
+      if (companyName && companyName.trim() !== '') {
+        nameScore = getNameSimilarity(companyName, customer.company_name);
+        
+        // Calculate weighted average - phone matches are slightly more important
+        // Only give 100% if both scores are 100%
+        combinedScore = Math.round((phoneScore * 0.6) + (nameScore * 0.4));
+        
+        // Small boost if both scores are good, but cap at 95 unless both are perfect
+        if (phoneScore > 70 && nameScore > 70) {
+          const maxBoost = (phoneScore === 100 && nameScore === 100) ? 100 : 95;
+          combinedScore = Math.min(maxBoost, combinedScore + 5);
+        }
+      }
+      
+
+      
+      return {
+        ...customer,
+        deleted: customer.deleted_at !== null,
+        score: combinedScore,
+        matchReasons: {
+          telephone: true,
+          companyName: nameScore > 50,
+          afm: false
+        }
+      };
+    }).sort((a, b) => b.score - a.score); // Sort by score descending
+
+  } catch (error) {
+    console.error('Error in findExactPhoneMatches:', error);
+    return [];
+  }
+};
+
 // Export the service
-export default { findPotentialDuplicates }; 
+export default { findPotentialDuplicates, findExactPhoneMatches }; 

@@ -26,6 +26,7 @@ import { AccessibleDialogContent } from '@/components/ui/DialogUtilities';
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 import DetailsTab from "./offer-dialog/DetailsTab";
 import BasicTab from "./offer-dialog/BasicTab";
+import DocumentsTab from "./offer-dialog/DocumentsTab";
 import HeaderSection from './offer-dialog/HeaderSection';
 import FormFooter from './offer-dialog/FormFooter';
 
@@ -397,6 +398,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   const contextValue = useMemo(() => ({
     offerId: offerId || null,
     customerId,
+    customerName,
     register,
     watch,
     setValue,
@@ -423,6 +425,7 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
   }), [
     offerId,
     customerId,
+    customerName,
     register,
     watch,
     setValue,
@@ -627,17 +630,23 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
                   <AppTabsList className="border-t-0">
                     <AppTabsTrigger value="basic">Βασικά Στοιχεία</AppTabsTrigger>
                     <AppTabsTrigger value="details">Λεπτομέρειες</AppTabsTrigger>
+                    <AppTabsTrigger value="documents">Έγγραφα</AppTabsTrigger>
                   </AppTabsList>
                   
-                  <div className="flex-1 relative" style={{ minHeight: '600px' }}>
+                  <div className="flex-1 relative" style={{ minHeight: '600px', pointerEvents: 'auto' }}>
                     {/* Tab 1: Basic Information */}
-                    <AppTabsContent value="basic" className="absolute inset-0 pt-2 overflow-auto">
+                    <AppTabsContent value="basic" className="absolute inset-0 pt-2 overflow-auto pointer-events-auto">
                       <BasicTab />
                     </AppTabsContent>
                     
                     {/* Tab 2: Details */}
-                    <AppTabsContent value="details" className="absolute inset-0 pt-1 overflow-auto">
+                    <AppTabsContent value="details" className="absolute inset-0 pt-1 overflow-auto pointer-events-auto" style={{ position: 'relative' }}>
                       <DetailsTab />
+                    </AppTabsContent>
+
+                    {/* Tab 3: Documents */}
+                    <AppTabsContent value="documents" className="absolute inset-0 pt-1 overflow-auto pointer-events-auto">
+                      <DocumentsTab />
                     </AppTabsContent>
                   </div>
                 </AppTabs>

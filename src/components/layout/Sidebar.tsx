@@ -55,7 +55,7 @@ export default function Sidebar() {
   
   // Settings submenu items
   const settingsItems = [
-    { name: "Ρυθμίσεις Χρηστών", href: "/dashboard/settings", icon: Settings },
+    { name: "Γενικές Ρυθμίσεις", href: "/dashboard/settings", icon: Settings },
   ];
   
   // Add the service types menu item for admin and super users

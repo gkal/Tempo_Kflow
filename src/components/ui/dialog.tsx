@@ -117,7 +117,22 @@ const DialogContent = React.forwardRef<
           className
         )}
         style={{
-          overflowX: 'hidden'
+          overflowX: 'hidden',
+          ...(style || {})
+        }}
+        onPointerDownOutside={(e) => {
+          // Check if there's an active upload in progress
+          const activeUploads = document.querySelectorAll('[data-uploading="true"]');
+          const isUploading = activeUploads.length > 0;
+          
+          // Also check for any elements with an inline uploading state
+          const uploadElements = document.querySelectorAll('.uploading, [data-state="uploading"]');
+          const hasUploadElements = uploadElements.length > 0;
+          
+          if (isUploading || hasUploadElements) {
+            console.log('Dialog close prevented by onPointerDownOutside - upload in progress!');
+            e.preventDefault();
+          }
         }}
         {...props}
       >
@@ -132,7 +147,7 @@ const DialogContent = React.forwardRef<
         </div>
         {showCloseButton && (
           <DialogPrimitive.Close asChild>
-            <div className="absolute right-4 top-4 z-[51]">
+            <div className="absolute right-4 top-4 z-[50]">
               <CloseButton onClick={onCloseClick || (() => {})} />
             </div>
           </DialogPrimitive.Close>

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { VirtualDataTable } from '@/components/ui/virtual-table/VirtualDataTable';
 import { OffersList } from './OffersList';
 import { CustomerTableProps, Customer } from '@/types/CustomerTypes';
-import { formatDate } from '@/lib/utils';
+import { formatDate } from '@/utils/formatUtils';
 
 export const CustomerTable: React.FC<CustomerTableProps> = ({
   customers,

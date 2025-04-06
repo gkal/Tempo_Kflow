@@ -55,7 +55,9 @@ export function AppTabsList({
   className?: string 
 }) {
   return (
-    <TabsList className={cn("flex w-full bg-[#2f3e46] p-0 h-auto justify-start border-0 sticky top-0 z-10", className)}>
+    <TabsList className={cn("flex w-full bg-[#2f3e46] p-0 h-auto justify-start border-0 sticky top-0", className)}
+      style={{ zIndex: 5 }}
+    >
       {children}
     </TabsList>
   );
@@ -84,8 +86,10 @@ export function AppTabsTrigger({
         "data-[state=active]:font-normal",
         "hover:bg-[#52796f] hover:text-[#cad2c5]",
         "inline-flex items-center justify-center whitespace-nowrap rounded-none",
+        "relative",
         className
       )}
+      style={{ zIndex: 10 }}
     >
       {children}
     </TabsTrigger>
@@ -101,11 +105,14 @@ export const AppTabsContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
     ref={ref}
-    className={cn("h-full", className)}
+    className={cn("h-full pointer-events-auto", className)}
     style={{ 
       display: 'flex', 
       flexDirection: 'column',
-      overflow: 'visible' 
+      overflow: 'visible',
+      position: 'relative',
+      zIndex: 1,
+      pointerEvents: 'auto'
     }}
     {...props}
   />
