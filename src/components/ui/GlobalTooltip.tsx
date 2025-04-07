@@ -28,11 +28,11 @@ interface GlobalTooltipProps {
 
 /**
  * Formats tooltip content based on length
- * - Short content (<150 chars) stays on one line
+ * - Short content (<140 chars) stays on one line
  * - Longer content wraps to multiple lines
  */
 const formatTooltipContent = (content: ReactNode): ReactNode => {
-  if (typeof content !== 'string' || content.length <= 150) {
+  if (typeof content !== 'string' || content.length <= 140) {
     return <div className="whitespace-nowrap overflow-hidden text-ellipsis">{content}</div>;
   }
   
@@ -138,8 +138,9 @@ export function GlobalTooltip({
         <>
           <div 
             className={cn(
-              "fixed z-[9999] rounded-md bg-[#1a2e35] px-3 py-1.5 text-xs text-[#cad2c5] border border-[#52796f] shadow-lg",
-              "min-w-[120px] max-w-[600px] transition-opacity duration-200 overflow-hidden",
+              "fixed z-[9999] rounded-md bg-[#1a2e35] px-4 py-2 text-xs text-[#cad2c5] border border-[#52796f] shadow-lg",
+              "min-w-[120px] max-w-[800px] transition-opacity duration-200",
+              "break-words whitespace-pre-wrap",
               className
             )}
             style={{ 

@@ -20,7 +20,7 @@ import {
   MeasurementUnit 
 } from '@/types/offer-details';
 import { v4 as uuidv4 } from 'uuid';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/GlobalTooltip';
 
 interface DetailsContextProviderProps {
   children: React.ReactNode;

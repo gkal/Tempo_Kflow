@@ -22,7 +22,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@/components/ui/GlobalTooltip";
 import { openNewOfferDialog, openEditOfferDialog } from '@/components/offers/main_offers_form/OfferDialogManager';
 import { Badge } from "@/components/ui/badge";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
@@ -788,26 +788,22 @@ export default function CustomerOffersPage() {
         
         return (
           <div className="flex items-center justify-center w-full h-full">
-            <GlobalTooltip content={isExpanded ? "Συρρίξτε για κλείσιμο" : "Συρρίξτε για ανάπτυξη"}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // No need for setTimeout - directly toggle the expanded state
-                  // The fetchCustomerOffers is now called inside toggleCustomerExpanded
-                  toggleCustomerExpanded(row.id);
-                }}
-                className="h-8 w-8 hover:bg-[#52796f]/60 hover:text-white transition-colors duration-200 rounded-full text-[#cad2c5] flex items-center justify-center relative group"
-              >
-                <span className="absolute inset-0 rounded-full bg-[#52796f]/0 group-hover:bg-[#52796f]/30 transition-colors duration-200"></span>
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 relative z-10" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 relative z-10" />
-                )}
-              </Button>
-            </GlobalTooltip>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCustomerExpanded(row.id);
+              }}
+              className="h-8 w-8 hover:bg-[#52796f]/60 hover:text-white transition-colors duration-200 rounded-full text-[#cad2c5] flex items-center justify-center relative group"
+            >
+              <span className="absolute inset-0 rounded-full bg-[#52796f]/0 group-hover:bg-[#52796f]/30 transition-colors duration-200"></span>
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 relative z-10" />
+              ) : (
+                <ChevronRight className="h-4 w-4 relative z-10" />
+              )}
+            </Button>
           </div>
         );
       },
