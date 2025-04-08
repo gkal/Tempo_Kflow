@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Application Color System */
+:root {
+  /* Primary palette */
+  --app-bg-primary: #2f3e46;
+  --app-bg-secondary: #354f52;
+  --app-bg-tertiary: #3a5258;
+  
+  /* Text colors */
+  --app-text-primary: #cad2c5;
+  --app-text-secondary: #a8c5b5;
+  --app-text-muted: #6a8a70;
+  
+  /* Border colors */
+  --app-border-primary: #52796f;
+  --app-border-secondary: #52796f80;
+  
+  /* Interactive states */
+  --app-hover-bg: #354f5280;
+  --app-focus-ring: #52796f;
+  --app-active-bg: #52796f40;
+  
+  /* Status colors */
+  --app-success: #84a98c;
+  --app-error: #e63946;
+  --app-warning: #ee9b00;
+  --app-info: #219ebc;
+
+  /* Form element dimensions */
+  --app-input-height: 2rem;
+  --app-input-padding-x: 0.75rem;
+  --app-input-padding-y: 0.25rem;
+  --app-input-radius: 0.125rem;
+
+  /* Override browser validation messages */
+  --webkit-validation-bubble-message-color: #cad2c5;
+  --webkit-validation-bubble-background-color: #2f3e46;
+  --webkit-validation-bubble-border-color: #52796f;
+
+  /* Accessibility fixes */
+  --radix-dialog-content-aria-describedby: true;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    background-color: var(--app-bg-primary);
+    color: var(--app-text-primary);
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--app-bg-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--app-border-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--app-border-secondary);
+} 

@@ -47,7 +47,7 @@ import { createPrefixedLogger, logDebug, logError, logInfo, logWarning } from "@
 import { useLoading } from '@/lib/LoadingContext';
 import { useDataService } from "@/hooks/useDataService";
 import { useNavigate } from "react-router-dom";
-import duplicateDetectionService from '@/services/duplicateDetectionService';
+import * as duplicateDetectionService from '@/services/duplicate-detection';
 import CustomerDetailDialog from './CustomerDetailDialog';
 import * as fuzzball from 'fuzzball';
 
@@ -173,6 +173,11 @@ interface Customer {
     companyName?: boolean;
     telephone?: boolean;
     afm?: boolean;
+  };
+  originalScores?: {
+    phoneSimilarity: number;
+    nameSimilarity: number;
+    afmSimilarity: number;
   };
 }
 
@@ -709,10 +714,16 @@ const CustomerForm = ({
   // Use the duplicateDetectionService to find exact phone matches using database normalization
   // Now also includes company name for combined scoring (name + phone)
   const phoneSearch = async () => {
-
+    console.log('phoneSearch called with phoneValue:', phoneValue);
+    console.log('phoneValue formatted/unformatted:', {
+      original: phoneValue,
+      cleaned: phoneValue.replace(/\D/g, ''),
+      length: phoneValue.replace(/\D/g, '').length,
+      companyName: formData.company_name || 'None' // Log company name for debugging
+    });
     
     if (!phoneValue || phoneValue.trim() === '') {
-
+      console.log('phoneSearch: Empty phone value, returning empty array');
       setPotentialMatches([]);
       return;
     }
@@ -720,15 +731,57 @@ const CustomerForm = ({
     // Basic client-side check for minimum digits before hitting the DB
     const cleanedPhoneForCheck = phoneValue.replace(/\D/g, '');
     if (cleanedPhoneForCheck.length < 7) {
-
+      console.log('phoneSearch: Phone too short, minimum 7 digits required. Current length:', cleanedPhoneForCheck.length);
       setPotentialMatches([]);
       return;
     }
 
     try {
-      // Use the duplicateDetectionService's findExactPhoneMatches function with company name
-      // This will calculate combined scores based on both phone and name similarity
-      const matches = await duplicateDetectionService.findExactPhoneMatches(phoneValue, formData.company_name);
+      // Try multiple search strategies in sequence to maximize match chances
+      
+      // If we have a company name, always pass it - this helps with scoring combined matches higher
+      const companyName = formData.company_name && formData.company_name.trim().length >= 2 ? 
+        formData.company_name : null;
+      
+      // Strategy 1: Search with original formatted phone number first (e.g., 6983-50.50)
+      console.log('phoneSearch: Strategy 1 - Using formatted phone:', phoneValue, 'with company:', companyName || 'None');
+      let matches = await duplicateDetectionService.findExactPhoneMatches(phoneValue, companyName);
+      
+      // Strategy 2: If no matches and the phone has formatting, try with unformatted (digit-only) version
+      if (matches.length === 0 && phoneValue !== cleanedPhoneForCheck) {
+        console.log('phoneSearch: Strategy 2 - Using unformatted phone:', cleanedPhoneForCheck);
+        matches = await duplicateDetectionService.findExactPhoneMatches(cleanedPhoneForCheck, companyName);
+      }
+      
+      // Strategy 3: If still no matches, try a patterns based on segment formatting (splitting by dash, dot, space)
+      if (matches.length === 0 && (phoneValue.includes('-') || phoneValue.includes('.') || phoneValue.includes(' '))) {
+        console.log('phoneSearch: Strategy 3 - Using segmented search pattern');
+        
+        // Get all segments split by any separator
+        const segments = cleanedPhoneForCheck.match(/\d+/g) || [];
+        if (segments.length >= 2) {
+          // Try with only the first segment which is usually the area/mobile code
+          const firstSegment = segments[0];
+          console.log('phoneSearch: Trying search with first segment:', firstSegment);
+          
+          // Check if we have minimum 4 digits for meaningful search
+          if (firstSegment.length >= 4) {
+            matches = await duplicateDetectionService.findExactPhoneMatches(firstSegment, companyName);
+          }
+        }
+      }
+      
+      console.log('phoneSearch: Final results:', {
+        matchCount: matches.length,
+        companyNameUsed: companyName || 'None',
+        matches: matches.map(m => ({ 
+          id: m.id, 
+          company: m.company_name, 
+          phone: m.telephone,
+          score: m.score,
+          hasBothMatches: m.matchReasons?.companyName && m.matchReasons?.telephone
+        }))
+      });
 
       setPotentialMatches(matches);
     } catch (e) {
@@ -759,21 +812,18 @@ const CustomerForm = ({
       const phoneDigits = phoneValue ? phoneValue.replace(/\D/g, '').length : 0;
       
       if (phoneDigits >= 7) { // Keep phone at 7 digits minimum
-
         phoneSearch();
       }
     }
     // For company name with minimum chars, trigger company search
     else if (fieldId === 'company_name') {
-      if (formData.company_name && formData.company_name.trim().length >= 2) { // Keep company name at 2 chars minimum
-
+      if (formData.company_name && formData.company_name.trim().length >= 2) { // Reduced to just 2 chars minimum
         findMatches();
       }
     }
     // For AFM field with minimum chars, trigger search with AFM
     else if (fieldId === 'afm') {
       if (formData.afm && formData.afm.trim().length >= 5) {
-
         findMatches();
       }
     }
@@ -781,13 +831,24 @@ const CustomerForm = ({
 
   // Helper function to find matches using company name and AFM
   const findMatches = async () => {
-    const matches = await duplicateDetectionService.findPotentialDuplicates({
-      company_name: formData.company_name,
-      telephone: '', // Don't include phone in company search
-      afm: formData.afm || ''
-    }, 65); // Using 65% threshold for potential duplicates
-    
-    setPotentialMatches(matches);
+    // Only search if we have at least 2 characters for company name
+    if (formData.company_name && formData.company_name.length >= 2) {
+      const matches = await duplicateDetectionService.findPotentialDuplicates({
+        company_name: formData.company_name,
+        telephone: phoneValue, // Include phone in company name search for better matching
+        afm: formData.afm || ''
+      }, 40); // Reduced threshold to 40% to show more matches with our new scoring system
+      
+      console.log('Find matches results:', {
+        searchTerm: formData.company_name,
+        results: matches.length,
+        matches: matches.map(m => ({ company: m.company_name, score: m.score }))
+      });
+      
+      setPotentialMatches(matches);
+    } else {
+      setPotentialMatches([]);
+    }
   };
 
   // Effect for debounced search
@@ -795,13 +856,11 @@ const CustomerForm = ({
     // Skip search if either we don't have minimum input or we have an existing customer
     const phoneDigits = phoneValue.replace(/\D/g, '').length;
     const companyNameChars = formData.company_name.length;
-    
 
-    
     // Only search if we're not navigating to a customer and not in edit mode (no customerId)
     if (!navigatingToCustomer && !customerId) {
       // Only search if one of the fields has minimum required input
-      const hasMinCompany = companyNameChars >= 3; // Start search with 3+ characters
+      const hasMinCompany = companyNameChars >= 2; // Start search with just 2+ characters
       const hasMinPhone = phoneDigits >= 7; // Keep phone at 7 digits minimum
       // Only consider AFM if it's a complete AFM (8 digits) to avoid disrupting other matches
       const hasCompleteAfm = formData.afm.replace(/\D/g, '').length === 8;
@@ -815,18 +874,15 @@ const CustomerForm = ({
         
         // If phone field is focused and has digits, prioritize phone search
         if (activeField === 'telephone' && hasMinPhone) {
-
           await phoneSearch();
           return;
         }
         
         // Otherwise use company name search or complete AFM
         if (hasMinCompany || hasCompleteAfm) {
-
           await findMatches();
         } else if (hasMinPhone) {
           // Fallback to phone search if company not provided but phone is
-
           await phoneSearch();
         }
       }, 300); // Reduced debounce delay from 500ms to 300ms for faster response

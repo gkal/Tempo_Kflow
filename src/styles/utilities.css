@@ -1,0 +1,59 @@
+/* Text utilities */
+span {
+  color: inherit;
+}
+
+span[title] {
+  cursor: help;
+}
+
+.text-blue-400 {
+  color: #60a5fa !important;
+}
+
+/* Loading indicators */
+.dots-blue {
+  color: #60a5fa;
+}
+
+.ellipsis-blue {
+  color: #60a5fa;
+}
+
+/* Dialog accessibility */
+[role="dialog"],
+[role="alertdialog"] {
+  --radix-dialog-content-aria-describedby: true;
+}
+
+/* Selection styles */
+::selection {
+  background-color: var(--app-border-primary);
+  color: var(--app-text-primary);
+}
+
+::-moz-selection {
+  background-color: var(--app-border-primary);
+  color: var(--app-text-primary);
+}
+
+/* Placeholder styles */
+::placeholder {
+  color: var(--app-text-muted) !important;
+  opacity: 1 !important;
+}
+
+/* Option styles */
+option {
+  background-color: var(--app-bg-primary);
+  color: var(--app-text-primary);
+}
+
+/* Label styles */
+label {
+  color: var(--app-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  margin-bottom: 0.25rem;
+  display: block;
+} 

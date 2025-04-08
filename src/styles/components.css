@@ -1,0 +1,232 @@
+/* Dialog styles */
+.DialogOverlay {
+  background-color: rgba(0, 0, 0, 0.5);
+  position: fixed;
+  inset: 0;
+  animation: fadeIn 150ms ease-out;
+}
+
+.DialogContent {
+  background-color: var(--app-bg-primary);
+  border-radius: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 500px;
+  max-height: 85vh;
+  padding: 25px;
+}
+
+/* Textarea variants */
+.customer-notes-textarea {
+  min-height: 100px !important;
+  height: auto !important;
+  resize: vertical !important;
+  background-color: var(--app-bg-primary) !important;
+  color: var(--app-text-primary) !important;
+}
+
+.customer-notes-textarea:hover, 
+.customer-notes-textarea:focus {
+  box-shadow: 0 0 0 2px var(--app-focus-ring) !important;
+}
+
+.service-type-textarea {
+  min-height: 80px !important;
+  height: auto !important;
+  resize: vertical !important;
+  background-color: var(--app-bg-primary) !important;
+  color: var(--app-text-primary) !important;
+  font-family: monospace !important;
+}
+
+.service-type-textarea:hover, 
+.service-type-textarea:focus {
+  box-shadow: 0 0 0 2px var(--app-focus-ring) !important;
+}
+
+.contact-notes-textarea {
+  min-height: 60px !important;
+  height: auto !important;
+  resize: vertical !important;
+  background-color: var(--app-bg-primary) !important;
+  color: var(--app-text-primary) !important;
+}
+
+.contact-notes-textarea:hover, 
+.contact-notes-textarea:focus {
+  box-shadow: 0 0 0 2px var(--app-focus-ring) !important;
+}
+
+/* Login form styles */
+.login-input {
+  height: var(--app-input-height) !important;
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+  background-color: var(--app-bg-primary) !important;
+  color: var(--app-text-primary) !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.login-input::placeholder {
+  color: var(--app-text-muted) !important;
+  opacity: 1 !important;
+}
+
+.login-input:hover, .login-input:focus {
+  box-shadow: 0 0 0 1px var(--app-focus-ring) !important;
+}
+
+/* Table styles */
+tr.force-hover {
+  background-color: var(--app-hover-bg) !important;
+}
+
+tr.force-hover td {
+  background-color: transparent !important;
+}
+
+/* Fixed height textarea */
+.textarea-3-lines {
+  height: calc(3 * 1.5rem + 2 * var(--app-input-padding-y)) !important;
+  min-height: calc(3 * 1.5rem + 2 * var(--app-input-padding-y)) !important;
+  resize: none !important;
+}
+
+/* Dropdown menu */
+.dropdown-item {
+  @apply px-2 py-1 text-sm cursor-pointer;
+}
+
+.dropdown-item:hover {
+  background-color: var(--app-hover-bg);
+}
+
+/* Tooltip styles */
+.custom-tooltip {
+  @apply relative inline-block;
+}
+
+.tooltip-text {
+  @apply invisible absolute z-10 p-2 bg-gray-800 text-white text-sm rounded-md;
+}
+
+.service-tooltip:hover .tooltip-text {
+  @apply visible;
+}
+
+/* Offer dialog styles */
+.offer-dialog-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.offer-dialog-content {
+  background-color: var(--app-bg-primary);
+  border-radius: 8px;
+  padding: 20px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.offer-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--app-border-primary);
+}
+
+.offer-dialog-body {
+  margin-bottom: 20px;
+  max-height: calc(90vh - 200px);
+  overflow-y: auto;
+}
+
+.offer-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--app-border-primary);
+  background-color: var(--app-bg-primary);
+  position: sticky;
+  bottom: 0;
+}
+
+/* Search highlight */
+.search-highlight, .forced-highlight {
+  background-color: rgba(238, 155, 0, 0.2);
+  border-radius: 2px;
+  padding: 0 2px;
+  margin: 0 -2px;
+}
+
+.has-highlight-debug {
+  outline: 1px solid red;
+}
+
+/* Selection styles */
+.offer-dialog-content *::selection {
+  background-color: var(--app-border-primary);
+  color: var(--app-text-primary);
+}
+
+.offer-dialog-content *::-moz-selection {
+  background-color: var(--app-border-primary);
+  color: var(--app-text-primary);
+}
+
+.offer-dialog-content textarea::selection,
+.offer-dialog-content textarea::-moz-selection {
+  background-color: var(--app-border-primary);
+  color: var(--app-text-primary);
+}
+
+.offer-dialog-content input[type="datetime-local"]::selection,
+.offer-dialog-content input[type="datetime-local"]::-moz-selection {
+  background-color: var(--app-border-primary);
+  color: var(--app-text-primary);
+}
+
+.offer-dialog-content input[type]::selection,
+.offer-dialog-content input[type]::-moz-selection {
+  background-color: var(--app-border-primary);
+  color: var(--app-text-primary);
+}
+
+/* Custom scrollbar for specific elements */
+.scrollbar-visible::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-track {
+  background: var(--app-bg-primary);
+  border-radius: 4px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background: var(--app-border-primary);
+  border-radius: 4px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: var(--app-border-secondary);
+} 
