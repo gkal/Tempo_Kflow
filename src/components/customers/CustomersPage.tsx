@@ -110,6 +110,7 @@ const CustomersPage: React.FC = () => {
           { accessor: 'email', header: 'Email' },
           { accessor: 'afm', header: 'ΑΦΜ' },
           { accessor: 'address', header: 'Διεύθυνση' },
+          { accessor: 'town', header: 'Πόλη' },
         ];
 
         // Filter buttons
@@ -149,8 +150,8 @@ const CustomersPage: React.FC = () => {
               
               return (
                 <CustomerContextMenu customerId={customer.id} onCreateOffer={handleCreateOffer}>
-                  <div className="flex items-center gap-1 justify-start">
-                    <div className="flex items-center min-w-[40px] pl-2">
+                  <div className="flex items-center gap-1 justify-start w-full">
+                    <div className="flex items-center min-w-[40px] pl-2 shrink-0">
                       {offersCount > 0 ? (
                         <div 
                           className={`flex items-center justify-center relative group cursor-pointer hover:bg-[#52796f]/60 rounded-full w-10 h-8 transition-colors duration-200 ${isExpanded ? 'bg-[#52796f]/30' : ''}`}
@@ -171,15 +172,23 @@ const CustomersPage: React.FC = () => {
                           </div>
                         </div>
                       ) : (
-                        <span className="invisible">0</span>
+                        <div className="flex items-center justify-center w-10 h-8">
+                          <span className="invisible">0</span>
+                        </div>
                       )}
                     </div>
-                    <span className="text-[#cad2c5]">{customer.company_name}</span>
+                    <span className="text-[#cad2c5] overflow-hidden text-ellipsis whitespace-nowrap min-w-0 flex-1">{customer.company_name}</span>
                   </div>
                 </CustomerContextMenu>
               );
             },
+            sortingFn: (rowA, rowB) => {
+              const a = rowA.getValue('company_name') || '';
+              const b = rowB.getValue('company_name') || '';
+              return (a as string).localeCompare(b as string, 'el', { sensitivity: 'base' });
+            },
             meta: {
+              initialWidth: 300,
               className: 'text-left',
               headerClassName: 'relative flex justify-center'
             },
@@ -193,6 +202,7 @@ const CustomersPage: React.FC = () => {
             size: 150,
             cell: ({ row }) => row.customer_type || "—",
             meta: {
+              initialWidth: 150,
               className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
               headerClassName: 'relative flex justify-center'
             },
@@ -206,6 +216,7 @@ const CustomersPage: React.FC = () => {
             size: 150,
             cell: ({ row }) => row.telephone || "—",
             meta: {
+              initialWidth: 150,
               className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
               headerClassName: 'relative flex justify-center'
             },
@@ -219,9 +230,25 @@ const CustomersPage: React.FC = () => {
             size: 200,
             cell: ({ row }) => row.email || "—",
             meta: {
+              initialWidth: 200,
               className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
               headerClassName: 'relative flex justify-center'
             },
+          },
+          {
+            id: 'afm',
+            accessorKey: 'afm',
+            header: 'ΑΦΜ',
+            enableSorting: true,
+            sortDescFirst: false,
+            enableResizing: true,
+            size: 150,
+            meta: {
+              initialWidth: 150,
+              className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
+              headerClassName: 'relative flex justify-center'
+            },
+            cell: ({ row }) => row.afm || "—",
           },
           {
             accessorKey: 'address',
@@ -234,6 +261,21 @@ const CustomersPage: React.FC = () => {
               return row.address || "—";
             },
             meta: {
+              initialWidth: 250,
+              className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
+              headerClassName: 'relative flex justify-center'
+            },
+          },
+          {
+            accessorKey: 'town',
+            header: 'Πόλη',
+            enableSorting: true,
+            sortDescFirst: false,
+            enableResizing: true,
+            size: 150,
+            cell: ({ row }) => row.town || "—",
+            meta: {
+              initialWidth: 150,
               className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
               headerClassName: 'relative flex justify-center'
             },
@@ -247,6 +289,7 @@ const CustomersPage: React.FC = () => {
             size: 200,
             cell: ({ row }) => formatDateTime(row.created_at),
             meta: {
+              initialWidth: 200,
               className: 'text-left whitespace-nowrap overflow-hidden text-ellipsis',
               headerClassName: 'relative flex justify-center'
             },
@@ -297,6 +340,7 @@ const CustomersPage: React.FC = () => {
               );
             },
             meta: {
+              initialWidth: 150,
               className: 'text-right',
               headerClassName: 'relative flex justify-center'
             },
@@ -339,6 +383,7 @@ const CustomersPage: React.FC = () => {
                   selectedCustomerTypes={selectedCustomerTypes}
                   onCustomerTypeChange={handleCustomerTypeChange}
                   stabilizeExpandedRows={true}
+                  tableId="customers-table"
                 />
               </CustomerContextMenu>
             </div>

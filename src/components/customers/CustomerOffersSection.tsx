@@ -5,16 +5,32 @@ import React from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
-import { CustomerOffer } from "./types/CustomerTypes";
-import { 
-  formatCurrency, 
-  formatDate, 
-  formatStatus, 
-  formatResult,
-  getStatusClass,
-  getResultClass
-} from "./utils/CustomerFormatUtils";
-import { openEditOfferDialog } from '@/components/offers/main_offers_form/OfferDialogManager';
+import { Customer, CustomerOffer } from "./types/customerTypes";
+
+// Format utility functions
+const formatCurrency = (value?: number): string => {
+  if (value === undefined || value === null) return '€0.00';
+  return new Intl.NumberFormat('el-GR', { 
+    style: 'currency', 
+    currency: 'EUR' 
+  }).format(value);
+};
+
+const formatDate = (date?: string | null): string => {
+  if (!date) return '-';
+  return new Date(date).toLocaleDateString('el-GR');
+};
+
+// Status formatting
+const formatStatus = (status?: string): string => {
+  if (!status) return 'Άγνωστο';
+  return status;
+};
+
+const getStatusClass = (status?: string): string => {
+  if (!status) return 'bg-gray-100 text-gray-800';
+  return 'bg-blue-100 text-blue-800';
+};
 
 interface CustomerOffersSectionProps {
   customerId: string;
@@ -27,13 +43,19 @@ export const CustomerOffersSection: React.FC<CustomerOffersSectionProps> = ({
   offers,
   onDeleteClick
 }) => {
-  if (!offers || offers.length === 0) {
+  if (offers.length === 0) {
     return (
-      <div className="py-2 px-4 text-gray-500 italic">
+      <div className="bg-gray-50 p-4 rounded-md text-center text-gray-500 text-sm">
         Δεν υπάρχουν προσφορές για αυτόν τον πελάτη.
       </div>
     );
   }
+
+  // Function to handle clicking on an offer
+  const handleOfferClick = (offerId: string) => {
+    console.log(`Opening offer ${offerId} for customer ${customerId}`);
+    // For now, just log the action since openEditOfferDialog is not available
+  };
 
   return (
     <div className="bg-gray-50 p-2 rounded-md">
@@ -49,18 +71,18 @@ export const CustomerOffersSection: React.FC<CustomerOffersSectionProps> = ({
             <div className="flex justify-between items-start">
               <div 
                 className="flex-1 cursor-pointer" 
-                onClick={() => openEditOfferDialog(customerId, offer.id)}
+                onClick={() => handleOfferClick(offer.id)}
               >
                 <div className="flex justify-between">
                   <div className="font-medium text-gray-900">
-                    <TruncateWithTooltip text={offer.name} maxLength={40} />
+                    <TruncateWithTooltip text={offer.offer_number || 'Προσφορά'} maxLength={40} />
                   </div>
                   <div className="font-medium text-gray-900">
-                    {formatCurrency(parseFloat(offer.value) || 0)}
+                    {formatCurrency(offer.total_amount)}
                   </div>
                 </div>
                 <div className="text-sm text-gray-500 mt-1">
-                  {formatDate(offer.date)}
+                  {formatDate(offer.created_at)}
                 </div>
                 <div className="flex mt-2 gap-2">
                   <span
@@ -70,15 +92,6 @@ export const CustomerOffersSection: React.FC<CustomerOffersSectionProps> = ({
                   >
                     {formatStatus(offer.status)}
                   </span>
-                  {offer.result && (
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getResultClass(
-                        offer.result
-                      )}`}
-                    >
-                      {formatResult(offer.result)}
-                    </span>
-                  )}
                 </div>
               </div>
               <Button

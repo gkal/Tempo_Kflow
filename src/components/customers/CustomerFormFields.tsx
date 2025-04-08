@@ -95,14 +95,14 @@ export const CustomerFormFields: React.FC<CustomerFormFieldsProps> = ({
           Τύπος Πελάτη
         </Label>
         <GlobalDropdown
-          id="customer_type"
-          name="customer_type"
+          placeholder="Επιλέξτε τύπο πελάτη"
           value={formData.customer_type}
-          onChange={handleInputChange}
+          onSelect={(value) => handleInputChange({ 
+            target: { name: "customer_type", value } 
+          } as React.ChangeEvent<HTMLSelectElement>)}
+          options={CUSTOMER_TYPE_OPTIONS.map(type => type)}
           disabled={viewOnly}
-          className="w-full bg-[#2f3e46] text-[#cad2c5] border-[#354f52]"
-          options={CUSTOMER_TYPE_OPTIONS.map(type => ({ value: type, label: type }))}
-          placeholder="Επιλέξτε τύπο"
+          className="w-full mt-1"
         />
       </div>
 

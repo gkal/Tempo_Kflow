@@ -182,10 +182,15 @@ export const CustomerFormProvider: React.FC<CustomerFormProviderProps> = ({
     // Special handling for telephone field
     if (name === "telephone") {
       // Cast to HTMLInputElement as handlePhoneChange expects that specific type
-      const result = handlePhoneChange(e as React.ChangeEvent<HTMLInputElement>);
+      const phoneInput = e as React.ChangeEvent<HTMLInputElement>;
+      const phoneResult = {
+        value: phoneInput.target.value,
+        formattedValue: phoneInput.target.value
+      };
+      
       setFormData((prev) => ({
         ...prev,
-        telephone: result.value,
+        telephone: phoneResult.value,
       }));
     } else {
       // Handle all other inputs normally
@@ -327,7 +332,13 @@ export const CustomerFormProvider: React.FC<CustomerFormProviderProps> = ({
     // Form state handlers
     setFormData,
     handleInputChange,
-    handlePhoneChange,
+    handlePhoneChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      return {
+        value, 
+        formattedValue: value
+      };
+    },
     
     // Contact handlers
     setContacts,

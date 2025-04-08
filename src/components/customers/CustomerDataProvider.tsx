@@ -218,6 +218,8 @@ export const CustomerDataProvider: React.FC<CustomerDataProviderProps> = ({ chil
             customer_type, 
             created_at,
             address,
+            town,
+            postal_code,
             afm,
             offers(
               id, 

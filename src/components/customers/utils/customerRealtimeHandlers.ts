@@ -285,8 +285,6 @@ export const handleCustomersRealtimeEvent = (
   if (payload.eventType === 'INSERT') {
     // A new customer was added
     if (payload.new) {
-      console.log('🔵 New customer added:', payload.new.company_name);
-      
       // Map the new customer data to our Customer type
       const newCustomer: Customer = {
         id: payload.new.id,
@@ -297,6 +295,8 @@ export const handleCustomersRealtimeEvent = (
         created_at: payload.new.created_at,
         customer_type: payload.new.customer_type || '',
         address: payload.new.address || '',
+        town: payload.new.town || '',
+        postal_code: payload.new.postal_code || '',
         afm: payload.new.afm || '',
         offers_count: 0 // New customer has no offers yet
       };
@@ -361,6 +361,8 @@ export const handleCustomersRealtimeEvent = (
                 status: payload.new.status || customer.status,
                 customer_type: payload.new.customer_type || customer.customer_type,
                 address: payload.new.address || customer.address,
+                town: payload.new.town || customer.town,
+                postal_code: payload.new.postal_code || customer.postal_code,
                 afm: payload.new.afm || customer.afm
               };
             }
@@ -428,6 +430,8 @@ export const mapDatabaseCustomers = (dbCustomers: any[]): Customer[] => {
       created_at: dbCustomer.created_at,
       customer_type: dbCustomer.customer_type || '',
       address: dbCustomer.address || '',
+      town: dbCustomer.town || '',
+      postal_code: dbCustomer.postal_code || '',
       afm: dbCustomer.afm || '',
       offers_count: activeOffersCount,
       offers: validOffers.map((offer: any) => ({

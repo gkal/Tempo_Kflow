@@ -1,0 +1,421 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { flexRender, getCoreRowModel, getSortedRowModel, ColumnDef, useReactTable, SortingState, Row } from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { TableHead, TableRow, TableHeader, TableBody, TableCell, Table } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
+
+// Add debug logging only in development
+const debugLog = (message: string, data?: any) => {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[VirtualTable] ${message}`, data);
+  }
+};
+
+// Define the column metadata type
+interface ColumnMeta<TData, TValue> {
+  className?: string;
+  [key: string]: any;
+}
+
+interface VirtualTableProps<TData extends object, TValue = any> {
+  data: TData[];
+  columns: ColumnDef<TData, TValue>[];
+  renderExpanded?: (row: TData) => React.ReactNode;
+  isRowExpanded?: (id: string) => boolean;
+  onToggleExpand?: (id: string) => void;
+  keyExtractor?: (row: TData) => string;
+  onRowClick?: (row: TData) => void;
+  isLoading?: boolean;
+  hasNextPage?: boolean;
+  loadMore?: () => void;
+  rowActions?: (row: TData) => React.ReactNode;
+  loadingMessage?: string;
+  enableVirtualization?: boolean;
+  initialSortingState?: SortingState;
+}
+
+export function VirtualTable<TData extends object, TValue = any>({
+  data,
+  columns,
+  renderExpanded,
+  isRowExpanded,
+  onToggleExpand,
+  keyExtractor,
+  onRowClick,
+  isLoading = false,
+  hasNextPage = false,
+  loadMore,
+  rowActions,
+  loadingMessage = 'Loading more data...',
+  enableVirtualization = true,
+  initialSortingState,
+}: VirtualTableProps<TData, TValue>) {
+  // All state hooks must be defined at the top and in the same order every render
+  const [sorting, setSorting] = useState<SortingState>(initialSortingState || []);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Setup our table
+  const table = useReactTable({
+    data: data || [],
+    columns,
+    state: {
+      sorting,
+    },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    debugTable: process.env.NODE_ENV === 'development',
+  });
+
+  // Update sorting when initialSortingState changes
+  useEffect(() => {
+    if (initialSortingState) {
+      setSorting(initialSortingState);
+    }
+  }, [initialSortingState]);
+
+  // Debug the table creation
+  debugLog("Creating Table Instance...");
+
+  // Check for empty data
+  const isDataEmpty = !data || data.length === 0;
+  const rows = table.getRowModel().rows;
+  
+  // Load more data when scrolling near the end
+  const loadMoreRows = useCallback(() => {
+    if (!isLoading && hasNextPage && loadMore) {
+      debugLog("Loading more rows");
+      loadMore();
+    }
+  }, [isLoading, hasNextPage, loadMore]);
+
+  // Calculate row heights to handle expanded rows
+  const getRowHeight = useCallback((index: number): number => {
+    // Skip for non-virtualized tables or if rows aren't available
+    if (!rows || !rows[index]) return 60;
+    
+    // If using keyExtractor for expanded state management
+    if (keyExtractor && isRowExpanded && renderExpanded) {
+      try {
+        const rowId = keyExtractor(rows[index].original);
+        if (isRowExpanded(rowId)) {
+          // Expanded rows get more height
+          return 200;
+        }
+      } catch (e) {
+        console.error("Error in getRowHeight:", e);
+        return 60;
+      }
+    }
+    
+    return 60; // Default row height
+  }, [rows, keyExtractor, isRowExpanded, renderExpanded]);
+  
+  // Always create the virtualizer but only use it when conditions are met
+  // This ensures hook order is consistent between renders
+  const shouldUseVirtualizer = enableVirtualization && tableContainerRef.current && rows && rows.length > 0;
+  
+  const rowVirtualizer = useVirtualizer({
+    count: shouldUseVirtualizer ? (hasNextPage ? rows.length + 1 : rows.length) : 0,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 60,
+    overscan: 10,
+    onChange: (instance) => {
+      if (!shouldUseVirtualizer) return;
+      
+      const lastVisibleRowIndex = instance.range.endIndex - 1;
+      if (
+        hasNextPage &&
+        !isLoading &&
+        lastVisibleRowIndex >= rows.length - 5
+      ) {
+        loadMoreRows();
+      }
+    }
+  });
+
+  // Effect logging for debugging - only in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      debugLog(`Data updated: ${data?.length || 0} rows`, { 
+        firstRow: data?.length > 0 ? keyExtractor ? keyExtractor(data[0]) : 'no keyExtractor' : 'empty',
+        columns: columns.map(col => col.id || 'unnamed column')
+      });
+    }
+  }, [data, keyExtractor, columns]);
+
+  // Debug output if data is available but rows are empty - only in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && data?.length > 0 && (!rows || rows.length === 0)) {
+      console.warn("[VirtualTable] Data is available but no rows are rendered", {
+        dataLength: data.length,
+        rowsLength: rows?.length || 0
+      });
+    }
+  }, [data, rows]);
+
+  // Debug output for empty data but having columns - only in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && isDataEmpty && columns.length > 0) {
+      console.warn('[VirtualTable] Data is empty but columns are defined', {
+        columns: columns.map(col => col.id || 'unnamed column'),
+        isLoading
+      });
+    }
+  }, [isDataEmpty, columns, isLoading]);
+
+  // Early return for empty state
+  if (isDataEmpty && !isLoading) {
+    return (
+      <div className="text-center p-8 text-[#cad2c5]">
+        <p>No data available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={tableContainerRef}
+      className="relative overflow-auto h-full min-h-[400px] border border-[#52796f] rounded-md bg-[#2f3e46]"
+      style={{ contain: 'size layout' }}
+    >
+      <Table className="w-full border-collapse">
+        <TableHeader className="bg-[#354f52] sticky top-0 z-10">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow 
+              key={headerGroup.id}
+              className="border-b border-[#52796f]"
+            >
+              {headerGroup.headers.map((header, headerIndex) => {
+                const isSortable = header.column.getCanSort();
+                
+                return (
+                  <TableHead 
+                    key={header.id}
+                    colSpan={header.colSpan}
+                    style={{ 
+                      width: header.getSize() !== 150 ? header.getSize() : undefined, 
+                      minWidth: header.getSize() !== 150 ? header.getSize() : undefined 
+                    }}
+                    className={cn(
+                      "text-[#cad2c5] text-xs font-medium p-3 relative",
+                      isSortable && "cursor-pointer select-none"
+                    )}
+                    onClick={isSortable ? header.column.getToggleSortingHandler() : undefined}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                        {/* Single white arrow for sorting */}
+                        {isSortable && (
+                          <div className="ml-1 flex items-center">
+                            {header.column.getIsSorted() ? (
+                              header.column.getIsSorted() === "asc" ? (
+                                <ArrowUp className="h-3 w-3 text-white" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3 text-white" />
+                              )
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Add a thin vertical separator at the end of each column except the last one */}
+                    {headerIndex < headerGroup.headers.length - 1 && (
+                      <div className="absolute right-0 top-1/2 transform -translate-y-1/2 h-4 w-px bg-[#52796f]"></div>
+                    )}
+                  </TableHead>
+                );
+              })}
+            </TableRow>
+          ))}
+        </TableHeader>
+        
+        {/* Debug information - only in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <TableBody>
+            <TableRow>
+              <TableCell colSpan={columns.length} className="p-3 text-center bg-blue-900/20 text-[#84a98c] text-xs">
+                <div>Debug: Data length {data?.length || 0}, isLoading: {isLoading ? 'Yes' : 'No'}</div>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        )}
+        
+        <TableBody className="relative text-[#cad2c5]">
+          {(!isDataEmpty && rows && rows.length > 0) ? (
+            shouldUseVirtualizer ? (
+              // Virtualized rows
+              <tr>
+                <td colSpan={columns.length} className="p-0">
+                  <div
+                    className="relative w-full"
+                    style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+                  >
+                    {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                      // Check if we're rendering the loading row
+                      if (virtualRow.index >= rows.length) {
+                        return (
+                          <div
+                            key="loading-row"
+                            className="absolute top-0 left-0 w-full flex items-center justify-center py-4 bg-[#354f52]/50"
+                            style={{
+                              height: 60,
+                              transform: `translateY(${virtualRow.start}px)`,
+                            }}
+                          >
+                            <Loader2 className="h-5 w-5 animate-spin mr-2 text-[#84a98c]" />
+                            <span>{loadingMessage}</span>
+                          </div>
+                        );
+                      }
+                      
+                      const row = rows[virtualRow.index];
+                      if (!row) return null;
+                      
+                      const rowId = keyExtractor ? keyExtractor(row.original) : row.id;
+                      const isExpanded = isRowExpanded ? isRowExpanded(rowId) : false;
+                      
+                      return (
+                        <div
+                          key={rowId || virtualRow.key}
+                          data-index={virtualRow.index}
+                          className="absolute top-0 left-0 w-full"
+                          style={{
+                            height: getRowHeight(virtualRow.index),
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          <TableRow
+                            key={rowId || row.id}
+                            data-state={row.getIsSelected() ? "selected" : undefined}
+                            className={cn(
+                              "border-b border-[#52796f]/30 hover:bg-[#354f52]/50 cursor-pointer bg-transparent",
+                              isExpanded && "bg-[#354f52]/30"
+                            )}
+                            onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                          >
+                            {row.getVisibleCells().map((cell, cellIndex) => (
+                              <TableCell 
+                                key={cell.id}
+                                className={cn(
+                                  "p-3 relative",
+                                  (cell.column.columnDef.meta as ColumnMeta<TData, TValue>)?.className
+                                )}
+                              >
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                {/* Add a thin vertical separator after each cell except the last one */}
+                                {cellIndex < row.getVisibleCells().length - 1 && (
+                                  <div className="absolute right-0 top-1/2 transform -translate-y-1/2 h-4 w-px bg-[#52796f]/30"></div>
+                                )}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                          
+                          {isExpanded && renderExpanded && (
+                            <div className="px-3">
+                              {renderExpanded(row.original)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              // Non-virtualized rows for simpler rendering - limit to 8 rows
+              rows.slice(0, 8).map(row => {
+                const rowId = keyExtractor ? keyExtractor(row.original) : row.id;
+                const isExpanded = isRowExpanded ? isRowExpanded(rowId) : false;
+                
+                return (
+                  <React.Fragment key={rowId || row.id}>
+                    <TableRow
+                      data-state={row.getIsSelected() ? "selected" : undefined}
+                      className={cn(
+                        "border-b border-[#52796f]/30 hover:bg-[#354f52]/50 cursor-pointer bg-transparent",
+                        isExpanded && "bg-[#354f52]/30"
+                      )}
+                      onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                    >
+                      {row.getVisibleCells().map((cell, cellIndex) => (
+                        <TableCell 
+                          key={cell.id}
+                          className={cn(
+                            "p-3 relative",
+                            (cell.column.columnDef.meta as ColumnMeta<TData, TValue>)?.className
+                          )}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          {/* Add a thin vertical separator after each cell except the last one */}
+                          {cellIndex < row.getVisibleCells().length - 1 && (
+                            <div className="absolute right-0 top-1/2 transform -translate-y-1/2 h-4 w-px bg-[#52796f]/30"></div>
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    
+                    {isExpanded && renderExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={columns.length} className="p-0">
+                          {renderExpanded(row.original)}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center">
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2 text-[#84a98c]" />
+                    <span>Loading data...</span>
+                  </div>
+                ) : (
+                  <span>No results found</span>
+                )}
+              </TableCell>
+            </TableRow>
+          )}
+          
+          {/* Loading more indicator */}
+          {hasNextPage && !shouldUseVirtualizer && (
+            <TableRow id="load-more-trigger">
+              <TableCell colSpan={columns.length} className="p-3 text-center">
+                {isLoading && (
+                  <div className="py-2 flex items-center justify-center text-[#84a98c]">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    <span>{loadingMessage}</span>
+                  </div>
+                )}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+      
+      {/* Set the proper height for the table to account for virtualization */}
+      {shouldUseVirtualizer && (
+        <div
+          style={{
+            height: `${rowVirtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        ></div>
+      )}
+    </div>
+  );
+}
+
+export default VirtualTable; 

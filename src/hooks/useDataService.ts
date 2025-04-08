@@ -127,7 +127,8 @@ export function useDataService<T extends Record<string, any>>(
     lastQueryRef.current = queryOptions;
 
     try {
-      console.log(`[DataService] Fetching all records from table: ${tableName}`, { queryOptions });
+      // Log only when debugging is needed
+      // console.log(`[DataService] Fetching all records from table: ${tableName}`, { queryOptions });
       
       // Get the correct service name using the mapping
       const serviceName = TABLE_TO_SERVICE_MAP[tableName] || tableName;
@@ -142,7 +143,8 @@ export function useDataService<T extends Record<string, any>>(
         language: queryOptions?.language || defaultLanguage
       });
 
-      console.log(`[DataService] Fetch result for ${tableName}:`, response);
+      // Only log errors, not successful responses to reduce console noise
+      // console.log(`[DataService] Fetch result for ${tableName}:`, response);
 
       if (response.error) {
         throw response.error;

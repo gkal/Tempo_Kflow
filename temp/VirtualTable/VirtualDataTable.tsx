@@ -16,8 +16,7 @@ import {
   RowData,
   VisibilityState,
   ColumnResizeMode,
-  ColumnOrderState,
-  ColumnSizingState
+  ColumnOrderState
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, ChevronUp, Filter, ChevronsUpDown, GripVertical, GripHorizontal, Grid, Grip } from "lucide-react";
@@ -34,7 +33,6 @@ import {
 import { Check } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { normalizePhone } from "@/services/duplicate-detection/normalizers";
 
 // Define interfaces
 interface ColumnMeta {
@@ -387,67 +385,6 @@ export function VirtualDataTable<T extends Record<string, any>>({
     if (!debouncedSearchTerm || !searchColumn) return data;
     
     const searchLower = debouncedSearchTerm.toLowerCase();
-    
-    // Special case for phone search to use normalization
-    if (searchColumn === 'telephone') {
-      const normalizedSearchTerm = normalizePhone(searchLower);
-      
-      console.log('Phone search with normalized term:', normalizedSearchTerm);
-      
-      return data.filter(item => {
-        const value = item[searchColumn];
-        if (!value) return false;
-        
-        const normalizedValue = normalizePhone(String(value).toLowerCase());
-        
-        // Match the same approach as in the duplicate detection service
-        
-        // Special handling for format like 6983-50.50.43
-        const hasDashDotFormat = searchLower.includes('-') && 
-                              (searchLower.includes('.') || 
-                               searchLower.endsWith('-') || 
-                               searchLower.endsWith('-.'));
-        
-        // Build search conditions for different search strategies
-        let matched = false;
-        
-        // Strategy 1: Full text search with original format
-        if (String(value).toLowerCase().includes(searchLower)) {
-          matched = true;
-        }
-        
-        // Strategy 2: Substring search on normalized digits sequence
-        if (normalizedValue.includes(normalizedSearchTerm)) {
-          matched = true;
-        }
-        
-        // Strategy 3: Special format pattern matching
-        if (hasDashDotFormat) {
-          // Extract the digit groups from format like 6983-50.50.43
-          const firstPart = searchLower.split('-')[0];
-          if (firstPart && firstPart.length >= 4) {
-            const phoneValue = String(value).toLowerCase();
-            if (phoneValue.startsWith(firstPart + '-')) {
-              matched = true;
-            }
-          }
-        }
-        
-        // Strategy 4: For short phone numbers (5-6 digits), use broader matching with prefix
-        const digitsOnly = searchLower.replace(/\D/g, '');
-        if (digitsOnly.length >= 5 && digitsOnly.length <= 6) {
-          // Use the prefix for broader matching - this prevents records from disappearing as more digits are typed
-          const phonePrefix = digitsOnly.substring(0, Math.min(5, digitsOnly.length));
-          if (normalizedValue.includes(phonePrefix)) {
-            matched = true;
-          }
-        }
-        
-        return matched;
-      });
-    }
-    
-    // Default search for other columns
     return data.filter(item => {
       const value = item[searchColumn];
       return value ? String(value).toLowerCase().includes(searchLower) : false;
@@ -569,103 +506,34 @@ export function VirtualDataTable<T extends Record<string, any>>({
   }, []);
   
   const handleResizeStart = (columnId: string, event: React.MouseEvent | React.TouchEvent) => {
-    event.stopPropagation();
-    event.preventDefault();
-    
-    // Get the specific header element being resized
-    const headerElement = (event.target as HTMLElement).closest('th');
-    if (!headerElement) return;
-    
-    // Initial measurements
     const startX = 'touches' in event ? event.touches[0].clientX : event.clientX;
-    const startWidth = headerElement.getBoundingClientRect().width;
-    
-    // Create a resize overlay to prevent other elements from interfering
-    const overlay = document.createElement('div');
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.right = '0';
-    overlay.style.bottom = '0';
-    overlay.style.zIndex = '1000';
-    overlay.style.cursor = 'col-resize';
-    document.body.appendChild(overlay);
-    
-    // Create visual resize guide
-    const resizeGuide = document.createElement('div');
-    resizeGuide.style.position = 'absolute';
-    resizeGuide.style.top = '0';
-    resizeGuide.style.bottom = '0';
-    resizeGuide.style.width = '2px';
-    resizeGuide.style.backgroundColor = 'rgba(132, 169, 140, 0.4)'; // #84a98c with 40% opacity
-    resizeGuide.style.zIndex = '1001';
-    const tableElement = headerElement.closest('table');
-    const tableRect = tableElement?.getBoundingClientRect();
-    const headerRect = headerElement.getBoundingClientRect();
-    if (tableRect) {
-      resizeGuide.style.left = `${headerRect.right - tableRect.left}px`;
-      resizeGuide.style.height = `${tableRect.height}px`;
-      tableElement?.parentElement?.appendChild(resizeGuide);
-    }
-    
-    // Find column index based on header's position among its siblings
-    const headerCells = Array.from(headerElement.parentElement?.children || []);
-    const columnIndex = headerCells.indexOf(headerElement);
-    
-    // Track current width
-    let currentWidth = startWidth;
-    
+    const startWidth = columnSizing[columnId] || 150;
+    const headerElement = event.currentTarget.parentElement;
+    if (!headerElement) return;
+
     const handleMouseMove = (e: MouseEvent | TouchEvent) => {
       const currentX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const diff = currentX - startX;
+      const newWidth = Math.max(100, startWidth + diff); // Minimum width of 100px
       
-      // Calculate new width with a minimum of 40px to keep column visible
-      const newWidth = Math.max(40, startWidth + diff);
-      currentWidth = newWidth;
+      // Get the header content width
+      const headerContent = headerElement.querySelector('.header-content');
+      const headerWidth = headerContent ? headerContent.scrollWidth : 0;
       
-      // Update guide position
-      if (resizeGuide && tableRect) {
-        resizeGuide.style.left = `${headerRect.left - tableRect.left + newWidth}px`;
-      }
-      
-      // Apply width to all cells in this column immediately
-      if (tableElement) {
-        // Apply width to all th and td that are index'th child of their parent
-        const columnSelector = `th:nth-child(${columnIndex + 1}), td:nth-child(${columnIndex + 1})`;
-        const columnCells = tableElement.querySelectorAll(columnSelector);
-        
-        columnCells.forEach(cell => {
-          (cell as HTMLElement).style.width = `${newWidth}px`;
-          (cell as HTMLElement).style.minWidth = `${newWidth}px`;
-          
-          // Update content container
-          const content = cell.firstElementChild;
-          if (content) {
-            const padding = cell.tagName === 'TH' ? 40 : 24;
-            (content as HTMLElement).style.width = `${newWidth - padding}px`;
-            (content as HTMLElement).style.overflow = 'hidden';
-            (content as HTMLElement).style.textOverflow = 'ellipsis';
-            (content as HTMLElement).style.whiteSpace = 'nowrap';
-          }
-        });
+      // Don't allow resizing smaller than the header content
+      if (newWidth >= headerWidth) {
+        setColumnSizing(prev => ({
+          ...prev,
+          [columnId]: newWidth
+        }));
       }
     };
 
     const handleMouseUp = () => {
-      // Remove all event listeners
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('touchmove', handleMouseMove);
       document.removeEventListener('touchend', handleMouseUp);
-      
-      // Remove the overlay and guide
-      document.body.removeChild(overlay);
-      resizeGuide.remove();
-      
-      // Update the state with the final width
-      const finalSizing = {...columnSizing};
-      finalSizing[columnId] = currentWidth;
-      setColumnSizing(finalSizing);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -885,216 +753,201 @@ export function VirtualDataTable<T extends Record<string, any>>({
       )}
       
       {/* Table */}
-      <div className={cn(
-        "w-full rounded-md mt-4 border border-[#52796f] bg-[#2f3e46] text-black overflow-x-auto",
-        containerClassName
-      )}>
-        <div className="overflow-x-auto overflow-y-auto relative" ref={parentRef} style={{ height: '60vh' }}>
+      <div className="border border-[#52796f] bg-[#2f3e46]">
+        <div className="overflow-auto relative" ref={parentRef} style={{ height: '60vh' }}>
           {isDragging && (
             <div className="absolute inset-0 bg-[#354f52]/30 pointer-events-none z-10" />
           )}
-          <div className="inline-block min-w-max">
-            <table className="border-collapse [&_th]:border-0 [&_td]:border-0" style={{ tableLayout: 'fixed', width: 'max-content' }}>
-              <thead className="bg-[#2f3e46] sticky top-0 z-20 after:absolute after:content-[''] after:left-0 after:right-0 after:bottom-0 after:h-[1px] after:bg-[#52796f]">
-                {table.getHeaderGroups().map(headerGroup => (
-                  <tr key={headerGroup.id} className="[&_th]:border-0">
-                    {headerGroup.headers.map((header, i) => {
-                      const meta = header.column.columnDef.meta as { className?: string; headerClassName?: string } | undefined;
-                      const className = meta?.className;
-                      const isDraggedColumn = isDragging && draggedColumnId === header.column.id;
-                      
-                      return (
-                        <th 
-                          key={header.id}
-                          data-column-id={header.column.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, header.column.id)}
-                          onDragOver={(e) => handleDragOver(e, header.column.id)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, header.column.id)}
-                          onDragEnd={handleDragEnd}
-                          className={cn(
-                            "px-3 py-3 text-left text-sm font-medium text-[#84a98c] hover:text-white whitespace-nowrap relative bg-[#2f3e46] h-[48px] border-0 transition-all duration-150",
-                            i < headerGroup.headers.length - 1 && "after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-px after:bg-[#52796f]/50",
-                            header.column.getCanSort() ? "cursor-pointer select-none" : "",
-                            isDraggedColumn && "bg-[#84a98c]/20 backdrop-blur-sm shadow-lg z-30",
-                            dropTargetId === header.column.id && "before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-[#84a98c] before:z-40",
-                            className
-                          )}
-                          style={{
-                            width: `${columnSizing[header.column.id] || header.getSize()}px`,
-                            minWidth: `${columnSizing[header.column.id] || header.getSize()}px`,
-                            boxSizing: 'border-box',
-                            overflow: 'hidden'
-                          }}
-                        >
-                          <div className="flex items-center h-full">
-                            <div
-                              className={cn(
-                                "cursor-grab active:cursor-grabbing mr-2",
-                                isDraggedColumn && "cursor-grabbing"
-                              )}
-                            >
-                              <Grip className={cn(
-                                "h-3 w-3",
-                                isDraggedColumn ? "text-[#84a98c]" : "text-[#52796f] hover:text-[#84a98c]"
-                              )} />
-                            </div>
-                            
-                            {/* Header text and sort icon */}
-                            <div 
-                              className="flex-1 flex items-center justify-center"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (header.column.getCanSort()) {
-                                  header.column.getToggleSortingHandler()(e);
-                                }
-                              }}
-                            >
-                              <div className="inline-flex items-center">
-                                <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                                {header.column.getCanSort() && header.column.getIsSorted() && (
-                                  <ChevronUp className={cn(
-                                    "h-4 w-4 text-white ml-3",
-                                    header.column.getIsSorted() === "desc" && "rotate-180"
-                                  )} />
-                                )}
-                              </div>
-                            </div>
-                            
-                            {/* Resize handle */}
-                            <div
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleResizeStart(header.column.id, e);
-                              }}
-                              onTouchStart={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleResizeStart(header.column.id, e);
-                              }}
-                              onDoubleClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleDoubleClick(header.column.id);
-                              }}
-                              className={cn(
-                                "absolute right-0 top-0 h-full w-4 cursor-col-resize select-none touch-none",
-                                "hover:before:content-[''] hover:before:absolute hover:before:h-full hover:before:w-[3px] hover:before:bg-[#84a98c] hover:before:right-0 hover:before:top-0",
-                                "active:before:content-[''] active:before:absolute active:before:h-full active:before:w-[3px] active:before:bg-[#84a98c] active:before:right-0 active:before:top-0",
-                                header.column.getIsResizing() ? "before:content-[''] before:absolute before:h-full before:w-[3px] before:bg-[#3b82f6] before:right-0 before:top-0 before:shadow-[0_0_8px_rgba(59,130,246,0.5)]" : ""
-                              )}
-                              style={{ cursor: 'col-resize' }}
-                            />
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </thead>
-              <tbody className="divide-y divide-[#52796f]/20">
-                {paddingTop > 0 && (
-                  <tr>
-                    <td colSpan={tableColumns.length} style={{ height: `${paddingTop}px` }} />
-                  </tr>
-                )}
-                
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={tableColumns.length} className="text-center py-8">
-                      <div className="flex justify-center items-center text-[#84a98c]">
-                        <LoadingSpinner fullScreen={false} />
-                        <span className="ml-3">{loadingStateMessage || 'Loading...'}</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filteredData.length === 0 ? (
-                  <tr style={{ height: 'calc(60vh - 100px)' }}>
-                    <td 
-                      colSpan={tableColumns.length} 
-                      className="text-center"
-                    >
-                      <div className="absolute inset-0 flex items-center justify-center w-full h-full">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <span className="text-[#cad2c5] text-lg font-medium">{emptyStateMessage || 'Δεν βρέθηκαν αποτελέσματα'}</span>
-                          <span className="text-[#84a98c] text-sm">Αλλάξτε τα κριτήρια αναζήτησης και δοκιμάστε ξανά.</span>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  // Virtualized rows
-                  virtualRows.map(virtualRow => {
-                    const row = rows[virtualRow.index];
-                    const rowData = row.original as T;
-                    const rowId = getRowId(rowData);
-                    const isExpanded = !!expandedRowIds[rowId];
+          <table className="w-full border-collapse [&_th]:border-0 [&_td]:border-0">
+            <thead className="bg-[#2f3e46] sticky top-0 z-20 after:absolute after:content-[''] after:left-0 after:right-0 after:bottom-0 after:h-[1px] after:bg-[#52796f]">
+              {table.getHeaderGroups().map(headerGroup => (
+                <tr key={headerGroup.id} className="[&_th]:border-0">
+                  {headerGroup.headers.map((header, i) => {
+                    const meta = header.column.columnDef.meta as { className?: string; headerClassName?: string } | undefined;
+                    const className = meta?.className;
+                    const isDraggedColumn = isDragging && draggedColumnId === header.column.id;
                     
                     return (
-                      <React.Fragment key={rowId}>
-                        {/* Main row */}
-                        <tr
-                          className={cn(
-                            "hover:bg-[#354f52]/50 transition-colors duration-150",
-                            onRowClick && "cursor-pointer",
-                            isExpanded && "bg-[#354f52]/30 sticky top-0 z-10"
-                          )}
-                          onClick={e => onRowClick && handleRowClick(e, rowData)}
-                          data-customer-id={rowId}
-                        >
-                          {row.getVisibleCells().map((cell, cellIndex) => {
-                            // Safe access to meta with type assertion
-                            const meta = cell.column.columnDef.meta as { className?: string; headerClassName?: string } | undefined;
-                            const className = meta?.className;
-                            const isLastColumn = cellIndex === row.getVisibleCells().length - 1;
-                            
-                            return (
-                              <td
-                                key={cell.id}
-                                data-cell-id={cell.id}
-                                className={cn(
-                                  "px-2 py-2 text-[#cad2c5] text-sm",
-                                  !isLastColumn && "border-r border-[#52796f]",
-                                  className
-                                )}
-                                style={{
-                                  width: `${columnSizing[cell.column.id] || cell.column.getSize()}px`,
-                                  overflow: 'hidden',
-                                  boxSizing: 'border-box'
-                                }}
-                              >
-                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                        
-                        {/* Expanded content */}
-                        {isExpanded && renderExpandedContent && (
-                          <tr className="bg-[#2f3e46]" data-customer-id={rowId}>
-                            <td colSpan={tableColumns.length} className="px-0 py-0">
-                              <div className="relative">
-                                {renderExpandedContent(rowData)}
-                              </div>
-                            </td>
-                          </tr>
+                      <th 
+                        key={header.id}
+                        data-column-id={header.column.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, header.column.id)}
+                        onDragOver={(e) => handleDragOver(e, header.column.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, header.column.id)}
+                        onDragEnd={handleDragEnd}
+                        className={cn(
+                          "px-3 py-3 text-left text-sm font-medium text-[#84a98c] hover:text-white whitespace-nowrap relative bg-[#2f3e46] h-[48px] border-0 transition-all duration-150",
+                          i < headerGroup.headers.length - 1 && "after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-px after:bg-[#52796f]/50",
+                          header.column.getCanSort() ? "cursor-pointer select-none" : "",
+                          isDraggedColumn && "bg-[#84a98c]/20 backdrop-blur-sm shadow-lg z-30",
+                          dropTargetId === header.column.id && "before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-[#84a98c] before:z-40",
+                          className
                         )}
-                      </React.Fragment>
+                        style={{
+                          width: header.getSize(),
+                          minWidth: header.getSize(),
+                        }}
+                      >
+                        <div className="flex items-center h-full">
+                          <div
+                            className={cn(
+                              "cursor-grab active:cursor-grabbing mr-2",
+                              isDraggedColumn && "cursor-grabbing"
+                            )}
+                          >
+                            <Grip className={cn(
+                              "h-3 w-3",
+                              isDraggedColumn ? "text-[#84a98c]" : "text-[#52796f] hover:text-[#84a98c]"
+                            )} />
+                          </div>
+                          
+                          {/* Header text and sort icon */}
+                          <div 
+                            className="flex-1 flex items-center justify-center"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (header.column.getCanSort()) {
+                                header.column.getToggleSortingHandler()(e);
+                              }
+                            }}
+                          >
+                            <div className="inline-flex items-center">
+                              <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                              {header.column.getCanSort() && header.column.getIsSorted() && (
+                                <ChevronUp className={cn(
+                                  "h-4 w-4 text-white ml-3",
+                                  header.column.getIsSorted() === "desc" && "rotate-180"
+                                )} />
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Resize handle */}
+                          <div
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleResizeStart(header.column.id, e);
+                            }}
+                            onTouchStart={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleResizeStart(header.column.id, e);
+                            }}
+                            onDoubleClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDoubleClick(header.column.id);
+                            }}
+                            className={`absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none hover:bg-[#52796f]/50 ${
+                              header.column.getIsResizing() ? 'bg-[#84a98c]' : ''
+                            }`}
+                            style={{ cursor: 'col-resize' }}
+                          />
+                        </div>
+                      </th>
                     );
-                  })
-                )}
-                
-                {paddingBottom > 0 && (
-                  <tr>
-                    <td colSpan={tableColumns.length} style={{ height: `${paddingBottom}px` }} />
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  })}
+                </tr>
+              ))}
+            </thead>
+            <tbody className="divide-y divide-[#52796f]/20">
+              {paddingTop > 0 && (
+                <tr>
+                  <td colSpan={tableColumns.length} style={{ height: `${paddingTop}px` }} />
+                </tr>
+              )}
+              
+              {isLoading ? (
+                <tr>
+                  <td colSpan={tableColumns.length} className="text-center py-8">
+                    <div className="flex justify-center items-center text-[#84a98c]">
+                      <LoadingSpinner fullScreen={false} />
+                      <span className="ml-3">{loadingStateMessage || 'Loading...'}</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredData.length === 0 ? (
+                <tr style={{ height: 'calc(60vh - 100px)' }}>
+                  <td 
+                    colSpan={tableColumns.length} 
+                    className="text-center"
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center w-full h-full">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <span className="text-[#cad2c5] text-lg font-medium">{emptyStateMessage || 'Δεν βρέθηκαν αποτελέσματα'}</span>
+                        <span className="text-[#84a98c] text-sm">Αλλάξτε τα κριτήρια αναζήτησης και δοκιμάστε ξανά.</span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                // Virtualized rows
+                virtualRows.map(virtualRow => {
+                  const row = rows[virtualRow.index];
+                  const rowData = row.original as T;
+                  const rowId = getRowId(rowData);
+                  const isExpanded = !!expandedRowIds[rowId];
+                  
+                  return (
+                    <React.Fragment key={rowId}>
+                      {/* Main row */}
+                      <tr
+                        className={cn(
+                          "hover:bg-[#354f52]/50 transition-colors duration-150",
+                          onRowClick && "cursor-pointer",
+                          isExpanded && "bg-[#354f52]/30 sticky top-0 z-10"
+                        )}
+                        onClick={e => onRowClick && handleRowClick(e, rowData)}
+                        data-customer-id={rowId}
+                      >
+                        {row.getVisibleCells().map((cell, cellIndex) => {
+                          // Safe access to meta with type assertion
+                          const meta = cell.column.columnDef.meta as { className?: string; headerClassName?: string } | undefined;
+                          const className = meta?.className;
+                          const isLastColumn = cellIndex === row.getVisibleCells().length - 1;
+                          
+                          return (
+                            <td
+                              key={cell.id}
+                              data-cell-id={cell.id}
+                              className={cn(
+                                "px-2 py-2 text-[#cad2c5] text-sm",
+                                !isLastColumn && "border-r border-[#52796f]",
+                                className
+                              )}
+                            >
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                      
+                      {/* Expanded content */}
+                      {isExpanded && renderExpandedContent && (
+                        <tr className="bg-[#2f3e46]" data-customer-id={rowId}>
+                          <td colSpan={tableColumns.length} className="px-0 py-0">
+                            <div className="relative">
+                              {renderExpandedContent(rowData)}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+              
+              {paddingBottom > 0 && (
+                <tr>
+                  <td colSpan={tableColumns.length} style={{ height: `${paddingBottom}px` }} />
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
       

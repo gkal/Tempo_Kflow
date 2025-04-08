@@ -206,9 +206,24 @@ export const findPotentialDuplicates = async (
         }
       }
       
-      // Always also add the regular phone match condition
-      conditions.push(`telephone.ilike.%${normalizedPhone}%`);
-      console.log('Added telephone condition:', `telephone.ilike.%${normalizedPhone}%`);
+      // Only search for phone if we have at least 5 digits
+      if (normalizedPhone.length >= 5) {
+        // IMPORTANT FIX: For short phone numbers between 5-6 digits, search more broadly
+        // This ensures we don't lose matches when typing additional digits
+        if (normalizedPhone.length <= 6) {
+          // For short phone numbers, search more broadly - using the first few digits only
+          // This prevents records from disappearing as more digits are typed
+          const phonePrefix = normalizedPhone.substring(0, Math.min(5, normalizedPhone.length));
+          conditions.push(`telephone.ilike.%${phonePrefix}%`);
+          console.log('Added broader phone condition for short phone:', `telephone.ilike.%${phonePrefix}%`);
+        } else {
+          // For longer phones, use the full normalized number
+          conditions.push(`telephone.ilike.%${normalizedPhone}%`);
+          console.log('Added telephone condition:', `telephone.ilike.%${normalizedPhone}%`);
+        }
+      } else {
+        console.log('Phone too short for searching, skipping phone condition');
+      }
     }
     
     if (searchInput.afm) {
@@ -261,15 +276,24 @@ export const findPotentialDuplicates = async (
     if (normalizedPhone) {
       console.log('Phone search detected, showing ALL records found with phone match');
       
-      // Include ALL records from phone search, regardless of score
-      filteredCustomers = scoredCustomers;
-      
-      // Flag all phone matches for debugging
-      filteredCustomers.forEach(c => {
-        const phoneScore = c.originalScores?.phoneSimilarity || 0;
+      // Include ALL records from phone search with any phone similarity
+      filteredCustomers = scoredCustomers.filter(customer => {
+        const phoneScore = customer.originalScores?.phoneSimilarity || 0;
+        
+        // If there's any phone similarity, keep the record (even if score is low)
         if (phoneScore > 0) {
-          console.log(`KEEPING phone match: ${c.company_name} - phone similarity: ${phoneScore}`);
+          console.log(`KEEPING phone match: ${customer.company_name} - phone similarity: ${phoneScore}`);
+          return true;
         }
+        
+        // Also keep high-scoring name matches even during phone search
+        const nameScore = customer.originalScores?.nameSimilarity || 0;
+        if (nameScore >= 65) {
+          console.log(`KEEPING high name match during phone search: ${customer.company_name} - name similarity: ${nameScore}`);
+          return true;
+        }
+        
+        return false;
       });
     } else {
       // If not searching by phone, apply normal filtering
@@ -340,8 +364,8 @@ export const findExactPhoneMatches = async (
     // Extract just the significant digits without the formatting
     const digits = normalizedPhone.replace(/\D/g, '');
     
-    if (digits.length < 3) { // LOWERED minimum length to 3 to catch even more partial matches
-      console.log('findExactPhoneMatches: Phone number too short, minimum 3 digits required');
+    if (digits.length < 5) { // Increased minimum length to 5 to align with frontend requirements
+      console.log('findExactPhoneMatches: Phone number too short, minimum 5 digits required');
       return [];
     }
     
@@ -436,13 +460,13 @@ export const findExactPhoneMatches = async (
       }
       
       // If still no results, try with just the first 4 digits as a last resort
-      if (matchedCustomers.length === 0 && digits.length >= 4) {
-        console.log('Trying with first 4 digits as last resort:', digits.substring(0, 4));
+      if (matchedCustomers.length === 0 && digits.length >= 5) {
+        console.log('Trying with first 5 digits as last resort:', digits.substring(0, 5));
         
         const { data: lastResortMatches, error: lastResortError } = await supabase
           .from('customers')
           .select('*')
-          .ilike('telephone', `%${digits.substring(0, 4)}%`)
+          .ilike('telephone', `%${digits.substring(0, 5)}%`)
           .is('deleted', false)
           .limit(10);
           

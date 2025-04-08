@@ -20,7 +20,7 @@ import { checkForDuplicates } from "./utils/customerValidation";
 import { getDuplicateMatchReasons } from "./utils/customerFormUtils";
 import { useCustomerForm } from "./CustomerFormProvider";
 import { Customer } from "./types/customerTypes";
-import * as duplicateDetectionService from '@/services/duplicate-detection';
+import * as duplicateDetectionService from "@/services/duplicate-detection";
 import { createPrefixedLogger } from "@/utils/loggingUtils";
 
 // Initialize logger
@@ -55,7 +55,10 @@ export const CustomerDuplicateDetection: React.FC = () => {
           // Call the duplicate detection service
           const matches = await checkForDuplicates(
             formData,
-            duplicateDetectionService.checkDuplicates
+            async (searchInput) => {
+              // Use findPotentialDuplicates directly since checkDuplicates isn't available
+              return await duplicateDetectionService.findPotentialDuplicates(searchInput);
+            }
           );
           
           // Update the list of potential matches

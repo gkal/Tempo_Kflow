@@ -228,7 +228,10 @@ export function VirtualDataTable<T extends Record<string, any>>({
   stabilizeExpandedRows = true,
 }: VirtualDataTableProps<T>) {
   // State
-  const [sorting, setSorting] = useState<SortingState>(() => []);
+  const [sorting, setSorting] = useState<SortingState>(() => [
+    // Set initial sorting to match the search column
+    { id: initialSearchColumn || (searchColumns[0]?.accessor || ""), desc: false }
+  ]);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -316,20 +319,31 @@ export function VirtualDataTable<T extends Record<string, any>>({
     return columns.map((column) => {
       const columnId = column.id || column.accessorKey || "";
       const width = columnSizing[columnId] || column.meta?.initialWidth || 150;
+      const isCompanyName = columnId === 'company_name';
       
       if (column.accessorKey) {
         return columnHelper.accessor(column.accessorKey as any, {
           id: columnId,
           header: () => column.header,
           cell: column.cell ? 
-            ({ getValue, row }) => (
-              <div style={{ width: width - 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {column.cell?.({ getValue: () => getValue(), row: row.original }) as React.ReactNode}
-              </div>
-            ) : 
+            ({ getValue, row }) => {
+              if (isCompanyName) {
+                // For company_name, don't wrap with our spacing since it has its own layout
+                return column.cell?.({ getValue: () => getValue(), row: row.original }) as React.ReactNode;
+              }
+              return (
+                <div className="w-full overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }}>
+                  <div className="overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }}>
+                    {column.cell?.({ getValue: () => getValue(), row: row.original }) as React.ReactNode}
+                  </div>
+                </div>
+              );
+            } : 
             ({ getValue }) => (
-              <div style={{ width: width - 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {(getValue() as string) || <span className="text-xs text-[#52796f]">-</span>}
+              <div className="w-full overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }}>
+                <div className="overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }}>
+                  {(getValue() as string) || <span className="text-xs text-[#52796f]">-</span>}
+                </div>
               </div>
             ),
           enableSorting: column.enableSorting !== false,
@@ -341,14 +355,24 @@ export function VirtualDataTable<T extends Record<string, any>>({
           id: columnId,
           header: () => column.header,
           cell: column.cell ? 
-            ({ row }) => (
-              <div style={{ width: width - 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {column.cell?.({ row: row.original }) as React.ReactNode}
-              </div>
-            ) : 
+            ({ row }) => {
+              if (isCompanyName) {
+                // For company_name, don't wrap with our spacing since it has its own layout
+                return column.cell?.({ row: row.original }) as React.ReactNode;
+              }
+              return (
+                <div className="w-full overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }}>
+                  <div className="overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }}>
+                    {column.cell?.({ row: row.original }) as React.ReactNode}
+                  </div>
+                </div>
+              );
+            } : 
             () => (
-              <div style={{ width: width - 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {""}
+              <div className="w-full overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }}>
+                <div className="overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }}>
+                  {""}
+                </div>
               </div>
             ),
           meta: column.meta,
@@ -392,6 +416,9 @@ export function VirtualDataTable<T extends Record<string, any>>({
     if (searchColumn === 'telephone') {
       const normalizedSearchTerm = normalizePhone(searchLower);
       
+      // Require minimum 3 digits for phone search (reduced from 5 as requested)
+      if (normalizedSearchTerm.length < 3) return data; 
+      
       console.log('Phone search with normalized term:', normalizedSearchTerm);
       
       return data.filter(item => {
@@ -402,48 +429,39 @@ export function VirtualDataTable<T extends Record<string, any>>({
         
         // Match the same approach as in the duplicate detection service
         
-        // Special handling for format like 6983-50.50.43
-        const hasDashDotFormat = searchLower.includes('-') && 
-                              (searchLower.includes('.') || 
-                               searchLower.endsWith('-') || 
-                               searchLower.endsWith('-.'));
-        
-        // Build search conditions for different search strategies
-        let matched = false;
-        
-        // Strategy 1: Full text search with original format
-        if (String(value).toLowerCase().includes(searchLower)) {
-          matched = true;
-        }
-        
-        // Strategy 2: Substring search on normalized digits sequence
+        // 1. Exact match check using normalized values
         if (normalizedValue.includes(normalizedSearchTerm)) {
-          matched = true;
+          return true;
         }
         
-        // Strategy 3: Special format pattern matching
+        // 2. Handle special format like 6983-50.50.43
+        const hasDashDotFormat = searchLower.includes('-') && 
+                               (searchLower.includes('.') || 
+                                searchLower.endsWith('-') || 
+                                searchLower.endsWith('-.'));
+                                
         if (hasDashDotFormat) {
-          // Extract the digit groups from format like 6983-50.50.43
-          const firstPart = searchLower.split('-')[0];
-          if (firstPart && firstPart.length >= 4) {
+          // Check prefix match for dash-dot format
+          const prefix = searchLower.split('-')[0];
+          if (prefix && prefix.length >= 4) {
             const phoneValue = String(value).toLowerCase();
-            if (phoneValue.startsWith(firstPart + '-')) {
-              matched = true;
+            if (phoneValue.startsWith(prefix + '-')) {
+              return true;
             }
           }
         }
         
-        // Strategy 4: For short phone numbers (5-6 digits), use broader matching with prefix
+        // 3. For short phone numbers (3-6 digits), use broader matching
         const digitsOnly = searchLower.replace(/\D/g, '');
-        if (digitsOnly.length >= 5 && digitsOnly.length <= 6) {
-          // Use the prefix for broader matching - this prevents records from disappearing as more digits are typed
-          const phonePrefix = digitsOnly.substring(0, Math.min(5, digitsOnly.length));
+        if (digitsOnly.length >= 3 && digitsOnly.length <= 6) {
+          // Use the first digits for broader matching
+          const phonePrefix = digitsOnly.substring(0, Math.min(digitsOnly.length, 6));
           if (normalizedValue.includes(phonePrefix)) {
-            matched = true;
+            return true;
           }
         }
-        
-        return matched;
+                
+        return false;
       });
     }
     
@@ -465,6 +483,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
     },
     onColumnOrderChange: setColumnOrder,
     onSortingChange: setSorting,
+    onColumnSizingChange: setColumnSizing,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -472,9 +491,12 @@ export function VirtualDataTable<T extends Record<string, any>>({
     getFacetedUniqueValues: getFacetedUniqueValues(),
     getFacetedMinMaxValues: getFacetedMinMaxValues(),
     enableMultiSort: false,
-    enableColumnResizing: false,
+    enableColumnResizing: true,
+    columnResizeMode: "onEnd" as ColumnResizeMode,
     defaultColumn: {
-      size: 150
+      size: 150,
+      minSize: 10,
+      maxSize: 1000
     }
   });
   
@@ -564,10 +586,11 @@ export function VirtualDataTable<T extends Record<string, any>>({
   // Handle search column change
   const handleColumnChange = useCallback((value: string) => {
     setSearchColumn(value);
-    // Remove the automatic sorting when changing column
-    // setSorting([{ id: value, desc: false }]);
+    // Update sorting to match the selected column
+    setSorting([{ id: value, desc: false }]);
   }, []);
   
+  // Completely redesigned resize handler that isolates column resizing
   const handleResizeStart = (columnId: string, event: React.MouseEvent | React.TouchEvent) => {
     event.stopPropagation();
     event.preventDefault();
@@ -591,66 +614,24 @@ export function VirtualDataTable<T extends Record<string, any>>({
     overlay.style.cursor = 'col-resize';
     document.body.appendChild(overlay);
     
-    // Create visual resize guide
-    const resizeGuide = document.createElement('div');
-    resizeGuide.style.position = 'absolute';
-    resizeGuide.style.top = '0';
-    resizeGuide.style.bottom = '0';
-    resizeGuide.style.width = '2px';
-    resizeGuide.style.backgroundColor = 'rgba(132, 169, 140, 0.4)'; // #84a98c with 40% opacity
-    resizeGuide.style.zIndex = '1001';
-    const tableElement = headerElement.closest('table');
-    const tableRect = tableElement?.getBoundingClientRect();
-    const headerRect = headerElement.getBoundingClientRect();
-    if (tableRect) {
-      resizeGuide.style.left = `${headerRect.right - tableRect.left}px`;
-      resizeGuide.style.height = `${tableRect.height}px`;
-      tableElement?.parentElement?.appendChild(resizeGuide);
-    }
-    
-    // Find column index based on header's position among its siblings
-    const headerCells = Array.from(headerElement.parentElement?.children || []);
-    const columnIndex = headerCells.indexOf(headerElement);
-    
-    // Track current width
-    let currentWidth = startWidth;
-    
     const handleMouseMove = (e: MouseEvent | TouchEvent) => {
       const currentX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const diff = currentX - startX;
       
-      // Calculate new width with a minimum of 40px to keep column visible
-      const newWidth = Math.max(40, startWidth + diff);
-      currentWidth = newWidth;
+      // Calculate new width with a minimum of 20px to keep column visible
+      const newWidth = Math.max(20, startWidth + diff);
       
-      // Update guide position
-      if (resizeGuide && tableRect) {
-        resizeGuide.style.left = `${headerRect.left - tableRect.left + newWidth}px`;
-      }
+      // Update just this column - critical for independent sizing
+      const newSizing = {...columnSizing};
+      newSizing[columnId] = newWidth;
       
-      // Apply width to all cells in this column immediately
-      if (tableElement) {
-        // Apply width to all th and td that are index'th child of their parent
-        const columnSelector = `th:nth-child(${columnIndex + 1}), td:nth-child(${columnIndex + 1})`;
-        const columnCells = tableElement.querySelectorAll(columnSelector);
-        
-        columnCells.forEach(cell => {
-          (cell as HTMLElement).style.width = `${newWidth}px`;
-          (cell as HTMLElement).style.minWidth = `${newWidth}px`;
-          
-          // Update content container
-          const content = cell.firstElementChild;
-          if (content) {
-            const padding = cell.tagName === 'TH' ? 40 : 24;
-            (content as HTMLElement).style.width = `${newWidth - padding}px`;
-            (content as HTMLElement).style.overflow = 'hidden';
-            (content as HTMLElement).style.textOverflow = 'ellipsis';
-            (content as HTMLElement).style.whiteSpace = 'nowrap';
-          }
-        });
-      }
+      // Apply the change immediately to avoid visual lag
+      headerElement.style.width = `${newWidth}px`;
+      
+      // Update state (this doesn't cause immediate re-render)
+      setColumnSizing(newSizing);
     };
-
+    
     const handleMouseUp = () => {
       // Remove all event listeners
       document.removeEventListener('mousemove', handleMouseMove);
@@ -658,71 +639,21 @@ export function VirtualDataTable<T extends Record<string, any>>({
       document.removeEventListener('touchmove', handleMouseMove);
       document.removeEventListener('touchend', handleMouseUp);
       
-      // Remove the overlay and guide
+      // Remove the overlay
       document.body.removeChild(overlay);
-      resizeGuide.remove();
       
-      // Update the state with the final width
+      // Final update to ensure state matches DOM
+      const finalWidth = headerElement.getBoundingClientRect().width;
       const finalSizing = {...columnSizing};
-      finalSizing[columnId] = currentWidth;
+      finalSizing[columnId] = finalWidth;
       setColumnSizing(finalSizing);
     };
-
+    
+    // Add event listeners for mouse/touch move and up/end
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('touchmove', handleMouseMove);
     document.addEventListener('touchend', handleMouseUp);
-  };
-
-  // Function to calculate the maximum content width for a column
-  const calculateMaxContentWidth = (columnId: string) => {
-    const column = table.getColumn(columnId);
-    if (!column) return 150;
-
-    let maxWidth = 0;
-    
-    // Get header width
-    const headerElement = document.querySelector(`[data-column-id="${columnId}"]`);
-    if (headerElement) {
-      const headerContent = headerElement.querySelector('.header-content');
-      if (headerContent) {
-        maxWidth = Math.max(maxWidth, headerContent.getBoundingClientRect().width);
-      }
-    }
-
-    // Get content width from all visible rows
-    const rows = table.getRowModel().rows;
-    rows.forEach(row => {
-      const cell = row.getVisibleCells().find(cell => cell.column.id === columnId);
-      if (cell) {
-        const cellElement = document.querySelector(`[data-cell-id="${cell.id}"]`);
-        if (cellElement) {
-          const content = cellElement.firstElementChild;
-          if (content) {
-            // Get the actual content width without padding
-            const contentWidth = content.getBoundingClientRect().width;
-            maxWidth = Math.max(maxWidth, contentWidth);
-          }
-        }
-      }
-    });
-
-    // Add padding and some buffer
-    return Math.max(100, maxWidth + 48); // 24px padding on each side
-  };
-
-  // Function to handle double click for auto-resize
-  const handleDoubleClick = (columnId: string) => {
-    const maxWidth = calculateMaxContentWidth(columnId);
-    const currentWidth = columnSizing[columnId] || 150;
-    
-    // Only update if the new width is different
-    if (maxWidth !== currentWidth) {
-      setColumnSizing(prev => ({
-        ...prev,
-        [columnId]: maxWidth
-      }));
-    }
   };
   
   const handleDragStart = (e: React.DragEvent, columnId: string) => {
@@ -885,16 +816,34 @@ export function VirtualDataTable<T extends Record<string, any>>({
       )}
       
       {/* Table */}
-      <div className={cn(
-        "w-full rounded-md mt-4 border border-[#52796f] bg-[#2f3e46] text-black overflow-x-auto",
-        containerClassName
-      )}>
-        <div className="overflow-x-auto overflow-y-auto relative" ref={parentRef} style={{ height: '60vh' }}>
+      <div className="border border-[#52796f] bg-[#2f3e46] relative">
+        {/* Right border element */}
+        <div className="absolute top-0 right-0 bottom-0 w-[2px] bg-[#52796f] z-30"></div>
+        <div 
+          className="overflow-x-auto overflow-y-auto relative" 
+          ref={parentRef} 
+          style={{ height: '60vh', width: '100%' }}
+        >
           {isDragging && (
             <div className="absolute inset-0 bg-[#354f52]/30 pointer-events-none z-10" />
           )}
           <div className="inline-block min-w-max">
-            <table className="border-collapse [&_th]:border-0 [&_td]:border-0" style={{ tableLayout: 'fixed', width: 'max-content' }}>
+            <table 
+              className="border-collapse [&_th]:border-0 [&_td]:border-0" 
+              style={{ tableLayout: 'fixed', width: 'max-content', borderSpacing: 0 }}
+            >
+              <colgroup>
+                {table.getAllColumns().map((column, index) => (
+                  <col 
+                    key={column.id} 
+                    data-col-id={column.id}
+                    style={{ 
+                      width: `${columnSizing[column.id] || column.getSize()}px`,
+                      minWidth: '10px'
+                    }} 
+                  />
+                ))}
+              </colgroup>
               <thead className="bg-[#2f3e46] sticky top-0 z-20 after:absolute after:content-[''] after:left-0 after:right-0 after:bottom-0 after:h-[1px] after:bg-[#52796f]">
                 {table.getHeaderGroups().map(headerGroup => (
                   <tr key={headerGroup.id} className="[&_th]:border-0">
@@ -902,6 +851,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
                       const meta = header.column.columnDef.meta as { className?: string; headerClassName?: string } | undefined;
                       const className = meta?.className;
                       const isDraggedColumn = isDragging && draggedColumnId === header.column.id;
+                      const isLastHeader = i === headerGroup.headers.length - 1;
                       
                       return (
                         <th 
@@ -914,24 +864,24 @@ export function VirtualDataTable<T extends Record<string, any>>({
                           onDrop={(e) => handleDrop(e, header.column.id)}
                           onDragEnd={handleDragEnd}
                           className={cn(
-                            "px-3 py-3 text-left text-sm font-medium text-[#84a98c] hover:text-white whitespace-nowrap relative bg-[#2f3e46] h-[48px] border-0 transition-all duration-150",
-                            i < headerGroup.headers.length - 1 && "after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-px after:bg-[#52796f]/50",
+                            "p-2 text-center text-sm font-medium text-[#84a98c] hover:text-white whitespace-nowrap relative bg-[#2f3e46] h-[48px] border-0 transition-all duration-150",
+                            i < headerGroup.headers.length - 1 ? "after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-px after:bg-[#52796f]/50" : "",
+                            isLastHeader && "border-r-[2px] border-r-[#52796f]",
                             header.column.getCanSort() ? "cursor-pointer select-none" : "",
                             isDraggedColumn && "bg-[#84a98c]/20 backdrop-blur-sm shadow-lg z-30",
                             dropTargetId === header.column.id && "before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-[#84a98c] before:z-40",
                             className
                           )}
                           style={{
-                            width: `${columnSizing[header.column.id] || header.getSize()}px`,
-                            minWidth: `${columnSizing[header.column.id] || header.getSize()}px`,
-                            boxSizing: 'border-box',
-                            overflow: 'hidden'
+                            width: `${columnSizing[header.column.id] || header.column.getSize()}px`,
+                            overflow: 'hidden',
+                            boxSizing: 'border-box'
                           }}
                         >
-                          <div className="flex items-center h-full">
+                          <div className="flex items-center justify-center h-full">
                             <div
                               className={cn(
-                                "cursor-grab active:cursor-grabbing mr-2",
+                                "cursor-grab active:cursor-grabbing mr-1 shrink-0",
                                 isDraggedColumn && "cursor-grabbing"
                               )}
                             >
@@ -943,7 +893,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
                             
                             {/* Header text and sort icon */}
                             <div 
-                              className="flex-1 flex items-center justify-center"
+                              className="inline-flex items-center justify-center header-content overflow-hidden text-ellipsis whitespace-nowrap w-full"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -951,16 +901,18 @@ export function VirtualDataTable<T extends Record<string, any>>({
                                   header.column.getToggleSortingHandler()(e);
                                 }
                               }}
+                              style={{ 
+                                maxWidth: 'calc(100% - 8px)',
+                                overflow: 'hidden'
+                              }}
                             >
-                              <div className="inline-flex items-center">
-                                <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                                {header.column.getCanSort() && header.column.getIsSorted() && (
-                                  <ChevronUp className={cn(
-                                    "h-4 w-4 text-white ml-3",
-                                    header.column.getIsSorted() === "desc" && "rotate-180"
-                                  )} />
-                                )}
-                              </div>
+                              <span className="overflow-hidden text-ellipsis whitespace-nowrap max-w-full block text-center">{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                              {header.column.getCanSort() && header.column.getIsSorted() && (
+                                <ChevronUp className={cn(
+                                  "h-4 w-4 text-white ml-2 shrink-0",
+                                  header.column.getIsSorted() === "desc" && "rotate-180"
+                                )} />
+                              )}
                             </div>
                             
                             {/* Resize handle */}
@@ -975,17 +927,9 @@ export function VirtualDataTable<T extends Record<string, any>>({
                                 e.stopPropagation();
                                 handleResizeStart(header.column.id, e);
                               }}
-                              onDoubleClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleDoubleClick(header.column.id);
-                              }}
-                              className={cn(
-                                "absolute right-0 top-0 h-full w-4 cursor-col-resize select-none touch-none",
-                                "hover:before:content-[''] hover:before:absolute hover:before:h-full hover:before:w-[3px] hover:before:bg-[#84a98c] hover:before:right-0 hover:before:top-0",
-                                "active:before:content-[''] active:before:absolute active:before:h-full active:before:w-[3px] active:before:bg-[#84a98c] active:before:right-0 active:before:top-0",
-                                header.column.getIsResizing() ? "before:content-[''] before:absolute before:h-full before:w-[3px] before:bg-[#3b82f6] before:right-0 before:top-0 before:shadow-[0_0_8px_rgba(59,130,246,0.5)]" : ""
-                              )}
+                              className={`absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none hover:bg-[#84a98c]/80 ${
+                                header.column.getIsResizing() ? 'bg-[#84a98c]' : ''
+                              }`}
                               style={{ cursor: 'col-resize' }}
                             />
                           </div>
@@ -998,112 +942,4 @@ export function VirtualDataTable<T extends Record<string, any>>({
               <tbody className="divide-y divide-[#52796f]/20">
                 {paddingTop > 0 && (
                   <tr>
-                    <td colSpan={tableColumns.length} style={{ height: `${paddingTop}px` }} />
-                  </tr>
-                )}
-                
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={tableColumns.length} className="text-center py-8">
-                      <div className="flex justify-center items-center text-[#84a98c]">
-                        <LoadingSpinner fullScreen={false} />
-                        <span className="ml-3">{loadingStateMessage || 'Loading...'}</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filteredData.length === 0 ? (
-                  <tr style={{ height: 'calc(60vh - 100px)' }}>
-                    <td 
-                      colSpan={tableColumns.length} 
-                      className="text-center"
-                    >
-                      <div className="absolute inset-0 flex items-center justify-center w-full h-full">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <span className="text-[#cad2c5] text-lg font-medium">{emptyStateMessage || 'Δεν βρέθηκαν αποτελέσματα'}</span>
-                          <span className="text-[#84a98c] text-sm">Αλλάξτε τα κριτήρια αναζήτησης και δοκιμάστε ξανά.</span>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  // Virtualized rows
-                  virtualRows.map(virtualRow => {
-                    const row = rows[virtualRow.index];
-                    const rowData = row.original as T;
-                    const rowId = getRowId(rowData);
-                    const isExpanded = !!expandedRowIds[rowId];
-                    
-                    return (
-                      <React.Fragment key={rowId}>
-                        {/* Main row */}
-                        <tr
-                          className={cn(
-                            "hover:bg-[#354f52]/50 transition-colors duration-150",
-                            onRowClick && "cursor-pointer",
-                            isExpanded && "bg-[#354f52]/30 sticky top-0 z-10"
-                          )}
-                          onClick={e => onRowClick && handleRowClick(e, rowData)}
-                          data-customer-id={rowId}
-                        >
-                          {row.getVisibleCells().map((cell, cellIndex) => {
-                            // Safe access to meta with type assertion
-                            const meta = cell.column.columnDef.meta as { className?: string; headerClassName?: string } | undefined;
-                            const className = meta?.className;
-                            const isLastColumn = cellIndex === row.getVisibleCells().length - 1;
-                            
-                            return (
-                              <td
-                                key={cell.id}
-                                data-cell-id={cell.id}
-                                className={cn(
-                                  "px-2 py-2 text-[#cad2c5] text-sm",
-                                  !isLastColumn && "border-r border-[#52796f]",
-                                  className
-                                )}
-                                style={{
-                                  width: `${columnSizing[cell.column.id] || cell.column.getSize()}px`,
-                                  overflow: 'hidden',
-                                  boxSizing: 'border-box'
-                                }}
-                              >
-                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                        
-                        {/* Expanded content */}
-                        {isExpanded && renderExpandedContent && (
-                          <tr className="bg-[#2f3e46]" data-customer-id={rowId}>
-                            <td colSpan={tableColumns.length} className="px-0 py-0">
-                              <div className="relative">
-                                {renderExpandedContent(rowData)}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })
-                )}
-                
-                {paddingBottom > 0 && (
-                  <tr>
-                    <td colSpan={tableColumns.length} style={{ height: `${paddingBottom}px` }} />
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      
-      {/* Records count - outside the table */}
-      <div className="flex justify-end mt-3">
-        <p className="text-sm text-[#52796f]">
-          Βρέθηκαν <span className="text-white font-medium">{isLoading ? "..." : filteredData.length}</span> εγγραφές
-        </p>
-      </div>
-    </>
-  );
-} 
+                    <td colSpan={tableColumns.length} style={{ height: `${paddingTop}px`

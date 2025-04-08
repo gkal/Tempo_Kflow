@@ -119,4 +119,18 @@ export const CUSTOMER_TYPE_OPTIONS = [
   "Οικοδομές",
   "Εκτακτος Πελάτης",
   "Εκτακτη Εταιρία"
-]; 
+];
+
+/**
+ * Customer offer data structure
+ */
+export interface CustomerOffer {
+  id: string;
+  offer_number?: string;
+  total_amount?: number;
+  created_at?: string;
+  status?: string;
+  customer_id?: string;
+  name?: string;
+  requirements?: string;
+} 

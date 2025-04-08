@@ -305,7 +305,9 @@ const SearchBarCustomDropdown: React.FC<SearchBarDropdownProps> = ({
     }
     
     const directMatch = currentOptions.find(opt => opt.value === value);
-    const fallbackMatch = value ? currentOptions.find(opt => opt.value === value.split('_')[0]) : null;
+    const fallbackMatch = typeof value === 'string' && value 
+      ? currentOptions.find(opt => opt.value === value.split('_')[0]) 
+      : null;
     const result = directMatch || fallbackMatch || currentOptions[0];
     
     return result;
@@ -400,10 +402,10 @@ const SearchBarCustomDropdown: React.FC<SearchBarDropdownProps> = ({
           {selectedOption ? selectedOption.label : "Select..."}
         </div>
         <div 
-          className={`flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className="flex-shrink-0 flex items-center justify-center"
         >
           <div 
-            className="w-2 h-2 border-r-2 border-b-2 border-[#84a98c] transform rotate-45"
+            className={`w-2 h-2 border-r-2 border-b-2 border-[#84a98c] transform rotate-45 transition-transform duration-200 ${isOpen ? 'rotate-[225deg] translate-y-[-2px]' : ''}`}
           ></div>
         </div>
       </button>

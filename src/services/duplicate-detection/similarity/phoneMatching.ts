@@ -19,6 +19,25 @@ export const getPhoneSimilarity = (phone1: string, phone2: string): number => {
   // Exact match
   if (standardized1 === standardized2) return 100;
   
+  // IMPROVED HANDLING FOR SHORT PHONE NUMBERS
+  // For very short numbers (like when user is still typing), use special handling
+  if (standardized1.length <= 6 || standardized2.length <= 6) {
+    // Get the shorter and longer number
+    const shorter = standardized1.length <= standardized2.length ? standardized1 : standardized2;
+    const longer = standardized1.length <= standardized2.length ? standardized2 : standardized1;
+    
+    // If shorter is a prefix of longer, give a good score
+    if (longer.startsWith(shorter) && shorter.length >= 3) {
+      // Score increases with length of shorter number
+      return Math.min(50 + (shorter.length * 5), 90);
+    }
+    
+    // If longer contains shorter, give a moderate score
+    if (longer.includes(shorter) && shorter.length >= 3) {
+      return Math.min(40 + (shorter.length * 4), 85);
+    }
+  }
+  
   // Check if one is contained within the other (partial match)
   if (standardized1.includes(standardized2) || standardized2.includes(standardized1)) {
     const minLength = Math.min(standardized1.length, standardized2.length);

@@ -147,20 +147,13 @@ export const CustomerContactManagement: React.FC<CustomerContactManagementProps>
               Κύρια Επαφή
             </Label>
             <GlobalDropdown
-              id="primary_contact"
+              options={contacts.map(contact => ({ id: contact.id, name: `${contact.name} ${contact.surname} - ${contact.role || "N/A"}` }))}
               value={formData.primary_contact_id}
-              onChange={(e) => setPrimaryContact(e.target.value)}
+              onSelect={(option) => setPrimaryContact(option)}
+              placeholder="Επιλέξτε κύρια επαφή"
               disabled={viewOnly}
-              style={{ marginBottom: "10px" }}
               className="w-full bg-[#2f3e46] text-[#cad2c5] mt-1"
-            >
-              <option value="">Επιλέξτε κύρια επαφή</option>
-              {contacts.map((contact) => (
-                <option key={contact.id} value={contact.id}>
-                  {contact.name} {contact.surname} - {contact.role || "N/A"}
-                </option>
-              ))}
-            </GlobalDropdown>
+            />
           </div>
         )}
 
@@ -174,9 +167,10 @@ export const CustomerContactManagement: React.FC<CustomerContactManagementProps>
             <ContactList
               contacts={contacts}
               onContactClick={handleContactSelect}
-              onDeleteClick={!viewOnly ? handleDeleteContactClick : undefined}
-              selectedContactId={selectedContact?.id}
-              isPrimaryContact={(contactId) => formData.primary_contact_id === contactId}
+              onAddContact={() => setShowContactDialog(true)}
+              primaryContactId={formData.primary_contact_id}
+              onSetPrimary={(contactId) => setPrimaryContact(contactId)}
+              onDeleteContact={!viewOnly ? handleDeleteContactClick : undefined}
             />
           )}
         </div>
@@ -186,7 +180,8 @@ export const CustomerContactManagement: React.FC<CustomerContactManagementProps>
       <ContactDialog
         open={showContactDialog}
         onOpenChange={setShowContactDialog}
-        onSave={handleContactCreated}
+        customerId={customerId || ""}
+        refreshData={() => fetchContacts()}
       />
 
       {/* Delete Contact Confirmation Dialog */}
