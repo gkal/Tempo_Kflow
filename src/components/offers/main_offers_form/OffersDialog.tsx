@@ -152,7 +152,11 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       address: "",
       postal_code: "",
       town: "",
-      status: "active"
+      status: "active",
+      waste_type: '',
+      our_transport: '',
+      client_transport: '',
+      transport_type: false
     }
   });
   
@@ -208,7 +212,11 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       certificate: "",
       address: "",
       postal_code: "",
-      town: ""
+      town: "",
+      waste_type: "",
+      our_transport: "",
+      client_transport: "",
+      transport_type: false
     };
   }, [customerId, defaultSource, user?.id]);
 
@@ -238,7 +246,11 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         address: '',
         postal_code: '',
         town: '',
-        status: 'active'
+        status: 'active',
+        waste_type: '',
+        our_transport: '',
+        client_transport: '',
+        transport_type: false
       });
       
       // Clear any errors
@@ -547,7 +559,11 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       address: "",
       postal_code: "",
       town: "",
-      status: "active"
+      status: "active",
+      waste_type: "",
+      our_transport: "",
+      client_transport: "",
+      transport_type: false
     });
     
     // Clear any errors

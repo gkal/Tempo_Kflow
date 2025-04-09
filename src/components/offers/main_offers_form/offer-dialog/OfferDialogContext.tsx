@@ -20,6 +20,10 @@ export interface OfferFormValues {
   town?: string;
   status?: string;
   progress?: number;
+  waste_type?: string;
+  our_transport?: string;
+  client_transport?: string;
+  transport_type?: boolean;
 }
 
 // Define the database offer type

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { formStyles } from "./utils/customerFormUtils";
-import { CUSTOMER_TYPE_OPTIONS } from "./types/customerTypes";
+import { CUSTOMER_TYPE_OPTIONS } from "./types/CustomerTypes";
 import { useCustomerForm } from "./CustomerFormProvider";
 import { validateCustomerForm, validateNotEmpty } from "./utils/customerValidation";
 import { createPrefixedLogger } from "@/utils/loggingUtils";

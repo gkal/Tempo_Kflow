@@ -3,7 +3,7 @@
  * Extracted from CustomerForm.tsx to improve modularity
  */
 
-import { CustomerFormData } from '../types/customerTypes';
+import { CustomerFormData } from '../types/CustomerTypes';
 import { validateEmail, validatePhone } from '@/utils/validationUtils';
 import { createPrefixedLogger } from '@/utils/loggingUtils';
 

@@ -12,7 +12,7 @@ import { usePhoneFormat } from "@/hooks/usePhoneFormat";
 import { useNavigate } from "react-router-dom";
 import * as duplicateDetectionService from '@/services/duplicate-detection';
 import { supabase } from '@/lib/supabaseClient';
-import { CustomerFormData, Customer } from './types/customerTypes';
+import { CustomerFormData, Customer } from './types/CustomerTypes';
 import { isFormValid } from './utils/customerValidation';
 import { customerToFormData, getInitialFormData } from './utils/customerFormUtils';
 import { createPrefixedLogger } from '@/utils/loggingUtils';

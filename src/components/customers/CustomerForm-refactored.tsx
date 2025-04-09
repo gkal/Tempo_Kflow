@@ -10,7 +10,7 @@ import { CustomerFormFields } from "./CustomerFormFields";
 import { CustomerContactManagement } from "./CustomerContactManagement";
 import { CustomerDuplicateDetection } from "./CustomerDuplicateDetection";
 import { CustomerFormActions } from "./CustomerFormActions";
-import { CustomerFormProps } from "./types/customerTypes";
+import { CustomerFormProps } from "./types/CustomerTypes";
 import { createPrefixedLogger } from "@/utils/loggingUtils";
 
 // Initialize logger

@@ -3,7 +3,7 @@
  * Extracted from CustomerForm.tsx to improve modularity
  */
 
-import { CustomerFormData, CustomerFormSubmissionData, Customer, CUSTOMER_TYPE_MAP } from '../types/customerTypes';
+import { CustomerFormData, CustomerFormSubmissionData, Customer, CUSTOMER_TYPE_MAP } from '../types/CustomerTypes';
 import { createPrefixedLogger } from '@/utils/loggingUtils';
 
 // Create a logger for this utilities file

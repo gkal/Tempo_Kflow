@@ -5,7 +5,7 @@ import React from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
-import { Customer, CustomerOffer } from "./types/customerTypes";
+import { Customer, CustomerOffer } from "./types/CustomerTypes";
 
 // Format utility functions
 const formatCurrency = (value?: number): string => {

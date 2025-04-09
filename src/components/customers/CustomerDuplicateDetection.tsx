@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { checkForDuplicates } from "./utils/customerValidation";
 import { getDuplicateMatchReasons } from "./utils/customerFormUtils";
 import { useCustomerForm } from "./CustomerFormProvider";
-import { Customer } from "./types/customerTypes";
+import { Customer } from "./types/CustomerTypes";
 import * as duplicateDetectionService from "@/services/duplicate-detection";
 import { createPrefixedLogger } from "@/utils/loggingUtils";
 

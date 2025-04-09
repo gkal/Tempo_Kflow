@@ -9,7 +9,6 @@ import { el } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { createPortal } from 'react-dom';
-import { useFormWatch } from "@/utils/formHelpers";
 
 /**
  * Type definition for context properties we need but aren't in the original interface
@@ -113,9 +112,9 @@ const BasicTab = () => {
         </div>
         <div className="p-2">
           {/* Fields for address, TK, and town */}
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1 w-[50%]">
-              <div className="w-full text-[#a8c5b5] text-sm">
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <div className="flex items-center w-[42%]">
+              <div className="text-[#a8c5b5] text-sm whitespace-nowrap mr-2 min-w-16">
                 Διεύθυνση
               </div>
               <input
@@ -123,11 +122,11 @@ const BasicTab = () => {
                 {...register("address")}
                 disabled={formState.isSubmitting}
                 className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] rounded-md p-1 text-sm h-8 w-full hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] focus:shadow-[0_0_0_2px_#52796f] focus:outline-none transition-all duration-200"
-                placeholder="Εισάγετε τη διεύθυνση"
+                placeholder="Διεύθυνση"
               />
             </div>
-            <div className="flex flex-col gap-1 w-[30%]">
-              <div className="w-full text-[#a8c5b5] text-sm">
+            <div className="flex items-center w-[33%]">
+              <div className="text-[#a8c5b5] text-sm whitespace-nowrap mr-2 min-w-10">
                 Πόλη
               </div>
               <input
@@ -138,8 +137,8 @@ const BasicTab = () => {
                 placeholder="Πόλη"
               />
             </div>
-            <div className="flex flex-col gap-1 w-[18%]">
-              <div className="w-full text-[#a8c5b5] text-sm">
+            <div className="flex items-center w-[20%]">
+              <div className="text-[#a8c5b5] text-sm whitespace-nowrap mr-2 min-w-10">
                 Τ.Κ.
               </div>
               <input
@@ -153,7 +152,7 @@ const BasicTab = () => {
           </div>
           
           <div className="flex flex-wrap justify-between gap-2 mt-2">
-            <div className="flex flex-col gap-0.5 w-[50%]">
+            <div className="flex flex-col gap-0.5 w-[33%]">
               <div className="w-full text-[#a8c5b5] text-sm">
                 Ζήτηση Πελάτη
               </div>
@@ -164,7 +163,18 @@ const BasicTab = () => {
                 placeholder="Εισάγετε τη ζήτηση πελάτη"
               />
             </div>
-            <div className="flex flex-col gap-0.5 w-[48%]">
+            <div className="flex flex-col gap-0.5 w-[33%]">
+              <div className="w-full text-[#a8c5b5] text-sm">
+                Είδος Αποβλήτου / Κατηγορία
+              </div>
+              <textarea
+                {...register("waste_type")}
+                disabled={formState.isSubmitting}
+                className="bg-[#2f3e46] border border-[#52796f] text-[#cad2c5] rounded-md text-sm w-full hover:border-[#84a98c] hover:shadow-[0_0_0_1px_#52796f] focus:shadow-[0_0_0_2px_#52796f] focus:outline-none transition-all duration-200 py-1 px-2 resize-none [height:70px!important]"
+                placeholder="Εισάγετε το είδος αποβλήτου"
+              />
+            </div>
+            <div className="flex flex-col gap-0.5 w-[30%]">
               <div className="w-full text-[#a8c5b5] text-sm">
                 Ποσό
               </div>
@@ -190,32 +200,140 @@ const BasicTab = () => {
       </section>
 
       {/* ==================== SECTION: REQUIREMENTS ==================== */}
-      <section className="section-requirements bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-full max-w-full" style={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
-        <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
-          <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-            ΕΠΙΠΛΕΟΝ ΣΤΟΙΧΕΙΑ
-          </h2>
-        </div>
-        <div className="p-2 space-y-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2" style={{ position: 'relative', zIndex: 15, pointerEvents: 'auto' }}>
-            <HMAToggle control={control} setValue={setValue} />
-
-            <div className="flex items-center">
-              <div className="w-1/5 text-[#a8c5b5] text-sm pr-0">
-                Βεβαίωση
+      <div className="flex gap-2 items-stretch">
+        <section className="section-requirements bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-1/2" style={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
+          <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
+            <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+              ΕΠΙΠΛΕΟΝ ΣΤΟΙΧΕΙΑ
+            </h2>
+          </div>
+          <div className="py-1 px-3">
+            <div className="flex flex-col gap-1" style={{ position: 'relative', zIndex: 15, pointerEvents: 'auto' }}>
+              <div className="flex items-center py-1">
+                <div className="w-[100px] text-[#a8c5b5] text-sm whitespace-nowrap">
+                  ΗΜΑ
+                </div>
+                <div className="flex items-center">
+                  <div className="relative flex items-center">
+                    <div 
+                      className="relative w-12 h-6 rounded-full transition-colors duration-200 ease-in-out flex items-center"
+                      onClick={() => setValue("hma", !watch("hma"))}
+                      style={{ 
+                        cursor: 'pointer',
+                        backgroundColor: watch("hma") ? '#52796f' : '#354f52',
+                        borderWidth: '1px',
+                        borderColor: watch("hma") ? '#84a98c' : '#52796f'
+                      }}
+                    >
+                      <div 
+                        className="absolute w-4 h-4 rounded-full transition-all duration-200 ease-in-out"
+                        style={{ 
+                          top: 'calc(50% - 0.5rem)',
+                          left: watch("hma") ? 'calc(100% - 1.1rem)' : '2px',
+                          backgroundColor: watch("hma") ? '#84a98c' : '#a0a0a0'
+                        }}
+                      ></div>
+                    </div>
+                    <span 
+                      className={`ml-2 text-sm ${watch("hma") ? 'text-[#84d970] font-semibold' : 'text-[#cad2c5]'}`}
+                      onClick={() => setValue("hma", !watch("hma"))}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {watch("hma") ? 'Ναι' : 'Όχι'}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="w-4/5">
-                <Input
-                  id="certificate"
-                  className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8 text-sm pl-2"
-                  {...register("certificate")}
-                  disabled={formState.isSubmitting}
-                />
+              
+              <div className="flex items-center py-1">
+                <div className="w-[100px] text-[#a8c5b5] text-sm whitespace-nowrap">
+                  Βεβαίωση
+                </div>
+                <div className="flex-1">
+                  <Input
+                    id="certificate"
+                    className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8 text-sm pl-2"
+                    {...register("certificate")}
+                    disabled={formState.isSubmitting}
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+        
+        {/* ==================== SECTION: METAFORES ==================== */}
+        <section className="section-metafores bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden w-1/2" style={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
+          <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f] flex justify-between items-center">
+            <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+              ΜΕΤΑΦΟΡΑ
+            </h2>
+            <div className="flex items-center">
+              <div className="w-12 text-center">
+                <span className={`text-xs inline-block whitespace-nowrap font-semibold ${!watch("transport_type") ? 'text-[#84d970]' : 'text-[#9bafa6]'}`}>
+                  Πελάτης
+                </span>
+              </div>
+              <div className="relative mx-2 w-10 h-5 rounded-full transition-colors duration-200 ease-in-out"
+                onClick={() => setValue("transport_type", !watch("transport_type"))}
+                style={{ 
+                  cursor: 'pointer',
+                  backgroundColor: watch("transport_type") ? '#52796f' : '#354f52',
+                  borderWidth: '1px',
+                  borderColor: watch("transport_type") ? '#84a98c' : '#52796f'
+                }}
+              >
+                <div
+                  className="absolute w-3.5 h-3.5 rounded-full transition-all duration-200 ease-in-out"
+                  style={{ 
+                    top: 'calc(50% - 0.4375rem)',
+                    left: watch("transport_type") ? 'calc(100% - 0.875rem - 2px)' : '2px',
+                    backgroundColor: watch("transport_type") ? '#84a98c' : '#a0a0a0'
+                  }}
+                ></div>
+              </div>
+              <div className="w-12 text-center">
+                <span className={`text-xs inline-block whitespace-nowrap font-semibold ${watch("transport_type") ? 'text-[#84d970]' : 'text-[#9bafa6]'}`}>
+                  Κρόνος
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="py-1 px-3">
+            <div className="flex flex-col gap-1" style={{ position: 'relative', zIndex: 15, pointerEvents: 'auto' }}>
+              <div className="flex items-center py-1">
+                <div className="w-[100px] text-[#a8c5b5] text-sm whitespace-nowrap">
+                  Μέσο Δικό μας
+                </div>
+                <div className="flex-1">
+                  <Input
+                    id="our_transport"
+                    className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8 text-sm pl-2"
+                    placeholder="Μέσο μεταφοράς μας"
+                    disabled={formState.isSubmitting}
+                    {...register("our_transport")}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center py-1">
+                <div className="w-[100px] text-[#a8c5b5] text-sm whitespace-nowrap">
+                  Τρ.Φόρτωσης
+                </div>
+                <div className="flex-1">
+                  <Input
+                    id="client_transport"
+                    className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8 text-sm pl-2"
+                    placeholder="Τρόπος φόρτωσης"
+                    disabled={formState.isSubmitting}
+                    {...register("client_transport")}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
 
       {/* ==================== SECTION: STATUS AND ASSIGNMENT ==================== */}
       <section className="status-section bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden" style={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
@@ -318,54 +436,6 @@ const BasicTab = () => {
           </div>
         </div>
       </section>
-    </div>
-  );
-};
-
-/**
- * HMA Toggle component
- */
-const HMAToggle = ({ control, setValue }) => {
-  // Use our custom useFormWatch helper
-  const hmaValue = useFormWatch(control, "hma", false);
-
-  const toggleHma = () => {
-    setValue("hma", !hmaValue);
-  };
-
-  return (
-    <div className="flex items-center">
-      <div className="w-1/3 text-[#a8c5b5] text-sm pr-1">
-        ΗΜΑ
-      </div>
-      <div className="w-2/3 flex items-center">
-        <div className="relative flex items-center">
-          <div 
-            className={`w-12 h-6 rounded-full transition-colors duration-200 ease-in-out ${
-              hmaValue 
-                ? 'bg-[#52796f] border border-[#84a98c]' 
-                : 'bg-[#354f52] border border-[#52796f]'
-            }`}
-            onClick={toggleHma}
-            style={{ cursor: 'pointer' }}
-          >
-            <div 
-              className={`absolute top-1 w-4 h-4 rounded-full transition-transform duration-200 ease-in-out ${
-                hmaValue 
-                  ? 'transform translate-x-7 bg-[#84a98c]' 
-                  : 'transform translate-x-1 bg-gray-500'
-              }`}
-            ></div>
-          </div>
-          <span 
-            className={`ml-2 text-sm ${hmaValue ? 'text-[#84a98c]' : 'text-[#cad2c5]'}`}
-            onClick={toggleHma}
-            style={{ cursor: 'pointer' }}
-          >
-            {hmaValue ? 'Ναι' : 'Όχι'}
-          </span>
-        </div>
-      </div>
     </div>
   );
 };

@@ -5,7 +5,7 @@
  */
 
 import { supabase } from '@/lib/supabaseClient';
-import { CustomerFormSubmissionData } from '../types/customerTypes';
+import { CustomerFormSubmissionData } from '../types/CustomerTypes';
 import { createPrefixedLogger } from '@/utils/loggingUtils';
 
 // Initialize logger

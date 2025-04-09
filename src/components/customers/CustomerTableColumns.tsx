@@ -11,7 +11,7 @@ import {
   Mail, 
   Users
 } from "lucide-react";
-import { Customer } from "./types/customerTypes";
+import { Customer } from "./types/CustomerTypes";
 import { createColumnHelper } from "@tanstack/react-table";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
