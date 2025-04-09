@@ -13,7 +13,9 @@ import type {
   Unit,
   Notification,
   OfferHistory,
-  TaskHistory
+  TaskHistory,
+  EquipmentCategory,
+  EquipmentItem
 } from '@/services/api/types';
 
 /**
@@ -131,6 +133,18 @@ export const serviceCategoriesService = DataService.forTable<ServiceCategory>('s
  * Manages detailed service subcategories
  */
 export const serviceSubcategoriesService = DataService.forTable<ServiceSubcategory>('service_subcategories');
+
+/**
+ * Equipment categories table data service
+ * Manages equipment category records
+ */
+export const equipmentCategoriesService = DataService.forTable<EquipmentCategory>('equipment_categories');
+
+/**
+ * Equipment items table data service
+ * Manages equipment item records
+ */
+export const equipmentItemsService = DataService.forTable<EquipmentItem>('equipment_items');
 
 /**
  * Units table data service

@@ -156,7 +156,9 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       waste_type: '',
       our_transport: '',
       client_transport: '',
-      transport_type: false
+      who_transport: true,
+      loading: '',
+      transport_type: ''
     }
   });
   
@@ -216,7 +218,9 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       waste_type: "",
       our_transport: "",
       client_transport: "",
-      transport_type: false
+      who_transport: true,
+      loading: "",
+      transport_type: ""
     };
   }, [customerId, defaultSource, user?.id]);
 
@@ -250,7 +254,9 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
         waste_type: '',
         our_transport: '',
         client_transport: '',
-        transport_type: false
+        who_transport: true,
+        loading: '',
+        transport_type: ""
       });
       
       // Clear any errors
@@ -563,7 +569,9 @@ const OffersDialog = React.memo(function OffersDialog(props: OffersDialogProps) 
       waste_type: "",
       our_transport: "",
       client_transport: "",
-      transport_type: false
+      who_transport: true,
+      loading: "",
+      transport_type: ""
     });
     
     // Clear any errors

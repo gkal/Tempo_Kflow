@@ -23,7 +23,9 @@ export interface OfferFormValues {
   waste_type?: string;
   our_transport?: string;
   client_transport?: string;
-  transport_type?: boolean;
+  who_transport?: boolean;
+  loading?: string;
+  transport_type?: string;
 }
 
 // Define the database offer type
@@ -50,6 +52,11 @@ export interface DatabaseOffer {
   tk: string;
   town: string;
   status: string;
+  waste_type: string;
+  who_transport: boolean;
+  loading: string;
+  transport_type: string;
+  our_transport?: string; // Optional since it's not stored in the database
 }
 
 // Export the props interface so it can be imported by other files

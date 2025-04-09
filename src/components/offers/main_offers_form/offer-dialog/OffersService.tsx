@@ -19,6 +19,16 @@ export const saveOfferAndGetId = async (
     // Clear any previous errors
     setErrorMessage("");
     
+    // If our_transport has a value but transport_type doesn't, copy the value
+    if (formData.our_transport && !formData.transport_type) {
+      formData.transport_type = formData.our_transport;
+    }
+    
+    // And vice versa
+    if (formData.transport_type && !formData.our_transport) {
+      formData.our_transport = formData.transport_type;
+    }
+    
     const safeUserId = userId || ADMIN_USER_ID;
     const customerIdString = formData.customer_id || customerId;
 
@@ -42,7 +52,11 @@ export const saveOfferAndGetId = async (
         updated_at: new Date().toISOString(),
         contact_id: selectedContactId,
         created_at: formData.created_at || new Date().toISOString(),
-        assigned_to: formData.assigned_to || null
+        assigned_to: formData.assigned_to || null,
+        waste_type: formData.waste_type || null,
+        who_transport: formData.who_transport !== undefined ? formData.who_transport : true,
+        loading: formData.loading || null,
+        transport_type: formData.transport_type || null
       };
 
       const { data, error } = await supabase
@@ -80,7 +94,11 @@ export const saveOfferAndGetId = async (
         created_at: formData.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
         contact_id: selectedContactId,
-        assigned_to: formData.assigned_to || null
+        assigned_to: formData.assigned_to || null,
+        waste_type: formData.waste_type || null,
+        who_transport: formData.who_transport !== undefined ? formData.who_transport : true,
+        loading: formData.loading || null,
+        transport_type: formData.transport_type || null
       };
 
       const { data: newOffer, error } = await supabase
@@ -199,6 +217,10 @@ export const fetchOffer = async (
     }
 
     if (offer) {
+      // The transport_type field contains the actual text, 
+      // so we can use it directly without any lookup
+      const displayTransport = offer.transport_type || "";
+
       reset({
         customer_id: offer.customer_id,
         created_at: dateFormatUtils.formatCurrentDateTime(offer.created_at),
@@ -215,9 +237,14 @@ export const fetchOffer = async (
         address: offer.address || '',
         postal_code: offer.tk || '',
         town: offer.town || '',
-        status: offer.status || ''
+        status: offer.status || '',
+        waste_type: offer.waste_type || '',
+        who_transport: offer.who_transport !== undefined ? offer.who_transport : true,
+        loading: offer.loading || '',
+        our_transport: displayTransport || '',
+        transport_type: displayTransport || ''
       });
-
+      
       setSelectedContactId(offer.contact_id || null);
     }
   } catch (error) {

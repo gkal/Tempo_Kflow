@@ -42,7 +42,10 @@ export type TableName =
   | 'resource_locks'
   | 'history_logs'
   | 'system_settings'
-  | 'document_references';
+  | 'document_references'
+  | 'equipment_categories'
+  | 'equipment_items'
+  | 'audit_log';
 
 /**
  * Customer table row type
@@ -315,6 +318,45 @@ export interface Equipment {
   updated_at?: string;
   deleted_at?: string | null;
   // Add other fields based on your database schema
+}
+
+/**
+ * Equipment category table row type - matches database structure exactly
+ */
+export interface EquipmentCategory {
+  id: string;
+  category_name: string;
+  date_created: string;
+  created_at?: string;
+  date_updated: string | null;
+  user_create: string | null;
+  user_updated: string | null;
+  deleted_at: string | null;
+  is_deleted?: boolean | null;
+  code_prefix?: string | null;
+}
+
+/**
+ * Equipment item table row type - matches database structure exactly
+ */
+export interface EquipmentItem {
+  id: string;
+  item_name: string;
+  name?: string;
+  category_id: string;
+  created_at: string;
+  date_created: string;
+  date_updated: string | null;
+  user_create: string | null;
+  user_updated: string | null;
+  status: string | null;
+  code: string | null;
+  is_available?: boolean | null;
+  date_rented?: string | null;
+  dates_available?: string | null;
+  assigned_user?: string | null;
+  deleted_at?: string | null;
+  is_deleted?: boolean | null;
 }
 
 /**

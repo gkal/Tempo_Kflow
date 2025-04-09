@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { SearchBar } from "@/components/ui/search-bar";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, EyeOff, Settings as SettingsIcon, File } from "lucide-react";
+import { Plus, Eye, EyeOff, Settings as SettingsIcon, File, Wrench } from "lucide-react";
 import { DataTableBase } from "@/components/ui/data-table-base";
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from "@/lib/AuthContext";
@@ -11,6 +11,7 @@ import './settings-cursor-fix.css'; // Import the CSS fix
 import { toast } from "@/components/ui/use-toast";
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 import { DocumentSettingsTab } from "./DocumentSettingsTab";
+import { EquipmentSettingsTab } from "./EquipmentSettingsTab";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -269,6 +270,10 @@ export default function SettingsPage() {
                 <SettingsIcon className="h-4 w-4" />
                 Ρυθμίσεις Χρηστών
               </AppTabsTrigger>
+              <AppTabsTrigger value="equipment" className="flex items-center gap-2">
+                <Wrench className="h-4 w-4" />
+                Ρυθμίσεις Εξοπλισμού
+              </AppTabsTrigger>
               <AppTabsTrigger value="documents" className="flex items-center gap-2">
                 <File className="h-4 w-4" />
                 Ρυθμίσεις Εγγράφων
@@ -312,6 +317,10 @@ export default function SettingsPage() {
                   isLoading={loading}
                 />
               </div>
+            </AppTabsContent>
+            
+            <AppTabsContent value="equipment" className="mt-0">
+              <EquipmentSettingsTab />
             </AppTabsContent>
             
             <AppTabsContent value="documents" className="mt-0">

@@ -2,13 +2,19 @@ import React, { useContext, CSSProperties, useEffect, useState, useRef } from 'r
 import { OfferDialogContext } from './OfferDialogContext';
 import { GlobalDropdown } from "@/components/ui/GlobalDropdown";
 import { Input } from "@/components/ui/input";
-import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Plus, Phone, Calendar } from "lucide-react";
+import { DialogHeader, DialogTitle, DialogDescription, Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { Plus, Phone, Calendar, ChevronDown, Search, Check, ArrowRight, Settings } from "lucide-react";
 import { DayPicker } from 'react-day-picker';
 import { el } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { createPortal } from 'react-dom';
+import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
+import { EquipmentCategory, EquipmentItem } from "@/services/api/types";
+import { fetchRecords } from "@/services/api/supabaseService";
+import { Button } from "@/components/ui/button";
+import { DataTableBase } from "@/components/ui/data-table-base";
+import { Card, CardContent } from "@/components/ui/card";
 
 /**
  * Type definition for context properties we need but aren't in the original interface
@@ -58,6 +64,9 @@ interface ExtendedContextType {
 const BasicTab = () => {
   const context = useContext(OfferDialogContext) as ExtendedContextType | null;
   
+  // Replace dropdown state with dialog state
+  const [showEquipmentDialog, setShowEquipmentDialog] = useState(false);
+  
   if (!context) {
     return (
       <div className="p-4 text-center text-[#cad2c5]">
@@ -100,6 +109,17 @@ const BasicTab = () => {
     contactDisplayMap,
     contacts,
   } = context;
+
+  // Helper to append equipment item text to the input
+  const handleEquipmentSelect = (item: EquipmentItem) => {
+    // Display the equipment name in the input field
+    const currentValue = watch("our_transport") || "";
+    const newValue = currentValue ? `${currentValue}, ${item.item_name}` : item.item_name;
+    
+    // Store the actual text in both fields
+    setValue("our_transport", newValue);
+    setValue("transport_type", newValue);
+  };
 
   return (
     <div className="space-y-2 pt-0">
@@ -270,30 +290,30 @@ const BasicTab = () => {
             </h2>
             <div className="flex items-center">
               <div className="w-12 text-center">
-                <span className={`text-xs inline-block whitespace-nowrap font-semibold ${!watch("transport_type") ? 'text-[#84d970]' : 'text-[#9bafa6]'}`}>
+                <span className={`text-xs inline-block whitespace-nowrap font-semibold ${!watch("who_transport") ? 'text-[#84d970]' : 'text-[#9bafa6]'}`}>
                   Πελάτης
                 </span>
               </div>
               <div className="relative mx-2 w-10 h-5 rounded-full transition-colors duration-200 ease-in-out"
-                onClick={() => setValue("transport_type", !watch("transport_type"))}
+                onClick={() => setValue("who_transport", !watch("who_transport"))}
                 style={{ 
                   cursor: 'pointer',
-                  backgroundColor: watch("transport_type") ? '#52796f' : '#354f52',
+                  backgroundColor: watch("who_transport") ? '#52796f' : '#354f52',
                   borderWidth: '1px',
-                  borderColor: watch("transport_type") ? '#84a98c' : '#52796f'
+                  borderColor: watch("who_transport") ? '#84a98c' : '#52796f'
                 }}
               >
                 <div
                   className="absolute w-3.5 h-3.5 rounded-full transition-all duration-200 ease-in-out"
                   style={{ 
                     top: 'calc(50% - 0.4375rem)',
-                    left: watch("transport_type") ? 'calc(100% - 0.875rem - 2px)' : '2px',
-                    backgroundColor: watch("transport_type") ? '#84a98c' : '#a0a0a0'
+                    left: watch("who_transport") ? 'calc(100% - 0.875rem - 2px)' : '2px',
+                    backgroundColor: watch("who_transport") ? '#84a98c' : '#a0a0a0'
                   }}
                 ></div>
               </div>
               <div className="w-12 text-center">
-                <span className={`text-xs inline-block whitespace-nowrap font-semibold ${watch("transport_type") ? 'text-[#84d970]' : 'text-[#9bafa6]'}`}>
+                <span className={`text-xs inline-block whitespace-nowrap font-semibold ${watch("who_transport") ? 'text-[#84d970]' : 'text-[#9bafa6]'}`}>
                   Κρόνος
                 </span>
               </div>
@@ -305,13 +325,34 @@ const BasicTab = () => {
                 <div className="w-[100px] text-[#a8c5b5] text-sm whitespace-nowrap">
                   Μέσο Δικό μας
                 </div>
-                <div className="flex-1">
-                  <Input
-                    id="our_transport"
-                    className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8 text-sm pl-2"
-                    placeholder="Μέσο μεταφοράς μας"
-                    disabled={formState.isSubmitting}
-                    {...register("our_transport")}
+                <div className="flex-1 relative">
+                  <div className="flex">
+                    <Input
+                      id="our_transport"
+                      className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8 text-sm pl-2 pr-8"
+                      placeholder="Μέσο μεταφοράς μας"
+                      disabled={formState.isSubmitting}
+                      {...register("our_transport")}
+                      onChange={(e) => {
+                        // Also update transport_type with the same value
+                        const value = e.target.value;
+                        setValue("transport_type", value);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[#84a98c] hover:text-[#cad2c5] bg-transparent border-none"
+                      onClick={() => setShowEquipmentDialog(true)}
+                    >
+                      <Settings size={16} />
+                    </button>
+                  </div>
+                  
+                  {/* Equipment Selector Dialog */}
+                  <EquipmentSelector
+                    open={showEquipmentDialog}
+                    onClose={() => setShowEquipmentDialog(false)}
+                    onSelect={handleEquipmentSelect}
                   />
                 </div>
               </div>
@@ -322,11 +363,11 @@ const BasicTab = () => {
                 </div>
                 <div className="flex-1">
                   <Input
-                    id="client_transport"
+                    id="loading"
                     className="bg-[#354f52] border-[#52796f] text-[#cad2c5] h-8 text-sm pl-2"
                     placeholder="Τρόπος φόρτωσης"
                     disabled={formState.isSubmitting}
-                    {...register("client_transport")}
+                    {...register("loading")}
                   />
                 </div>
               </div>
@@ -437,6 +478,196 @@ const BasicTab = () => {
         </div>
       </section>
     </div>
+  );
+};
+
+// Create a new EquipmentSelector component
+interface EquipmentSelectorProps {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (item: EquipmentItem) => void;
+}
+
+const EquipmentSelector: React.FC<EquipmentSelectorProps> = ({ 
+  open, 
+  onClose, 
+  onSelect
+}) => {
+  const [categories, setCategories] = useState<EquipmentCategory[]>([]);
+  const [items, setItems] = useState<EquipmentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tableData, setTableData] = useState<any[]>([]);
+  // Get current transport_type value from context to highlight selection
+  const context = useContext(OfferDialogContext) as ExtendedContextType | null;
+  const currentTransportType = context ? context.watch("transport_type") : null;
+  
+  // Fetch equipment categories and items
+  useEffect(() => {
+    if (open) {
+      const fetchEquipment = async () => {
+        try {
+          setLoading(true);
+          
+          // Fetch categories
+          const categoriesData = await fetchRecords<EquipmentCategory>(
+            "equipment_categories",
+            { order: { column: "category_name", ascending: true } }
+          );
+          
+          // Fetch items
+          const itemsData = await fetchRecords<EquipmentItem>(
+            "equipment_items",
+            { order: { column: "item_name", ascending: true } }
+          );
+          
+          const fetchedCategories = categoriesData?.data as EquipmentCategory[] || [];
+          const fetchedItems = itemsData?.data as EquipmentItem[] || [];
+          
+          setCategories(fetchedCategories);
+          setItems(fetchedItems);
+          
+          // Create table data with the same structure as EquipmentSettingsTab
+          const combinedData = [];
+          let sortOrder = 0;
+          
+          // Process each category and its items
+          if (fetchedCategories) {
+            fetchedCategories.forEach(category => {
+              // Add the main category
+              combinedData.push({
+                id: category.id,
+                category_name: category.category_name,
+                created_at: category.created_at || category.date_created,
+                date_created: category.date_created,
+                date_updated: category.date_updated,
+                user_create: category.user_create,
+                user_updated: category.user_updated,
+                isItem: false,
+                code_prefix: category.code_prefix || null,
+                sortIndex: sortOrder++
+              });
+              
+              // Find and add items under their parent category immediately after the category
+              const relatedItems = fetchedItems.filter(
+                item => item.category_id === category.id
+              ) || [];
+              
+              relatedItems.forEach(item => {
+                // Create a properly typed item entry
+                const itemEntry = {
+                  id: item.id,
+                  category_name: item.item_name,
+                  date_created: item.date_created,
+                  date_updated: item.date_updated,
+                  user_create: item.user_create,
+                  user_updated: item.user_updated,
+                  created_at: item.created_at,
+                  isItem: true,
+                  parentId: item.category_id,
+                  item_name: item.item_name,
+                  sortIndex: sortOrder++,
+                  originalItem: item
+                };
+                
+                combinedData.push(itemEntry);
+              });
+            });
+          }
+          
+          setTableData(combinedData);
+        } catch (error) {
+          console.error("Error fetching equipment data:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      fetchEquipment();
+    }
+  }, [open]);
+
+  // Handle row click
+  const handleRowClick = (row: any) => {
+    if (row.isItem) {
+      const originalItem = row.originalItem;
+      onSelect(originalItem);
+      onClose();
+    }
+  };
+
+  // Column definitions for the table
+  const columns = [
+    {
+      header: "Ονομασία Εξοπλισμού",
+      accessor: "category_name",
+      width: "100%", 
+      cell: (value: string, row: any) => {
+        if (!value) return "-";
+        
+        if (row.isItem) {
+          return (
+            <div className="pl-4 flex items-center text-[#84a98c] py-0">
+              <span className="mr-1 text-[#52796f] flex-shrink-0">└─</span>
+              {value}
+            </div>
+          );
+        }
+        
+        return (
+          <div className="text-[#cad2c5] font-medium py-0">
+            {value}
+          </div>
+        );
+      }
+    }
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent 
+        className="bg-[#2f3e46] text-[#cad2c5] border border-[#52796f] max-w-md p-4"
+      >
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-base font-medium text-[#a8c5b5]">
+            <span>Επιλογή Εξοπλισμού</span>
+          </DialogTitle>
+          <DialogDescription className="text-[#84a98c] text-xs">
+            Επιλέξτε τον εξοπλισμό από την παρακάτω λίστα
+          </DialogDescription>
+        </DialogHeader>
+        
+        {loading ? (
+          <div className="py-2 text-center">
+            <div className="animate-pulse text-[#84a98c]">Φόρτωση εξοπλισμού...</div>
+          </div>
+        ) : (
+          <div className="py-2">
+            <DataTableBase
+              columns={columns}
+              data={tableData}
+              isLoading={loading}
+              onRowClick={handleRowClick}
+              defaultSortColumn="sortIndex"
+              defaultSortDirection="asc"
+              emptyStateMessage="Δεν υπάρχουν καταχωρημένα είδη εξοπλισμού"
+              containerClassName="bg-[#354f52] rounded border border-[#52796f]"
+              rowClassName="cursor-pointer hover:bg-[#354f52] py-0.5 text-xs"
+              showSearch={false}
+            />
+          </div>
+        )}
+        
+        <DialogFooter className="border-t border-[#52796f] pt-2 mt-2">
+          <Button 
+            variant="outline" 
+            onClick={onClose}
+            className="bg-[#354f52] border-[#52796f] text-[#cad2c5] hover:bg-[#52796f] h-8 px-3 text-sm"
+          >
+            Κλείσιμο
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

@@ -984,6 +984,140 @@ export type Database = {
           }
         ]
       }
+      equipment_categories: {
+        Row: {
+          id: string;
+          category_name: string;
+          name?: string; // Optional field as we're removing it
+          created_at: string;
+          date_created: string;
+          date_updated: string | null;
+          user_create: string | null;
+          user_updated: string | null;
+          code_prefix: string | null;
+        }
+        Insert: {
+          id?: string;
+          category_name: string;
+          name?: string;
+          created_at?: string;
+          date_created?: string;
+          date_updated?: string | null;
+          user_create?: string | null;
+          user_updated?: string | null;
+          code_prefix?: string | null;
+        }
+        Update: {
+          id?: string;
+          category_name?: string;
+          name?: string;
+          created_at?: string;
+          date_created?: string;
+          date_updated?: string | null;
+          user_create?: string | null;
+          user_updated?: string | null;
+          code_prefix?: string | null;
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_categories_user_create_fkey"
+            columns: ["user_create"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_categories_user_updated_fkey"
+            columns: ["user_updated"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      equipment_items: {
+        Row: {
+          id: string;
+          item_name: string;
+          name?: string; // Optional field as we might be removing it
+          category_id: string;
+          created_at: string;
+          date_created: string;
+          date_updated: string | null;
+          user_create: string | null;
+          user_updated: string | null;
+          status: string | null;
+          code: string | null;
+          is_available: boolean | null;
+          date_rented: string | null;
+          dates_available: string | null;
+          assigned_user: string | null;
+        }
+        Insert: {
+          id?: string;
+          item_name: string;
+          name?: string;
+          category_id: string;
+          created_at?: string;
+          date_created?: string;
+          date_updated?: string | null;
+          user_create?: string | null;
+          user_updated?: string | null;
+          status?: string | null;
+          code?: string | null;
+          is_available?: boolean | null;
+          date_rented?: string | null;
+          dates_available?: string | null;
+          assigned_user?: string | null;
+        }
+        Update: {
+          id?: string;
+          item_name?: string;
+          name?: string;
+          category_id?: string;
+          created_at?: string;
+          date_created?: string;
+          date_updated?: string | null;
+          user_create?: string | null;
+          user_updated?: string | null;
+          status?: string | null;
+          code?: string | null;
+          is_available?: boolean | null;
+          date_rented?: string | null;
+          dates_available?: string | null;
+          assigned_user?: string | null;
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_items_user_create_fkey"
+            columns: ["user_create"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_items_user_updated_fkey"
+            columns: ["user_updated"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_items_assigned_user_fkey"
+            columns: ["assigned_user"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
