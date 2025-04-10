@@ -533,44 +533,48 @@ const EquipmentSelector: React.FC<EquipmentSelectorProps> = ({
           // Process each category and its items
           if (fetchedCategories) {
             fetchedCategories.forEach(category => {
-              // Add the main category
-              combinedData.push({
-                id: category.id,
-                category_name: category.category_name,
-                created_at: category.created_at || category.date_created,
-                date_created: category.date_created,
-                date_updated: category.date_updated,
-                user_create: category.user_create,
-                user_updated: category.user_updated,
-                isItem: false,
-                code_prefix: category.code_prefix || null,
-                sortIndex: sortOrder++
-              });
-              
-              // Find and add items under their parent category immediately after the category
+              // Find available items for this category before adding the category
               const relatedItems = fetchedItems.filter(
-                item => item.category_id === category.id
+                item => item.category_id === category.id && item.is_available === true
               ) || [];
               
-              relatedItems.forEach(item => {
-                // Create a properly typed item entry
-                const itemEntry = {
-                  id: item.id,
-                  category_name: item.item_name,
-                  date_created: item.date_created,
-                  date_updated: item.date_updated,
-                  user_create: item.user_create,
-                  user_updated: item.user_updated,
-                  created_at: item.created_at,
-                  isItem: true,
-                  parentId: item.category_id,
-                  item_name: item.item_name,
-                  sortIndex: sortOrder++,
-                  originalItem: item
-                };
-                
-                combinedData.push(itemEntry);
-              });
+              // Only add the category if it has at least one available item
+              if (relatedItems.length > 0) {
+                // Add the main category
+                combinedData.push({
+                  id: category.id,
+                  category_name: category.category_name,
+                  created_at: category.created_at || category.date_created,
+                  date_created: category.date_created,
+                  date_updated: category.date_updated,
+                  user_create: category.user_create,
+                  user_updated: category.user_updated,
+                  isItem: false,
+                  code_prefix: category.code_prefix || null,
+                  sortIndex: sortOrder++
+                });
+              
+                // Add all available items under this category
+                relatedItems.forEach(item => {
+                  // Create a properly typed item entry
+                  const itemEntry = {
+                    id: item.id,
+                    category_name: item.item_name,
+                    date_created: item.date_created,
+                    date_updated: item.date_updated,
+                    user_create: item.user_create,
+                    user_updated: item.user_updated,
+                    created_at: item.created_at,
+                    isItem: true,
+                    parentId: item.category_id,
+                    item_name: item.item_name,
+                    sortIndex: sortOrder++,
+                    originalItem: item
+                  };
+                  
+                  combinedData.push(itemEntry);
+                });
+              }
             });
           }
           
@@ -633,6 +637,7 @@ const EquipmentSelector: React.FC<EquipmentSelectorProps> = ({
           </DialogTitle>
           <DialogDescription className="text-[#84a98c] text-xs">
             Επιλέξτε τον εξοπλισμό από την παρακάτω λίστα
+            <span className="block mt-1 text-green-400 font-medium">Εμφανίζεται μόνο ο διαθέσιμος εξοπλισμός</span>
           </DialogDescription>
         </DialogHeader>
         
@@ -649,7 +654,7 @@ const EquipmentSelector: React.FC<EquipmentSelectorProps> = ({
               onRowClick={handleRowClick}
               defaultSortColumn="sortIndex"
               defaultSortDirection="asc"
-              emptyStateMessage="Δεν υπάρχουν καταχωρημένα είδη εξοπλισμού"
+              emptyStateMessage="Δεν υπάρχει διαθέσιμος εξοπλισμός αυτή τη στιγμή"
               containerClassName="bg-[#354f52] rounded border border-[#52796f]"
               rowClassName="cursor-pointer hover:bg-[#354f52] py-0.5 text-xs"
               showSearch={false}

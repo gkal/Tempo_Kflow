@@ -54,6 +54,8 @@ interface CategoryWithItems {
   item_name?: string;
   code_prefix?: string | null;
   sortIndex?: number;
+  is_available?: boolean;
+  dates_available?: number | null;
 }
 
 // CategoryContextMenu Component για προσθήκη εξοπλισμού με δεξί κλικ
@@ -201,11 +203,18 @@ export function EquipmentSettingsTab() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<CategoryWithItems | null>(null);
   const [currentParentCategory, setCurrentParentCategory] = useState<CategoryWithItems | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    category_name: string;
+    item_name: string;
+    code: string;
+    is_active: boolean;
+    dates_available: string;
+  }>({
     category_name: "",
     item_name: "",
     code: "",
-    is_active: true
+    is_active: true,
+    dates_available: ""
   });
   const [formMessage, setFormMessage] = useState<{
     type: 'success' | 'error';
@@ -235,6 +244,7 @@ export function EquipmentSettingsTab() {
         
       if (itemsError) throw itemsError;
       
+      // Set items without logging
       setItems(itemsData as EquipmentItem[] || []);
       
       // Combine categories and items for display
@@ -276,6 +286,10 @@ export function EquipmentSettingsTab() {
               isItem: true,
               parentId: item.category_id,
               item_name: item.item_name,
+              is_available: item.is_available,
+              dates_available: item.dates_available !== null && item.dates_available !== undefined
+                ? Math.floor(Number(item.dates_available))
+                : null,
               sortIndex: sortOrder++
             };
             
@@ -350,14 +364,54 @@ export function EquipmentSettingsTab() {
   };
   
   // Open dialog for category editing
-  const openCategoryDialog = (category?: CategoryWithItems) => {
+  const openCategoryDialog = async (category?: CategoryWithItems) => {
     // Check if we should skip opening the dialog (for right-click handling)
     if (window.skipNextCategoryOpen) {
       window.skipNextCategoryOpen = false;
       return;
     }
     
-    if (category) {
+    // If this is an item (subcategory) being edited
+    if (category && category.isItem) {
+      // Set current category
+      setCurrentCategory(category);
+      
+      // Fetch detailed item data to get all fields
+      try {
+        const { data, error } = await supabase
+          .from('equipment_items')
+          .select('*')
+          .eq('id', category.id)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching item details:', error);
+        }
+        
+        // Initialize form with item data for editing
+        setFormData({
+          category_name: category.category_name,
+          item_name: data?.item_name || category.item_name || category.category_name,
+          code: data?.code || "",
+          // Use is_available field directly rather than status
+          is_active: data?.is_available === true,
+          // Convert number to string for the input field, but ensure it's not a date
+          dates_available: data?.dates_available !== null && data?.dates_available !== undefined ? 
+                           String(Number(data.dates_available)) : ""
+        });
+      } catch (error) {
+        console.error('Error retrieving item data:', error);
+        // Initialize with basic data if error
+        setFormData({
+          category_name: category.category_name,
+          item_name: "",
+          code: "",
+          is_active: true,
+          dates_available: ""
+        });
+      }
+    } else if (category) {
+      // Regular category editing
       setCurrentCategory(category);
       setFormData({
         ...formData,
@@ -374,15 +428,67 @@ export function EquipmentSettingsTab() {
     setShowCategoryDialog(true);
   };
   
-  // Open dialog for item creation
-  const openItemDialog = (parentCategory: CategoryWithItems) => {
+  // Open dialog for item creation or editing
+  const openItemDialog = async (parentCategory: CategoryWithItems) => {
     setCurrentParentCategory(parentCategory);
-    setFormData({
-      ...formData,
-      item_name: "",
-      code: "",
-      is_active: true
-    });
+    
+    // If this is an item (i.e., editing an existing item)
+    if (parentCategory.isItem && parentCategory.parentId) {
+      // Find the category for this item
+      const category = categories.find(cat => cat.id === parentCategory.parentId);
+      if (category) {
+        setCurrentParentCategory(category);
+      }
+      
+      // Set currentCategory for editing
+      setCurrentCategory(parentCategory);
+      
+      // Look for the item's dates_available value
+      try {
+        const { data, error } = await supabase
+          .from('equipment_items')
+          .select('*')
+          .eq('id', parentCategory.id)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching item details:', error);
+        }
+        
+        // Initialize form with item data
+        setFormData({
+          category_name: "",
+          item_name: parentCategory.item_name || parentCategory.category_name,
+          code: data?.code || "",
+          // Use is_available directly - it's a boolean
+          is_active: data?.is_available === true,
+          // Convert number to string for the input field, but ensure it's not a date
+          dates_available: data?.dates_available !== null && data?.dates_available !== undefined ? 
+                           String(Number(data.dates_available)) : ""
+        });
+      } catch (error) {
+        console.error('Error retrieving item data:', error);
+        // Initialize with basic data if error
+        setFormData({
+          category_name: "",
+          item_name: parentCategory.item_name || parentCategory.category_name,
+          code: "",
+          is_active: true,
+          dates_available: ""
+        });
+      }
+    } else {
+      // Creating a new item
+      setCurrentCategory(null);
+      setFormData({
+        category_name: "",
+        item_name: "",
+        code: "",
+        is_active: true,
+        dates_available: ""
+      });
+    }
+    
     setShowItemDialog(true);
   };
   
@@ -470,37 +576,63 @@ export function EquipmentSettingsTab() {
     }
 
     try {
-      // Update item data
-      const { error } = await supabase
-        .from('equipment_items')
-        .update({
-          item_name: formData.item_name,
-          name: formData.item_name,
-          code: formData.code || "",
-          date_updated: new Date().toISOString(),
-          user_updated: null, // Set to null to avoid foreign key constraint issues
-          status: formData.is_active.toString()
-        })
-        .eq('id', currentCategory?.id);
+      // Convert dates_available to integer if provided
+      let maxDaysValue: number | null = null;
+      if (formData.dates_available.trim() !== '') {
+        // Parse directly to integer, don't convert through Date
+        maxDaysValue = parseInt(formData.dates_available, 10);
+        // Extra validation to ensure it's a valid number
+        if (isNaN(maxDaysValue) || maxDaysValue < 0) {
+          maxDaysValue = null;
+        }
+      }
+      
+      // Create update data - ensure both is_available and status fields get the same boolean value
+      const updateData: any = {
+        item_name: formData.item_name,
+        name: formData.item_name,
+        code: formData.code || "",
+        date_updated: new Date().toISOString(),
+        user_updated: null,
+        // Set both fields to the same boolean value
+        is_available: formData.is_active,
+        status: formData.is_active
+      };
+      
+      // Add dates_available if it's a valid number
+      if (maxDaysValue !== null) {
+        // Store directly as a number
+        updateData.dates_available = maxDaysValue;
+      } else {
+        // Make sure to set null if no valid value
+        updateData.dates_available = null;
+      }
+      
+      // Use DataService to update the record
+      const { error } = await updateRecord<EquipmentItem>(
+        'equipment_items',
+        currentCategory?.id || '',
+        updateData
+      );
         
       if (error) {
         console.error('Update item error:', error);
         throw error;
       }
-      
+        
       setFormMessage({
         type: 'success',
         text: 'Το στοιχείο εξοπλισμού ενημερώθηκε επιτυχώς.'
       });
-      
+        
       // Refresh data
       fetchEquipmentSettings();
-      
+        
       // Reset form after successful submission
       setTimeout(() => {
-        setFormData({ category_name: "", item_name: "", code: "", is_active: true });
+        setFormData({ category_name: "", item_name: "", code: "", is_active: true, dates_available: "" });
         setCurrentCategory(null);
-        setShowItemDialog(false);
+        setShowCategoryDialog(false); // Close the category dialog instead of item dialog
         setFormMessage(null);
       }, 1500);
     } catch (error) {
@@ -516,7 +648,7 @@ export function EquipmentSettingsTab() {
   const handleItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormMessage(null);
-    
+
     if (!formData.item_name.trim()) {
       setFormMessage({
         type: 'error',
@@ -525,49 +657,76 @@ export function EquipmentSettingsTab() {
       return;
     }
 
+    if (!currentParentCategory) {
+      console.error('No category selected for item');
+      return;
+    }
+
     try {
-      // Create new item using DataService
-      const newItemData = {
+      // Convert dates_available to integer if provided
+      let maxDaysValue: number | null = null;
+      if (formData.dates_available.trim() !== '') {
+        // Parse directly to integer, don't convert through Date
+        maxDaysValue = parseInt(formData.dates_available, 10);
+        // Extra validation to ensure it's a valid number
+        if (isNaN(maxDaysValue) || maxDaysValue < 0) {
+          maxDaysValue = null;
+        }
+      }
+      
+      // Create new item data - both status and is_available are set to the same boolean value
+      const newItemData: any = {
         item_name: formData.item_name,
         name: formData.item_name,
         code: formData.code || "",
-        category_id: currentParentCategory?.id,
+        category_id: currentParentCategory.id,
         date_created: new Date().toISOString(),
         created_at: new Date().toISOString(),
-        user_create: null, // Set to null to avoid foreign key constraint issues
-        status: formData.is_active.toString() // Convert boolean to string to match TypeScript definitions
+        user_create: null,
+        // Set both fields as booleans
+        is_available: formData.is_active,
+        status: formData.is_active
       };
-      
-      const { data: newItem, error } = await createRecord<EquipmentItem>(
+
+      // Add dates_available if it's a valid number
+      if (maxDaysValue !== null) {
+        // Store directly as a number
+        newItemData.dates_available = maxDaysValue;
+      } else {
+        // Make sure to set null if no valid value
+        newItemData.dates_available = null;
+      }
+
+      // Use DataService to create a new record
+      const { data, error } = await createRecord<EquipmentItem>(
         'equipment_items',
         newItemData
       );
-        
+
       if (error) {
         console.error('Create item error:', error);
         throw error;
       }
-      
+
       setFormMessage({
         type: 'success',
         text: 'Το στοιχείο εξοπλισμού δημιουργήθηκε επιτυχώς.'
       });
-      
+
       // Refresh data
       fetchEquipmentSettings();
-      
+
       // Reset form after successful submission
       setTimeout(() => {
-        setFormData({ category_name: "", item_name: "", code: "", is_active: true });
-        setCurrentParentCategory(null);
+        setFormData({ category_name: "", item_name: "", code: "", is_active: true, dates_available: "" });
         setShowItemDialog(false);
         setFormMessage(null);
       }, 1500);
     } catch (error) {
-      console.error('Error saving equipment item:', error);
+      console.error('Error creating equipment item:', error);
       setFormMessage({
         type: 'error',
-        text: 'Σφάλμα κατά την αποθήκευση του στοιχείου εξοπλισμού.'
+        text: 'Σφάλμα κατά τη δημιουργία του στοιχείου εξοπλισμού.'
       });
     }
   };
@@ -578,7 +737,7 @@ export function EquipmentSettingsTab() {
     
     try {
       if (currentCategory.isItem) {
-        // Delete item using DataService
+        // Use DataService for soft delete
         const { error } = await softDeleteRecord(
           'equipment_items',
           currentCategory.id
@@ -609,7 +768,7 @@ export function EquipmentSettingsTab() {
           return;
         }
         
-        // Delete category using DataService
+        // Use DataService for soft delete
         const { error } = await softDeleteRecord(
           'equipment_categories',
           currentCategory.id
@@ -659,20 +818,26 @@ export function EquipmentSettingsTab() {
     {
       header: "Ονομασία Εξοπλισμού",
       accessor: "category_name",
-      width: "400px",
+      width: "300px",
       cell: (value: string, row: CategoryWithItems) => {
         if (!value) return "-";
         
         if (row.isItem) {
           return (
-            <div className="pl-6 flex items-center text-[#84a98c]">
+            <div 
+              className="pl-6 flex items-center text-[#84a98c]"
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent the category click from firing
+                openCategoryDialog(row); // Open dialog for this subcategory
+              }}
+            >
               <span className="mr-2 text-[#52796f] flex-shrink-0">└─</span>
               {value}
             </div>
           );
         }
         
-        // Για τις κύριες κατηγορίες, χρησιμοποιούμε το context menu
+        // For main categories, use the context menu
         return (
           <CategoryContextMenu 
             categoryId={row.id} 
@@ -682,6 +847,25 @@ export function EquipmentSettingsTab() {
               {value}
             </div>
           </CategoryContextMenu>
+        );
+      }
+    },
+    {
+      header: "Διαθεσιμότητα",
+      accessor: "is_available",
+      width: "120px",
+      cell: (value: boolean, row: CategoryWithItems) => {
+        if (!row.isItem) return "";
+        
+        // Find the actual item in the items array to get its availability
+        const item = items.find(i => i.id === row.id);
+        const isAvailable = item?.is_available === true;
+        
+        return (
+          <div className="flex items-center">
+            <div className={`w-3 h-3 rounded-full mr-2 ${isAvailable ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span>{isAvailable ? 'Ενεργός' : 'Ανενεργός'}</span>
+          </div>
         );
       }
     },
@@ -697,8 +881,6 @@ export function EquipmentSettingsTab() {
       width: "120px",
       cell: (_, row: CategoryWithItems) => (
         <div className="flex justify-end space-x-2">
-          {/* Remove the edit pencil icon since items can be edited by clicking on them */}
-          
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -721,6 +903,11 @@ export function EquipmentSettingsTab() {
       )
     }
   ];
+  
+  // Add debug information to check item structure
+  useEffect(() => {
+    // No debug logs needed
+  }, [items]);
   
   return (
     <TooltipProvider>
@@ -757,7 +944,12 @@ export function EquipmentSettingsTab() {
               defaultSortDirection="asc"
               emptyStateMessage="Δεν υπάρχουν καταχωρημένες κατηγορίες εξοπλισμού."
               showSearch={false}
-              onRowClick={openCategoryDialog}
+              onRowClick={(row) => {
+                // Only open the category dialog for categories, not subcategories
+                if (!row.isItem) {
+                  openCategoryDialog(row);
+                }
+              }}
               containerClassName="bg-[#354f52] rounded-lg border border-[#52796f] overflow-hidden"
               rowClassName="cursor-pointer hover:bg-[#354f52]"
             />
@@ -789,74 +981,208 @@ export function EquipmentSettingsTab() {
               </DialogTitle>
             </DialogHeader>
             
-            <form onSubmit={handleCategorySubmit} className="space-y-6">
-              <div className="bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-                <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
-                  <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                    ΣΤΟΙΧΕΙΑ ΚΑΤΗΓΟΡΙΑΣ
-                  </h2>
-                </div>
-                <div className="p-4">
-                  <div className="flex items-center mb-4">
-                    <div className="w-1/3 text-[#a8c5b5] text-sm pr-2">
-                      {currentCategory?.isItem ? 'Όνομα Εξοπλισμού' : 'Όνομα Κατηγορίας'} <span className="text-red-500">*</span>
+            {currentCategory && currentCategory.isItem ? (
+              // If editing a subcategory (equipment item), show all fields
+              <form onSubmit={handleItemUpdate} className="space-y-6">
+                <div className="bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+                  <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
+                    <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                      ΣΤΟΙΧΕΙΑ ΕΞΟΠΛΙΣΜΟΥ
+                    </h2>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center mb-4">
+                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-2">
+                        Όνομα Εξοπλισμού <span className="text-red-500">*</span>
+                      </div>
+                      <div className="w-2/3">
+                        <Input
+                          id="item_name"
+                          name="item_name"
+                          value={formData.item_name || formData.category_name}
+                          onChange={(e) => setFormData(prev => ({ ...prev, item_name: e.target.value, category_name: e.target.value }))}
+                          className="bg-[#1e2629] border border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]/50 focus:ring-2 focus:ring-[#84a98c] hover:border-[#84a98c] transition-all duration-200 w-full"
+                          placeholder="π.χ. Φορτηγό Mercedes 3.5T"
+                          disabled={loading}
+                          required
+                        />
+                      </div>
                     </div>
-                    <div className="w-2/3">
-                      <Input
-                        id="category_name"
-                        name="category_name"
-                        value={formData.category_name}
-                        onChange={(e) => setFormData(prev => ({ ...prev, category_name: e.target.value }))}
-                        className="bg-[#1e2629] border border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]/50 focus:ring-2 focus:ring-[#84a98c] hover:border-[#84a98c] transition-all duration-200 w-full"
-                        placeholder={currentCategory?.isItem 
-                          ? "π.χ. Φορτηγό Mercedes 3.5T" 
-                          : "π.χ. Οχήματα, Μηχανήματα έργου κ.λ.π."
-                        }
-                        disabled={loading}
-                        required
-                      />
+                    
+                    <div className="flex items-center mb-4">
+                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-2">
+                        Κωδικός (προαιρετικό)
+                      </div>
+                      <div className="w-2/3">
+                        <Input
+                          id="code"
+                          name="code"
+                          value={formData.code}
+                          onChange={handleInputChange}
+                          placeholder="π.χ. EQ001"
+                          className="bg-[#1e2629] border border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]/50 focus:ring-2 focus:ring-[#84a98c] hover:border-[#84a98c] transition-all duration-200 w-full"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center mb-4">
+                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-2">
+                        Μέγιστο Διάστημα Διαθεσιμότητας (ημέρες)
+                      </div>
+                      <div className="w-2/3">
+                        <Input
+                          id="dates_available"
+                          name="dates_available"
+                          type="number"
+                          min="0"
+                          value={formData.dates_available}
+                          onChange={(e) => setFormData(prev => ({ ...prev, dates_available: e.target.value }))}
+                          placeholder="π.χ. 7"
+                          className="bg-[#1e2629] border border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]/50 focus:ring-2 focus:ring-[#84a98c] hover:border-[#84a98c] transition-all duration-200 w-full"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-2">
+                        Κατάσταση
+                      </div>
+                      <div className="w-2/3 flex items-center gap-3">
+                        <div 
+                          className={`relative w-12 h-6 ${formData.is_active ? 'bg-[#84a98c]' : 'bg-gray-600'} rounded-full cursor-pointer border border-[#52796f] transition-colors duration-300`}
+                          onClick={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
+                        >
+                          <div 
+                            className={`absolute top-[3px] transform transition-transform duration-300 ease-in-out ${
+                              formData.is_active ? 'translate-x-6' : 'translate-x-1'
+                            } w-4 h-4 bg-white rounded-full border border-green-700`}
+                          />
+                        </div>
+                        
+                        <Label className="text-[#cad2c5] cursor-pointer" onClick={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}>
+                          {formData.is_active ? 
+                            <span>Ενεργός</span> : 
+                            <span>Ανενεργός</span>}
+                        </Label>
+                        <input 
+                          type="checkbox" 
+                          id="is_active" 
+                          className="hidden"
+                          checked={formData.is_active}
+                          onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              
-              {formMessage && (
-                <div
-                  className={`p-3 rounded-md ${
-                    formMessage.type === "success"
-                      ? "bg-green-900/30 text-green-300 border border-green-800"
-                      : "bg-red-900/30 text-red-300 border border-red-800"
-                  }`}
-                >
-                  {formMessage.text}
+                
+                {formMessage && (
+                  <div
+                    className={`p-3 rounded-md ${
+                      formMessage.type === "success"
+                        ? "bg-green-900/30 text-green-300 border border-green-800"
+                        : "bg-red-900/30 text-red-300 border border-red-800"
+                    }`}
+                  >
+                    {formMessage.text}
+                  </div>
+                )}
+                
+                <DialogFooter className="mt-6 border-t border-[#52796f] pt-6 flex gap-2">
+                  <Button
+                    type="submit"
+                    disabled={loading || !formData.item_name.trim()}
+                    className={`text-[#cad2c5] transition-colors duration-200 flex-1 shadow-md hover:shadow-lg ${
+                      !formData.item_name.trim() ? 'bg-[#52796f]/50 cursor-not-allowed' : 'bg-[#52796f] hover:bg-[#84a98c]'
+                    }`}
+                  >
+                    Αποθήκευση
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowCategoryDialog(false);
+                      setCurrentCategory(null);
+                      setFormMessage(null);
+                    }}
+                    className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5] transition-colors duration-200 flex-1"
+                    disabled={loading}
+                  >
+                    Ακύρωση
+                  </Button>
+                </DialogFooter>
+              </form>
+            ) : (
+              // Otherwise show regular category form
+              <form onSubmit={handleCategorySubmit} className="space-y-6">
+                <div className="bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+                  <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
+                    <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                      ΣΤΟΙΧΕΙΑ ΚΑΤΗΓΟΡΙΑΣ
+                    </h2>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center mb-4">
+                      <div className="w-1/3 text-[#a8c5b5] text-sm pr-2">
+                        Όνομα Κατηγορίας <span className="text-red-500">*</span>
+                      </div>
+                      <div className="w-2/3">
+                        <Input
+                          id="category_name"
+                          name="category_name"
+                          value={formData.category_name}
+                          onChange={(e) => setFormData(prev => ({ ...prev, category_name: e.target.value }))}
+                          className="bg-[#1e2629] border border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]/50 focus:ring-2 focus:ring-[#84a98c] hover:border-[#84a98c] transition-all duration-200 w-full"
+                          placeholder="π.χ. Οχήματα, Μηχανήματα έργου κ.λ.π."
+                          disabled={loading}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
-              
-              <DialogFooter className="mt-6 border-t border-[#52796f] pt-6 flex gap-2">
-                <Button
-                  type="submit"
-                  disabled={loading || !formData.category_name.trim()}
-                  className={`text-[#cad2c5] transition-colors duration-200 flex-1 shadow-md hover:shadow-lg ${
-                    !formData.category_name.trim() ? 'bg-[#52796f]/50 cursor-not-allowed' : 'bg-[#52796f] hover:bg-[#84a98c]'
-                  }`}
-                >
-                  Αποθήκευση
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setShowCategoryDialog(false);
-                    setCurrentCategory(null);
-                    setFormMessage(null);
-                  }}
-                  className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5] transition-colors duration-200 flex-1"
-                  disabled={loading}
-                >
-                  Ακύρωση
-                </Button>
-              </DialogFooter>
-            </form>
+                
+                {formMessage && (
+                  <div
+                    className={`p-3 rounded-md ${
+                      formMessage.type === "success"
+                        ? "bg-green-900/30 text-green-300 border border-green-800"
+                        : "bg-red-900/30 text-red-300 border border-red-800"
+                    }`}
+                  >
+                    {formMessage.text}
+                  </div>
+                )}
+                
+                <DialogFooter className="mt-6 border-t border-[#52796f] pt-6 flex gap-2">
+                  <Button
+                    type="submit"
+                    disabled={loading || !formData.category_name.trim()}
+                    className={`text-[#cad2c5] transition-colors duration-200 flex-1 shadow-md hover:shadow-lg ${
+                      !formData.category_name.trim() ? 'bg-[#52796f]/50 cursor-not-allowed' : 'bg-[#52796f] hover:bg-[#84a98c]'
+                    }`}
+                  >
+                    Αποθήκευση
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowCategoryDialog(false);
+                      setCurrentCategory(null);
+                      setFormMessage(null);
+                    }}
+                    className="border-[#52796f] text-[#cad2c5] hover:bg-[#354f52] hover:text-[#cad2c5] transition-colors duration-200 flex-1"
+                    disabled={loading}
+                  >
+                    Ακύρωση
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
           </DialogContent>
         </Dialog>
         
@@ -918,6 +1244,25 @@ export function EquipmentSettingsTab() {
                         value={formData.code}
                         onChange={handleInputChange}
                         placeholder="π.χ. EQ001"
+                        className="bg-[#1e2629] border border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]/50 focus:ring-2 focus:ring-[#84a98c] hover:border-[#84a98c] transition-all duration-200 w-full"
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center mb-4">
+                    <div className="w-1/3 text-[#a8c5b5] text-sm pr-2">
+                      Μέγιστο Διάστημα Διαθεσιμότητας (ημέρες)
+                    </div>
+                    <div className="w-2/3">
+                      <Input
+                        id="dates_available"
+                        name="dates_available"
+                        type="number"
+                        min="0"
+                        value={formData.dates_available}
+                        onChange={(e) => setFormData(prev => ({ ...prev, dates_available: e.target.value }))}
+                        placeholder="π.χ. 7"
                         className="bg-[#1e2629] border border-[#52796f] text-[#cad2c5] placeholder:text-[#84a98c]/50 focus:ring-2 focus:ring-[#84a98c] hover:border-[#84a98c] transition-all duration-200 w-full"
                         disabled={loading}
                       />

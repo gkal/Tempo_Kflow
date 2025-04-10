@@ -353,7 +353,7 @@ export interface EquipmentItem {
   code: string | null;
   is_available?: boolean | null;
   date_rented?: string | null;
-  dates_available?: string | null;
+  dates_available: number | null;
   assigned_user?: string | null;
   deleted_at?: string | null;
   is_deleted?: boolean | null;

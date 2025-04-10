@@ -503,6 +503,16 @@ export function VirtualDataTable<T extends Record<string, any>>({
       return 45;
     }, [rows, expandedRowIds, getRowId, hasExpandedRows, stabilizeExpandedRows]),
     overscan: hasExpandedRows ? 50 : 10, // Increase overscan when rows are expanded
+    // Use smooth scrolling with proper type signature
+    scrollToFn: useCallback((offset, canSmooth, instance) => {
+      const scrollElement = instance.scrollElement;
+      if (scrollElement) {
+        scrollElement.scrollTo({
+          top: offset,
+          behavior: canSmooth ? 'smooth' : 'auto'
+        });
+      }
+    }, []),
     rangeExtractor: useCallback((range) => {
       // Find expanded row index if any
       const expandedRowIndex = hasExpandedRows 
@@ -516,9 +526,13 @@ export function VirtualDataTable<T extends Record<string, any>>({
       const { startIndex, endIndex, overscan } = range;
       const newRange = [];
       
-      // Add extra buffer before and after for smooth scrolling
+      // Add extra buffer before for smooth scrolling
       const start = Math.max(0, startIndex - overscan);
-      const end = Math.min(rows.length - 1, endIndex + overscan);
+      
+      // Add extra buffer at the end with more overlap to prevent jumping
+      // Use a larger overscan value at the end for stability
+      const endOverscan = Math.min(rows.length * 0.25, 100); // Up to 25% of rows or 100 max
+      const end = Math.min(rows.length - 1, endIndex + endOverscan);
       
       // Add expanded row index to the range if it's not already included
       if (expandedRowIndex !== -1 && (expandedRowIndex < start || expandedRowIndex > end)) {
@@ -889,7 +903,17 @@ export function VirtualDataTable<T extends Record<string, any>>({
         "w-full rounded-md mt-4 border border-[#52796f] bg-[#2f3e46] text-black overflow-x-auto",
         containerClassName
       )}>
-        <div className="overflow-x-auto overflow-y-auto relative" ref={parentRef} style={{ height: '60vh' }}>
+        <div 
+          className="overflow-x-auto overflow-y-auto relative" 
+          ref={parentRef} 
+          style={{ 
+            height: '60vh', 
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#52796f #2f3e46',
+            overscrollBehavior: 'none', // Prevent scroll chaining
+            contain: 'strict' // Optimize rendering
+          }}
+        >
           {isDragging && (
             <div className="absolute inset-0 bg-[#354f52]/30 pointer-events-none z-10" />
           )}
@@ -902,9 +926,10 @@ export function VirtualDataTable<T extends Record<string, any>>({
                       const meta = header.column.columnDef.meta as { className?: string; headerClassName?: string } | undefined;
                       const className = meta?.className;
                       const isDraggedColumn = isDragging && draggedColumnId === header.column.id;
+                      const isLastHeader = i === headerGroup.headers.length - 1;
                       
                       return (
-                        <th 
+                        <th
                           key={header.id}
                           data-column-id={header.column.id}
                           draggable
@@ -914,9 +939,10 @@ export function VirtualDataTable<T extends Record<string, any>>({
                           onDrop={(e) => handleDrop(e, header.column.id)}
                           onDragEnd={handleDragEnd}
                           className={cn(
-                            "px-3 py-3 text-left text-sm font-medium text-[#84a98c] hover:text-white whitespace-nowrap relative bg-[#2f3e46] h-[48px] border-0 transition-all duration-150",
-                            i < headerGroup.headers.length - 1 && "after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-px after:bg-[#52796f]/50",
-                            header.column.getCanSort() ? "cursor-pointer select-none" : "",
+                            "p-2 text-center text-sm font-medium text-[#84a98c] hover:text-white whitespace-nowrap relative bg-[#2f3e46] h-[48px] border-0 transition-all duration-150",
+                            i < headerGroup.headers.length - 1 ? "after:content-[''] after:absolute after:right-0 after:top-1/4 after:h-1/2 after:w-px after:bg-[#52796f]/50" : "",
+                            isLastHeader && "border-r-[2px] border-r-[#52796f]",
+                            header.column.getCanSort() ? "cursor-pointer select-none" : "cursor-grab active:cursor-grabbing",
                             isDraggedColumn && "bg-[#84a98c]/20 backdrop-blur-sm shadow-lg z-30",
                             dropTargetId === header.column.id && "before:content-[''] before:absolute before:left-0 before:top-0 before:h-full before:w-1 before:bg-[#84a98c] before:z-40",
                             className
@@ -931,9 +957,10 @@ export function VirtualDataTable<T extends Record<string, any>>({
                           <div className="flex items-center h-full">
                             <div
                               className={cn(
-                                "cursor-grab active:cursor-grabbing mr-2",
+                                "cursor-grab active:cursor-grabbing",
                                 isDraggedColumn && "cursor-grabbing"
                               )}
+                              style={{ width: 0, height: 0, overflow: 'hidden' }}
                             >
                               <Grip className={cn(
                                 "h-3 w-3",
@@ -998,7 +1025,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
               <tbody className="divide-y divide-[#52796f]/20">
                 {paddingTop > 0 && (
                   <tr>
-                    <td colSpan={tableColumns.length} style={{ height: `${paddingTop}px` }} />
+                    <td colSpan={tableColumns.length} style={{ height: `${paddingTop}px`, padding: 0 }} />
                   </tr>
                 )}
                 
@@ -1089,7 +1116,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
                 
                 {paddingBottom > 0 && (
                   <tr>
-                    <td colSpan={tableColumns.length} style={{ height: `${paddingBottom}px` }} />
+                    <td colSpan={tableColumns.length} style={{ height: `${paddingBottom}px`, padding: 0 }} />
                   </tr>
                 )}
               </tbody>

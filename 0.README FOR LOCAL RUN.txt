@@ -1,6 +1,30 @@
 Only when the USER prompts #DONE, create a new .md file in C:\Tempo_Kflow\temp with the prefix of date-time (dd_mm_yyyy_hhmm), and then a short description of the chat.The contents are a summary of what we did in this chat, including modified files. If there is anything left to do, include a section TO DO. At the top of the file include the start time and end time of the chat. The goal of this log is so that it can be used to continue this work in later chats.
 Only when the USER prompts #DONEFULL, create a new .md file in C:\Tempo_Kflow\temp with the prefix of date-time (dd_mm_yyyy_hhmm), and then a short description of all the chat files that exist there.The contents are a summary of what we did from all the chats, including modified files. If there is anything left to do, include a section TO DO. At the top of the file include the start time and end time of the chat. The goal of this log is so that it can be used to continue this work in later chats.
+====================== Tasks ======================================
+1. Create a .md file
 
+2. Add this line to the top of it:
+"As you complete tasks and reference relevant files update this file as our memory to help with future tasks."
+
+3. Explain the task to Cursor Agent and have it fill out the core of the file. A transcription app like 
+@WisprFlow
+ or 
+@superwhisperapp
+ is great for this. Takes 2 minutes to describe a full feature and the steps needed. Then let Cursor organise the tasks for you neatly in the .md file based on your voice note.
+
+4. Ask Cursor to implement the first task in the file.
+
+5. Once that's done, the .md will be updated with the latest info, and you can ask it to move on to the next and so on.
+You could ask Cursor to implement everything in one go, but I prefer to understand what's happening at each stage - correct or approve - and then move on to the next step.
+
+What does this give us?
+
+Every step the .md file gets "smarter" and has all the latest context.
+
+This file is basically our to do list / kanban. It helps prevent the need to explain the same thing over and over. It's our task memory.
+
+It breaks down the tasks into manageable chunks. The same way a productive human works. The same way that AIs like Manus work.
+======================================================================================
 read the latest file we have create at the chat folder to see our last steps and to understand what we have done so far tell me if you understand it DONT CHANGE THE UI and after you read it
 
 ατέβασε και εγκατάστησε το Node.js από https://nodejs.org/en
