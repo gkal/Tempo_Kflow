@@ -6,7 +6,13 @@ import { CustomerFormInfo, CustomerContactInfo } from './customerFormService/typ
  * Base URL for form links
  * This should be set from environment variables
  */
-const FORM_BASE_URL = process.env.NEXT_PUBLIC_FORM_BASE_URL || 'https://yourapp.com/form';
+const FORM_BASE_URL = import.meta.env.VITE_FORM_BASE_URL || 'https://yourapp.com/form';
+
+/**
+ * Default company name
+ * This should be set from environment variables
+ */
+const COMPANY_NAME = import.meta.env.VITE_COMPANY_NAME || 'Your Company';
 
 /**
  * Interface for Gmail compose options
@@ -160,7 +166,7 @@ ${formLinkUrl}
 Αν έχετε ερωτήσεις, μη διστάσετε να επικοινωνήσετε μαζί μας.
 
 Ευχαριστούμε,
-${process.env.COMPANY_NAME || 'Your Company'} Team`;
+${COMPANY_NAME} Team`;
     
     // Generate Gmail compose URL
     return generateGmailComposeUrl({
@@ -234,7 +240,7 @@ export const generateFormLinkFollowUpUrl = (
     });
     
     // Get sender details
-    const companyName = senderInfo.companyName || process.env.COMPANY_NAME || 'Your Company';
+    const companyName = senderInfo.companyName || COMPANY_NAME;
     
     // Create subject
     const subject = `Υπενθύμιση: Συμπλήρωση Φόρμας - ${customerInfo.name}`;

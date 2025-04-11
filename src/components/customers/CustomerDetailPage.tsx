@@ -46,6 +46,7 @@ import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
 import CustomerFormLinkButton from "@/components/forms/CustomerFormLinkButton";
+import FormLinksTable from "@/components/forms/FormLinksTable";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -1152,47 +1153,38 @@ export default function CustomerDetailPage() {
                                         {customer.town || "—"}
                                       </div>
                                     </div>
+
+                                    <div>
+                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
+                                        Περιοχή
+                                      </div>
+                                      <div className="text-sm font-normal">
+                                        {customer.area || "—"}
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                              
-                              {/* Additional fields */}
-                              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {Object.entries(customer).map(([key, value]) => {
-                                  // Skip fields that are already displayed or belong to other categories
-                                  if (['id', 'company_name', 'customer_type', 'afm', 'doy', 
-                                       'address', 'postal_code', 'town', 
-                                       'telephone', 'email', 'webpage', 'fax_number',
-                                       'notes', 'status', 'created_at', 'updated_at', 
-                                       'created_by', 'modified_by', 'primary_contact_id'].includes(key)) {
-                                    return null;
-                                  }
-                                  
-                                  // Skip object values and null/undefined values
-                                  if (typeof value === 'object' || value === null || value === undefined) {
-                                    return null;
-                                  }
-                                  
-                                  // Skip history-related fields
-                                  if (key.includes('date') || key.includes('time') || key.includes('by') || 
-                                      key.includes('history') || key.includes('log')) {
-                                    return null;
-                                  }
-                                  
-                                  // Display any other fields that might exist
-                                  return (
-                                    <div key={key}>
-                                      <div className="text-[#84a98c] text-xs mb-1 font-bold">
-                                        {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}
-                                      </div>
-                                      <div className="text-sm font-normal">{value.toString() || "—"}</div>
-                                    </div>
-                                  );
-                                })}
                               </div>
                             </div>
                           </div>
 
+                          {/* Form Links Section */}
+                          <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden mb-6">
+                            <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
+                              <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                                ΦΟΡΜΕΣ ΠΕΛΑΤΗ
+                              </h2>
+                            </div>
+                            <div className="p-4">
+                              {id && (
+                                <FormLinksTable 
+                                  customerId={id} 
+                                  customerEmail={customer?.email}
+                                />
+                              )}
+                            </div>
+                          </div>
+                          
                           {/* History Section */}
                           <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
                             <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f] flex justify-between items-center">

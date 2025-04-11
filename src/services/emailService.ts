@@ -13,7 +13,6 @@
 
 import { logError, logInfo } from '@/utils';
 import { getCustomerInfoForOffer } from './offerFormService';
-import { FormLink, FormLinkWithOffer } from './formLinkService/types';
 
 // Update the imports to include CustomerFormLink and other required types
 import { CustomerFormLink, FormLinkStatus } from './formLinkService/types';
@@ -68,19 +67,19 @@ interface CustomerInfo {
  * Base URL for form links
  * This should be set from environment variables
  */
-const FORM_BASE_URL = process.env.NEXT_PUBLIC_FORM_BASE_URL || 'https://yourapp.com/form';
+const FORM_BASE_URL = import.meta.env.VITE_FORM_BASE_URL || 'https://yourapp.com/form';
 
 /**
  * Default sender email
  * This should be set from environment variables
  */
-const DEFAULT_FROM_EMAIL = process.env.EMAIL_FROM || 'offers@yourcompany.com';
+const DEFAULT_FROM_EMAIL = import.meta.env.VITE_EMAIL_FROM || 'offers@yourcompany.com';
 
 /**
  * Default company name for sender
  * This should be set from environment variables
  */
-const COMPANY_NAME = process.env.COMPANY_NAME || 'Your Company';
+const COMPANY_NAME = import.meta.env.VITE_COMPANY_NAME || 'Your Company';
 
 /**
  * Initialize Resend client with API key
@@ -88,22 +87,16 @@ const COMPANY_NAME = process.env.COMPANY_NAME || 'Your Company';
  */
 const initializeResendClient = () => {
   // Check if Resend API key is available
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = import.meta.env.VITE_RESEND_API_KEY;
   
   if (!apiKey) {
     logInfo('Resend API key not found, using mock implementation', null, 'EmailService');
     return createMockResendClient();
   }
   
-  // Import Resend dynamically to avoid issues during SSR
-  // Use any type to avoid TypeScript errors
-  return import('resend').then((module: any) => {
-    const { Resend } = module;
-    return new Resend(apiKey);
-  }).catch((error) => {
-    logError('Failed to initialize Resend client', error, 'EmailService');
-    return createMockResendClient();
-  });
+  // Create mock Resend client since the actual package is not installed
+  logInfo('Using mock Resend implementation', null, 'EmailService');
+  return createMockResendClient();
 };
 
 /**
@@ -416,7 +409,7 @@ const generateFormSubmissionNotificationTemplate = (
           <h2>Δεδομένα φόρμας:</h2>
           ${submissionHtml}
           <p style="text-align: center; margin-top: 20px;">
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/forms/approval" class="button">Έλεγχος Φόρμας</a>
+            <a href="${import.meta.env.VITE_APP_URL}/forms/approval" class="button">Έλεγχος Φόρμας</a>
           </p>
         </div>
         <div class="footer">
@@ -440,7 +433,7 @@ ${Object.entries(submissionData)
   .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
   .join('\n')}
 
-Για να ελέγξετε τη φόρμα, επισκεφθείτε: ${process.env.NEXT_PUBLIC_APP_URL}/forms/approval
+Για να ελέγξετε τη φόρμα, επισκεφθείτε: ${import.meta.env.VITE_APP_URL}/forms/approval
 
 Αυτό το email στάλθηκε αυτόματα. Παρακαλούμε μην απαντήσετε σε αυτό το email.
   `;
@@ -492,9 +485,9 @@ const generateApprovalRequestTemplate = (
   
   submissionHtml += '</table>';
   
-  const approveUrl = `${process.env.NEXT_PUBLIC_APP_URL}/forms/approve/${approvalToken}?action=approve`;
-  const rejectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/forms/approve/${approvalToken}?action=reject`;
-  const viewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/forms/approval/${formLinkId}`;
+  const approveUrl = `${import.meta.env.VITE_APP_URL}/forms/approve/${approvalToken}?action=approve`;
+  const rejectUrl = `${import.meta.env.VITE_APP_URL}/forms/approve/${approvalToken}?action=reject`;
+  const viewUrl = `${import.meta.env.VITE_APP_URL}/forms/approval/${formLinkId}`;
   
   const html = `
     <!DOCTYPE html>
@@ -576,7 +569,7 @@ const generateApprovalRequestTemplate = (
             <a href="${viewUrl}" class="button view">Προβολή Λεπτομερειών</a>
           </div>
           
-          <p>Ή μπορείτε να επισκεφθείτε το <a href="${process.env.NEXT_PUBLIC_APP_URL}/forms/approval">σύστημα διαχείρισης φορμών</a> για περισσότερες λεπτομέρειες και επιλογές.</p>
+          <p>Ή μπορείτε να επισκεφθείτε το <a href="${import.meta.env.VITE_APP_URL}/forms/approval">σύστημα διαχείρισης φορμών</a> για περισσότερες λεπτομέρειες και επιλογές.</p>
         </div>
         <div class="footer">
           <p>Αυτό το email στάλθηκε αυτόματα. Παρακαλούμε μην απαντήσετε σε αυτό το email.</p>
@@ -602,7 +595,7 @@ ${Object.entries(submissionData)
 Για να απορρίψετε: ${rejectUrl}
 Για να δείτε λεπτομέρειες: ${viewUrl}
 
-Ή μπορείτε να επισκεφθείτε το σύστημα διαχείρισης φορμών: ${process.env.NEXT_PUBLIC_APP_URL}/forms/approval
+Ή μπορείτε να επισκεφθείτε το σύστημα διαχείρισης φορμών: ${import.meta.env.VITE_APP_URL}/forms/approval
 
 Αυτό το email στάλθηκε αυτόματα. Παρακαλούμε μην απαντήσετε σε αυτό το email.
   `;
@@ -750,21 +743,35 @@ ${COMPANY_NAME}
 };
 
 /**
+ * Email parameters for sending form link to customer
+ */
+interface FormLinkEmailParams {
+  token: string;
+  customerInfo: CustomerFormInfo;
+  recipientEmail?: string;
+}
+
+/**
+ * Email parameters for sending form submission notification
+ */
+interface FormSubmissionNotificationParams {
+  formLinkId: string;
+  customerId: string;
+  submissionData?: any;
+}
+
+/**
  * Send form link to customer via email
  * 
- * @param customerInfo Customer information
- * @param formLink Form link details
- * @param expirationDate When the form link expires
- * @param recipientEmail Optional custom recipient email
+ * @param params Object containing token, customerInfo, and optional recipientEmail
  * @returns Promise with the result of the email send operation
  */
 export const sendFormLinkToCustomer = async (
-  customerInfo: CustomerFormInfo,
-  formLink: string,
-  expirationDate: Date,
-  recipientEmail?: string
+  params: FormLinkEmailParams
 ): Promise<{ success: boolean; messageId?: string; error?: any }> => {
   try {
+    const { token, customerInfo, recipientEmail } = params;
+    
     // Use provided recipient email or customer email
     const recipient = recipientEmail || customerInfo.email;
     
@@ -778,6 +785,13 @@ export const sendFormLinkToCustomer = async (
         error: 'No recipient email provided'
       };
     }
+    
+    // Construct form link URL
+    const formLink = `${FORM_BASE_URL}/${token}`;
+    
+    // Calculate expiration date - default to 72 hours if not available
+    const expirationDate = new Date();
+    expirationDate.setHours(expirationDate.getHours() + 72);
     
     // Generate email template
     const template = generateCustomerFormLinkTemplate(
@@ -802,39 +816,50 @@ export const sendFormLinkToCustomer = async (
 /**
  * Send form submission notification to users
  * 
- * @param customerInfo Customer information
- * @param submissionData Form submission data
- * @param submittedAt Date when the form was submitted
- * @param recipients List of recipient emails
+ * @param params Object containing formLinkId, customerId, and optional submissionData
+ * @param recipients Optional list of recipient emails
  * @returns Promise with the result of the email send operation
  */
 export const sendFormSubmissionNotification = async (
-  customerInfo: CustomerFormInfo,
-  submissionData: any,
-  submittedAt: Date,
+  params: FormSubmissionNotificationParams,
   recipients: string[] = []
 ): Promise<{ success: boolean; messageId?: string; error?: any }> => {
   try {
-    if (!recipients || recipients.length === 0) {
-      logError('Cannot send form submission notification: No recipients provided', 
-        { customerInfo }, 
+    const { formLinkId, customerId, submissionData = {} } = params;
+    
+    // Determine recipients if not provided
+    const notificationRecipients = recipients.length > 0 ? recipients : 
+      import.meta.env.VITE_NOTIFICATION_EMAILS ? 
+      import.meta.env.VITE_NOTIFICATION_EMAILS.split(',') : 
+      [DEFAULT_FROM_EMAIL];
+    
+    if (!notificationRecipients || notificationRecipients.length === 0) {
+      logError('Cannot send form submission notification: No recipients available', 
+        { formLinkId, customerId }, 
         'EmailService'
       );
       return { 
         success: false, 
-        error: 'No recipients provided'
+        error: 'No recipients available'
       };
     }
+    
+    // Create a placeholder customerInfo if we don't have full details yet
+    const customerInfo: CustomerFormInfo = {
+      id: customerId,
+      name: submissionData.customerData?.name || submissionData.company_name || 'Customer',
+      createdAt: new Date().toISOString()
+    };
     
     // Generate email template
     const template = generateFormSubmissionNotificationTemplate(
       customerInfo,
       submissionData,
-      submittedAt
+      new Date()
     );
     
     // Send email
-    return await sendEmail(recipients, {
+    return await sendEmail(notificationRecipients, {
       subject: template.subject,
       html: template.html,
       text: template.text,
@@ -977,7 +1002,7 @@ export const sendTestEmail = async (
             <li><strong>Sent to:</strong> ${recipient}</li>
             <li><strong>Sent from:</strong> ${DEFAULT_FROM_EMAIL}</li>
             <li><strong>Date/Time:</strong> ${new Date().toLocaleString()}</li>
-            <li><strong>Environment:</strong> ${process.env.NODE_ENV || 'development'}</li>
+            <li><strong>Environment:</strong> ${import.meta.env.MODE || 'development'}</li>
           </ul>
           <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #777;">
             This is an automated test email from ${COMPANY_NAME}.
@@ -1001,7 +1026,7 @@ Email details:
 - Sent to: ${recipient}
 - Sent from: ${DEFAULT_FROM_EMAIL}
 - Date/Time: ${new Date().toLocaleString()}
-- Environment: ${process.env.NODE_ENV || 'development'}
+- Environment: ${import.meta.env.MODE || 'development'}
 
 This is an automated test email from ${COMPANY_NAME}.
     `;

@@ -81,7 +81,7 @@ export function setupUtilities(options?: {
     loggingUtils.configureLogging({
       level: loggingUtils.LogLevel.INFO,
       enableConsole: true,
-      isProd: process.env.NODE_ENV === 'production'
+      isProd: import.meta.env.MODE === 'production'
     });
   }
 }

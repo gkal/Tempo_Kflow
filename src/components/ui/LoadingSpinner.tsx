@@ -2,48 +2,55 @@ import React from "react";
 import { DotLoader } from "react-spinners";
 
 interface LoadingSpinnerProps {
-  fullScreen?: boolean;
-  className?: string;
-  delayBeforeSpinner?: number;
   size?: number;
   color?: string;
+  thickness?: number;
 }
 
 /**
- * Enhanced loading spinner component using react-spinners DotLoader
- * with appropriate container and accessibility features.
- * 
- * @param fullScreen - Whether the spinner should take up the full screen
- * @param className - Additional CSS classes to apply
- * @param delayBeforeSpinner - Milliseconds to delay before showing the spinner (default: 300ms)
- * @param size - Size of the spinner dots (default: 25)
- * @param color - Color of the spinner (default: #84a98c)
+ * Loading spinner component with customizable size and color
+ * Used for loading states throughout the application
  */
 const LoadingSpinner = ({
-  fullScreen = true,
-  className = "",
-  delayBeforeSpinner = 300,
-  size = 25,
-  color = "#84a98c",
+  size = 40,
+  color = '#3b82f6', // Default to blue-500
+  thickness = 4,
 }: LoadingSpinnerProps) => {
-  const containerClasses = fullScreen
-    ? "min-h-screen flex items-center justify-center bg-[#2f3e46]"
-    : "flex flex-col items-center justify-center p-12";
-    
+  // Calculate spinner dimensions based on size
+  const viewBoxSize = 24;
+  const centerPoint = viewBoxSize / 2;
+  const radius = (viewBoxSize - thickness) / 2;
+  const circumference = 2 * Math.PI * radius;
+  
   return (
-    <div 
-      className={`${containerClasses} ${className}`} 
-      role="status"
-      aria-label="Loading"
-    >
-      <div className="flex flex-col items-center justify-center">
-        <DotLoader
-          color={color}
-          size={size}
-          speedMultiplier={0.8}
-          aria-label="Loading"
+    <div className="inline-block" style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}
+        xmlns="http://www.w3.org/2000/svg"
+        className="animate-spin"
+      >
+        <circle
+          cx={centerPoint}
+          cy={centerPoint}
+          r={radius}
+          fill="none"
+          stroke="#e5e7eb" // Default to gray-200
+          strokeWidth={thickness}
         />
-      </div>
+        <circle
+          cx={centerPoint}
+          cy={centerPoint}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={thickness}
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * 0.75} // Show 25% of the circle
+          strokeLinecap="round"
+        />
+      </svg>
     </div>
   );
 };

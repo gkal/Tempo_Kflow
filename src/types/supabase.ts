@@ -695,6 +695,95 @@ export type Database = {
           }
         ]
       }
+      customer_form_links: {
+        Row: {
+          id: string
+          customer_id: string
+          token: string
+          form_data: Json | null
+          status: string
+          notes: string | null
+          is_used: boolean
+          is_deleted: boolean
+          created_at: string
+          expires_at: string
+          submitted_at: string | null
+          approved_at: string | null
+          deleted_at: string | null
+          created_by: string | null
+          updated_by: string | null
+          approved_by: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          customer_id: string
+          token: string
+          form_data?: Json | null
+          status?: string
+          notes?: string | null
+          is_used?: boolean
+          is_deleted?: boolean
+          created_at?: string
+          expires_at: string
+          submitted_at?: string | null
+          approved_at?: string | null
+          deleted_at?: string | null
+          created_by?: string | null
+          updated_by?: string | null
+          approved_by?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          customer_id?: string
+          token?: string
+          form_data?: Json | null
+          status?: string
+          notes?: string | null
+          is_used?: boolean
+          is_deleted?: boolean
+          created_at?: string
+          expires_at?: string
+          submitted_at?: string | null
+          approved_at?: string | null
+          deleted_at?: string | null
+          created_by?: string | null
+          updated_by?: string | null
+          approved_by?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_form_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_form_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_form_links_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_form_links_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       system_settings: {
         Row: {
           id: string

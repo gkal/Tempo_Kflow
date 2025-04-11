@@ -1,9 +1,7 @@
 import { 
   FormLinkService 
 } from './formLinkService';
-import { 
-  CustomerFormService 
-} from './customerFormService';
+import { CustomerFormService } from './customerFormService/index';
 import { sendFormLinkToCustomer, sendFormSubmissionNotification } from './emailService';
 import { generateFormLinkEmailUrl } from './gmailService';
 import { logError, logInfo, logDebug } from '@/utils';

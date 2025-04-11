@@ -1,27 +1,23 @@
 /**
- * Get the base URL of the application
- * @returns Base URL of the application
+ * Get the base URL for the application
+ * @returns The base URL (with no trailing slash)
  */
 export function getBaseUrl(): string {
-  // Check if we're in a browser environment
-  if (typeof window !== 'undefined') {
-    const protocol = window.location.protocol;
-    const host = window.location.host;
-    return `${protocol}//${host}`;
+  // Check for explicitly set base URL
+  const envUrl = import.meta.env.VITE_APP_URL;
+  if (envUrl) {
+    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
   }
-  
-  // Server-side or non-browser environment
-  // Read from environment variables
-  if (process.env.NEXT_PUBLIC_BASE_URL) {
-    return process.env.NEXT_PUBLIC_BASE_URL;
+
+  // If no explicit URL set, construct based on current environment
+  if (import.meta.env.MODE === 'production') {
+    // Use window.location in production as fallback
+    const loc = window.location;
+    return `${loc.protocol}//${loc.host}`;
   }
-  
-  // Fallback to a default based on environment
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://yourdomain.com'; // Update this to your actual production domain
-  } else {
-    return 'http://localhost:3000'; // Default for development
-  }
+
+  // Default for development
+  return 'http://localhost:5173';
 }
 
 /**

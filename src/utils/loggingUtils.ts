@@ -37,9 +37,9 @@ interface LogConfig {
  * Current log configuration
  */
 const logConfig: LogConfig = {
-  level: process.env.NODE_ENV === 'production' ? LogLevel.WARN : LogLevel.DEBUG,
+  level: import.meta.env.MODE === 'production' ? LogLevel.WARN : LogLevel.DEBUG,
   enableConsole: true,
-  isProd: process.env.NODE_ENV === 'production'
+  isProd: import.meta.env.MODE === 'production'
 };
 
 /**

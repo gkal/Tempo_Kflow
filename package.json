@@ -66,6 +66,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
+    "deep-object-diff": "^1.1.9",
     "dotenv": "^16.4.7",
     "electron": "^35.1.4",
     "embla-carousel-react": "^8.1.5",
@@ -82,8 +83,10 @@
     "react-router": "^6.23.1",
     "react-router-dom": "^6.23.1",
     "react-spinners": "^0.15.0",
+    "resend": "^2.0.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
+    "ua-parser-js": "^2.0.3",
     "vaul": "^0.9.1",
     "xlsx": "^0.18.5",
     "zod": "^3.23.8"
