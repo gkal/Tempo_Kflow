@@ -24,6 +24,8 @@ import { PlusIcon } from "lucide-react";
 import { useFormRegistration } from '@/lib/FormContext';
 import { useFormContext } from '@/lib/FormContext';
 import { logDebug } from "@/utils/loggingUtils";
+import CustomerCreationSuccess from "@/components/forms/CustomerCreationSuccess";
+import { useNavigate } from "react-router-dom";
 
 interface CustomerFormData {
   company_name?: string;
@@ -79,6 +81,9 @@ export function CustomerDialog({
   const [isFormValid, setIsFormValid] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [savedCustomerName, setSavedCustomerName] = useState<string>("");
+  const navigate = useNavigate();
   const formRef = useRef(null);
   const { registerForm } = useFormContext();
 
@@ -89,7 +94,9 @@ export function CustomerDialog({
       setError(null);
       setIsNewCustomer(!customer?.id);
       setSavedCustomerId(null);
+      setSavedCustomerName("");
       setShowContactDialog(false);
+      setShowSuccessDialog(false);
       setIsFormValid(false);
     }
   }, [open, customer]);
@@ -110,10 +117,16 @@ export function CustomerDialog({
   const handleSave = (newCustomerId?: string, companyName?: string) => {
     if (newCustomerId) {
       setSavedCustomerId(typeof newCustomerId === 'string' ? newCustomerId : String(newCustomerId));
+      if (companyName) {
+        setSavedCustomerName(companyName);
+      }
       setSuccess(true);
       setSaving(false);
       
       if (isNewCustomer) {
+        // Show success dialog for new customers with form link option
+        setShowSuccessDialog(true);
+        
         if (refreshData) {
           try {
             refreshData();
@@ -178,7 +191,9 @@ export function CustomerDialog({
   };
 
   const handleViewCustomer = () => {
-    // Implement the logic to view the customer
+    if (savedCustomerId) {
+      navigate(`/customers/${savedCustomerId}`);
+    }
   };
 
   const handleDelete = () => {
@@ -318,6 +333,22 @@ export function CustomerDialog({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Customer Creation Success Dialog */}
+      {showSuccessDialog && savedCustomerId && (
+        <CustomerCreationSuccess
+          open={showSuccessDialog}
+          onOpenChange={setShowSuccessDialog}
+          customerId={savedCustomerId}
+          customerName={savedCustomerName}
+          customerEmail={customer?.email}
+          onView={handleViewCustomer}
+          onClose={() => {
+            setShowSuccessDialog(false);
+            onOpenChange(false);
+          }}
+        />
+      )}
     </>
   );
 }

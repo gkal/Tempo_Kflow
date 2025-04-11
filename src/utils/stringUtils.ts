@@ -183,4 +183,63 @@ export function getInitials(name: string, maxLength: number = 2): string {
     .map(word => word[0].toUpperCase())
     .slice(0, maxLength)
     .join("");
+}
+
+/**
+ * Generates a cryptographically secure random string
+ * @param length Length of the string to generate
+ * @param charset Character set to use for string generation (default: alphanumeric)
+ * @returns Randomly generated string
+ */
+export function generateRandomString(
+  length: number, 
+  charset: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+): string {
+  if (length <= 0) {
+    throw new Error('String length must be greater than 0');
+  }
+  
+  if (charset.length === 0) {
+    throw new Error('Character set cannot be empty');
+  }
+  
+  let result = '';
+  
+  // Use crypto API for better randomness if available
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+    const randomValues = new Uint32Array(length);
+    window.crypto.getRandomValues(randomValues);
+    
+    for (let i = 0; i < length; i++) {
+      result += charset.charAt(randomValues[i] % charset.length);
+    }
+  } else {
+    // Fallback for environments without crypto API
+    for (let i = 0; i < length; i++) {
+      result += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Escapes special characters in a string for use in a regular expression
+ * @param string String to escape
+ * @returns Escaped string
+ */
+export function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Truncates a string to a specified length and adds an ellipsis if truncated
+ * @param str String to truncate
+ * @param maxLength Maximum length of the string
+ * @returns Truncated string
+ */
+export function truncateString(str: string, maxLength: number): string {
+  if (!str) return '';
+  if (str.length <= maxLength) return str;
+  return str.substring(0, maxLength) + '...';
 } 

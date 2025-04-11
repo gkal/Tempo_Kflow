@@ -37,6 +37,15 @@
 - Implement responsive design principles
 - Ensure accessibility compliance
 
+### 🔄 Error Handling & Notifications
+- **DO NOT USE TOAST MESSAGES**
+  - Avoid floating/transient notifications for errors
+  - Display errors inline near the action buttons where possible
+  - If space is limited, temporarily increase form height to display errors above buttons
+  - Error messages should be clear and actionable
+  - Keep error messages visible until explicitly dismissed or issue is resolved
+  - Reason: Provides better visibility, clear association with the error source, and prevents missed notifications
+
 ### 🔄 UI Components & Standards
 - **Delete Confirmations**
   - Always use `ModernDeleteConfirmation` component

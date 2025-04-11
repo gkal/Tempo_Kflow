@@ -1,6 +1,5 @@
 import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import MuiThemeProvider from './theme/MuiThemeProvider';
@@ -40,7 +39,6 @@ function App() {
         <LoadingProvider>
           <FormProvider>
             <GlobalDialogProvider>
-              <Toaster />
               <Suspense 
                 fallback={<LoadingSpinner fullScreen={true} />}
               >

@@ -141,56 +141,14 @@ function dispatch(action: Action) {
 type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
-  // Skip toast messages related to user status changes
-  if (
-    (typeof props.title === 'string' && (
-      props.title.includes("Χρήστη") || 
-      props.title.includes("χρήστη") ||
-      props.title.includes("User") ||
-      props.title.includes("user")
-    )) || 
-    (typeof props.description === 'string' && (
-      props.description.includes("Χρήστη") ||
-      props.description.includes("χρήστη") ||
-      props.description.includes("User") ||
-      props.description.includes("user")
-    ))
-  ) {
-    // Don't show these toasts
-    const id = genId();
-    return {
-      id,
-      dismiss: () => {},
-      update: () => {},
-    };
-  }
-
+  // No-op function that doesn't display any toast
+  // Just return a valid response structure to avoid errors in existing code
   const id = genId();
-
-  const update = (props: ToasterToast) =>
-    dispatch({
-      type: "UPDATE_TOAST",
-      toast: { ...props, id },
-    })
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
-
-  dispatch({
-    type: "ADD_TOAST",
-    toast: {
-      ...props,
-      id,
-      open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss()
-      },
-    },
-  })
-
   return {
-    id: id,
-    dismiss,
-    update,
-  }
+    id,
+    dismiss: () => {},
+    update: () => {},
+  };
 }
 
 function useToast() {

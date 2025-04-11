@@ -45,6 +45,7 @@ import { CustomerDialog } from "./CustomerDialog";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
+import CustomerFormLinkButton from "@/components/forms/CustomerFormLinkButton";
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -833,6 +834,13 @@ export default function CustomerDetailPage() {
                 Επεξεργασία
               </Button>
             </GlobalTooltip>
+            
+            {/* Add Customer Form Link Button */}
+            <CustomerFormLinkButton 
+              customerId={id || ''} 
+              customerEmail={customer?.email}
+            />
+            
             <CloseButton 
               size="md" 
               onClick={() => navigate('/customers')} 

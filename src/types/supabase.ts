@@ -1118,6 +1118,62 @@ export type Database = {
           }
         ]
       }
+      query_performance_logs: {
+        Row: {
+          id: string;
+          query: string;
+          execution_time_ms: number;
+          executed_at: string;
+          parameters: string | null;
+          rows_affected: number | null;
+          source: string | null;
+          user_id: string | null;
+          success: boolean;
+          error_message: string | null;
+          created_at: string;
+          is_deleted: boolean;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          query: string;
+          execution_time_ms: number;
+          executed_at?: string;
+          parameters?: string | null;
+          rows_affected?: number | null;
+          source?: string | null;
+          user_id?: string | null;
+          success?: boolean;
+          error_message?: string | null;
+          created_at?: string;
+          is_deleted?: boolean;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          query?: string;
+          execution_time_ms?: number;
+          executed_at?: string;
+          parameters?: string | null;
+          rows_affected?: number | null;
+          source?: string | null;
+          user_id?: string | null;
+          success?: boolean;
+          error_message?: string | null;
+          created_at?: string;
+          is_deleted?: boolean;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "query_performance_logs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      }
     }
     Views: {
       [_ in never]: never

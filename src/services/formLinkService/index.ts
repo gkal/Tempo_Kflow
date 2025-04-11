@@ -1,234 +1,494 @@
-import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/lib/supabaseClient';
-import { FormLink, FormLinkValidationResult, FormLinkWithOffer } from './types';
-import { logError, logInfo, logDebug } from '@/utils';
+import { createRecord, fetchRecordById, fetchRecords, softDeleteRecord, updateRecord } from '@/services/api/supabaseService';
+import { generateRandomString } from '@/utils/stringUtils';
+import { 
+  CustomerFormLink, 
+  FormLinkCreationResponse, 
+  FormLinkFilterOptions, 
+  FormLinkGenerationOptions, 
+  FormLinkListResponse, 
+  FormLinkPaginationOptions, 
+  FormLinkResponse, 
+  FormLinkSortOptions, 
+  FormLinkStatus, 
+  FormLinkUpdateOptions, 
+  FormLinkUpdateResponse, 
+  FormLinkValidationResult, 
+  FormSubmissionResponse 
+} from './types';
+import { getBaseUrl } from '@/utils/urlUtils';
+import { Database } from '@/types/supabase';
+
+// Configuration
+const TOKEN_LENGTH = 32;
+const TOKEN_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const DEFAULT_EXPIRATION_HOURS = 24; // 1 day
 
 /**
- * Generate a secure token for form links
- * 
- * @returns A cryptographically secure token
+ * Service for managing customer form links
  */
-const generateSecureToken = (): string => {
-  // Generate a UUID and replace dashes with empty string
-  const uuid = uuidv4().replace(/-/g, '');
+export const FormLinkService = {
+  /**
+   * Generate a secure random token with collision detection
+   * @param length Token length
+   * @returns Secure random token
+   */
+  async generateUniqueToken(length: number = TOKEN_LENGTH): Promise<string> {
+    // Generate random token
+    const token = generateRandomString(length, TOKEN_CHARSET);
+    
+    // Check for collision
+    const { count } = await supabase
+      .from('customer_form_links')
+      .select('*', { count: 'exact', head: true })
+      .eq('token', token);
+    
+    // If collision, generate another token
+    if (count && count > 0) {
+      return this.generateUniqueToken(length);
+    }
+    
+    return token;
+  },
   
-  // Add a random timestamp component for additional uniqueness
-  const timestamp = Date.now().toString(36);
-  
-  // Combine them for a secure, unique token
-  return `${uuid}${timestamp}`;
-};
-
-/**
- * Generate a new form link for a specific offer
- * 
- * @param offerId The ID of the offer to create a link for
- * @param expirationHours Number of hours until the link expires
- * @returns The created form link
- */
-export const generateFormLink = async (
-  offerId: string,
-  expirationHours: number = 48 // Default to 48 hours
-): Promise<FormLink | null> => {
-  try {
-    // Validate inputs
-    if (!offerId) {
-      throw new Error('Offer ID is required');
-    }
-    
-    if (expirationHours <= 0) {
-      throw new Error('Expiration hours must be greater than 0');
-    }
-    
-    // Check if offer exists
-    const { data: offerExists, error: offerCheckError } = await supabase
-      .from('offers')
-      .select('id')
-      .eq('id', offerId)
-      .is('deleted_at', null)
-      .single();
-    
-    if (offerCheckError || !offerExists) {
-      logError('Error checking if offer exists:', offerCheckError || 'Offer not found', 'FormLinkService');
-      throw new Error('Offer does not exist or has been deleted');
-    }
-    
-    // Generate a secure token
-    const token = generateSecureToken();
-    
-    // Calculate expiration date
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + expirationHours);
-    
-    // Create the form link
-    const { data, error } = await supabase
-      .from('offer_form_links')
-      .insert({
-        offer_id: offerId,
+  /**
+   * Generate a form link for a customer
+   * @param options Form link generation options
+   * @returns Form link creation response
+   */
+  async generateFormLinkForCustomer(options: FormLinkGenerationOptions): Promise<FormLinkCreationResponse> {
+    try {
+      const { customerId, expirationHours = DEFAULT_EXPIRATION_HOURS, createdById } = options;
+      
+      // Validate customerId
+      const customer = await fetchRecordById<Database['public']['Tables']['customers']['Row']>('customers', customerId);
+      if (!customer) {
+        return {
+          success: false,
+          error: 'Ο πελάτης δεν βρέθηκε',
+        };
+      }
+      
+      // Generate unique token
+      const token = await this.generateUniqueToken();
+      
+      // Calculate expiration date
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + expirationHours);
+      
+      // Create form link
+      const formLink = await createRecord<CustomerFormLink>('customer_form_links', {
+        customer_id: customerId,
         token,
-        is_used: false,
         expires_at: expiresAt.toISOString(),
-      })
-      .select('*')
-      .single();
-    
-    if (error) {
-      logError('Error creating form link:', error, 'FormLinkService');
-      throw error;
-    }
-    
-    logInfo(`Created form link with token: ${token} for offer: ${offerId}`);
-    return data as FormLink;
-  } catch (error) {
-    logError('Exception in generateFormLink:', error, 'FormLinkService');
-    throw error;
-  }
-};
-
-/**
- * Validate a form link token
- * 
- * @param token The token to validate
- * @returns Validation result
- */
-export const validateFormLink = async (token: string): Promise<FormLinkValidationResult> => {
-  try {
-    // Default response for invalid tokens
-    const invalidResponse: FormLinkValidationResult = {
-      isValid: false,
-      isExpired: false,
-      isUsed: false,
-      message: 'Invalid form link'
-    };
-    
-    if (!token) {
-      return invalidResponse;
-    }
-    
-    // Find the form link
-    const { data, error } = await supabase
-      .from('offer_form_links')
-      .select('*, offer:offers(id, offer_number, customer_id, status)')
-      .eq('token', token)
-      .is('is_deleted', false)
-      .single();
-    
-    if (error || !data) {
-      logError('Error validating form link or link not found:', error || 'Link not found', 'FormLinkService');
-      return invalidResponse;
-    }
-    
-    const formLink = data as FormLinkWithOffer;
-    
-    // Check if the link has been used
-    if (formLink.is_used) {
+        is_used: false,
+        status: 'pending' as FormLinkStatus,
+        created_by: createdById || null,
+      });
+      
+      if (!formLink) {
+        return {
+          success: false,
+          error: 'Αποτυχία δημιουργίας συνδέσμου φόρμας',
+        };
+      }
+      
+      // Generate URL
+      const url = `${getBaseUrl()}/form/${token}`;
+      
       return {
-        isValid: false,
-        isExpired: false,
-        isUsed: true,
-        offer_id: formLink.offer_id,
-        message: 'This form has already been submitted'
+        success: true,
+        data: {
+          id: formLink.id,
+          token: formLink.token,
+          url,
+          expiresAt: formLink.expires_at,
+        },
+      };
+    } catch (error) {
+      console.error('Error generating form link:', error);
+      return {
+        success: false,
+        error: 'Προέκυψε ένα απρόσμενο σφάλμα',
       };
     }
-    
-    // Check if the link has expired
-    const expirationDate = new Date(formLink.expires_at);
-    const now = new Date();
-    
-    if (now > expirationDate) {
+  },
+  
+  /**
+   * Validate a form link token
+   * @param token Form link token
+   * @returns Validation result
+   */
+  async validateFormLink(token: string): Promise<FormLinkValidationResult> {
+    try {
+      // Get form link by token
+      const { data: formLink, error } = await supabase
+        .from('customer_form_links')
+        .select('*')
+        .eq('token', token)
+        .eq('is_deleted', false)
+        .single();
+      
+      if (error || !formLink) {
+        return {
+          isValid: false,
+          reason: 'Ο σύνδεσμος φόρμας δεν βρέθηκε',
+        };
+      }
+      
+      // Check expiration
+      if (new Date(formLink.expires_at) < new Date()) {
+        return {
+          isValid: false,
+          reason: 'Ο σύνδεσμος φόρμας έχει λήξει',
+          formLink: formLink as CustomerFormLink,
+        };
+      }
+      
+      // Check if form is in an invalid state (already approved/rejected)
+      if (formLink.status === 'approved' || formLink.status === 'rejected') {
+        const statusText = formLink.status === 'approved' ? 'εγκριθεί' : 'απορριφθεί';
+        return {
+          isValid: false,
+          reason: `Η φόρμα έχει ήδη ${statusText}`,
+          formLink: formLink as CustomerFormLink,
+        };
+      }
+      
+      // Get customer data
+      const customer = await fetchRecordById<Database['public']['Tables']['customers']['Row']>(
+        'customers', 
+        formLink.customer_id
+      );
+      
+      if (!customer) {
+        return {
+          isValid: false,
+          reason: 'Ο πελάτης δεν βρέθηκε',
+          formLink: formLink as CustomerFormLink,
+        };
+      }
+      
+      return {
+        isValid: true,
+        formLink: formLink as CustomerFormLink,
+        customer,
+      };
+    } catch (error) {
+      console.error('Error validating form link:', error);
       return {
         isValid: false,
-        isExpired: true,
-        isUsed: false,
-        offer_id: formLink.offer_id,
-        message: 'This form link has expired'
+        reason: 'Προέκυψε ένα απρόσμενο σφάλμα',
       };
     }
-    
-    // Link is valid
-    return {
-      isValid: true,
-      isExpired: false,
-      isUsed: false,
-      offer_id: formLink.offer_id,
-      message: 'Valid form link'
-    };
-  } catch (error) {
-    logError('Exception in validateFormLink:', error, 'FormLinkService');
-    return {
-      isValid: false,
-      isExpired: false,
-      isUsed: false,
-      message: 'An error occurred while validating the form link'
-    };
-  }
-};
-
-/**
- * Mark a form link as used after submission
- * 
- * @param token The token of the form link to mark
- * @returns Whether the operation was successful
- */
-export const markFormLinkAsUsed = async (token: string): Promise<boolean> => {
-  try {
-    if (!token) {
-      throw new Error('Token is required');
-    }
-    
-    // Update the form link
-    const { data, error } = await supabase
-      .from('offer_form_links')
-      .update({ is_used: true })
-      .eq('token', token)
-      .is('is_deleted', false)
-      .select('*')
-      .single();
-    
-    if (error) {
-      logError('Error marking form link as used:', error, 'FormLinkService');
+  },
+  
+  /**
+   * Mark a form link as used
+   * @param token Form link token
+   * @returns True if successful, false otherwise
+   */
+  async markFormLinkAsUsed(token: string): Promise<boolean> {
+    try {
+      // Get form link by token
+      const { data: formLink, error } = await supabase
+        .from('customer_form_links')
+        .select('id, is_used, expires_at, status')
+        .eq('token', token)
+        .eq('is_deleted', false)
+        .single();
+      
+      if (error || !formLink) {
+        return false;
+      }
+      
+      // Check if already used or expired
+      if (formLink.is_used || new Date(formLink.expires_at) < new Date()) {
+        return false;
+      }
+      
+      // Update form link
+      const updated = await updateRecord<CustomerFormLink>('customer_form_links', formLink.id, {
+        is_used: true,
+        submitted_at: new Date().toISOString(),
+        status: 'submitted' as FormLinkStatus,
+      });
+      
+      return !!updated;
+    } catch (error) {
+      console.error('Error marking form link as used:', error);
       return false;
     }
-    
-    logInfo(`Marked form link with token: ${token} as used`);
-    return true;
-  } catch (error) {
-    logError('Exception in markFormLinkAsUsed:', error, 'FormLinkService');
-    return false;
-  }
-};
-
-/**
- * Get all form links for a specific offer
- * 
- * @param offerId The ID of the offer to get links for
- * @returns Array of form links
- */
-export const getFormLinksByOfferId = async (offerId: string): Promise<FormLink[]> => {
-  try {
-    if (!offerId) {
-      throw new Error('Offer ID is required');
+  },
+  
+  /**
+   * Get form links by customer ID
+   * @param options Filter, sorting, and pagination options
+   * @returns Form links list response
+   */
+  async getFormLinks(
+    options: {
+      filter?: FormLinkFilterOptions;
+      sort?: FormLinkSortOptions;
+      pagination?: FormLinkPaginationOptions;
+    } = {}
+  ): Promise<FormLinkListResponse> {
+    try {
+      const { filter = {}, sort = { field: 'created_at', direction: 'desc' }, pagination = { page: 1, pageSize: 10 } } = options;
+      
+      // Build query
+      let query = supabase
+        .from('customer_form_links')
+        .select('*', { count: 'exact' });
+      
+      // Apply filters
+      if (filter.customerId) {
+        query = query.eq('customer_id', filter.customerId);
+      }
+      
+      if (filter.status) {
+        if (Array.isArray(filter.status)) {
+          query = query.in('status', filter.status);
+        } else {
+          query = query.eq('status', filter.status);
+        }
+      }
+      
+      if (filter.isUsed !== undefined) {
+        query = query.eq('is_used', filter.isUsed);
+      }
+      
+      if (filter.isExpired !== undefined) {
+        const now = new Date().toISOString();
+        if (filter.isExpired) {
+          query = query.lt('expires_at', now);
+        } else {
+          query = query.gte('expires_at', now);
+        }
+      }
+      
+      if (filter.createdAfter) {
+        query = query.gte('created_at', filter.createdAfter);
+      }
+      
+      if (filter.createdBefore) {
+        query = query.lte('created_at', filter.createdBefore);
+      }
+      
+      if (filter.createdBy) {
+        query = query.eq('created_by', filter.createdBy);
+      }
+      
+      // Exclude deleted records by default
+      query = query.eq('is_deleted', false);
+      
+      // Apply sorting
+      query = query.order(sort.field, { ascending: sort.direction === 'asc' });
+      
+      // Apply pagination
+      const from = (pagination.page - 1) * pagination.pageSize;
+      const to = from + pagination.pageSize - 1;
+      query = query.range(from, to);
+      
+      // Execute query
+      const { data, error, count } = await query;
+      
+      if (error) {
+        throw error;
+      }
+      
+      return {
+        success: true,
+        data: {
+          formLinks: (data || []) as CustomerFormLink[],
+          total: count || 0,
+          page: pagination.page,
+          pageSize: pagination.pageSize,
+          totalPages: Math.ceil((count || 0) / pagination.pageSize),
+        },
+      };
+    } catch (error) {
+      console.error('Error getting form links:', error);
+      return {
+        success: false,
+        error: 'An unexpected error occurred',
+      };
     }
-    
-    // Get all form links for the offer
-    const { data, error } = await supabase
-      .from('offer_form_links')
-      .select('*')
-      .eq('offer_id', offerId)
-      .is('is_deleted', false)
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      logError('Error getting form links for offer:', error, 'FormLinkService');
-      throw error;
+  },
+  
+  /**
+   * Get a form link by ID
+   * @param id Form link ID
+   * @returns Form link response
+   */
+  async getFormLinkById(id: string): Promise<FormLinkResponse> {
+    try {
+      const formLink = await fetchRecordById<CustomerFormLink>('customer_form_links', id);
+      
+      if (!formLink) {
+        return {
+          success: false,
+          error: 'Ο σύνδεσμος φόρμας δεν βρέθηκε',
+        };
+      }
+      
+      return {
+        success: true,
+        data: formLink,
+      };
+    } catch (error) {
+      console.error('Error getting form link by ID:', error);
+      return {
+        success: false,
+        error: 'Προέκυψε ένα απρόσμενο σφάλμα',
+      };
     }
-    
-    return (data || []) as FormLink[];
-  } catch (error) {
-    logError('Exception in getFormLinksByOfferId:', error, 'FormLinkService');
-    throw error;
-  }
-};
-
-// Re-export types
-export * from './types'; 
+  },
+  
+  /**
+   * Get a form link by token
+   * @param token Form link token
+   * @returns Form link response
+   */
+  async getFormLinkByToken(token: string): Promise<FormLinkResponse> {
+    try {
+      const { data, error } = await supabase
+        .from('customer_form_links')
+        .select('*')
+        .eq('token', token)
+        .eq('is_deleted', false)
+        .single();
+      
+      if (error || !data) {
+        return {
+          success: false,
+          error: 'Ο σύνδεσμος φόρμας δεν βρέθηκε',
+        };
+      }
+      
+      return {
+        success: true,
+        data: data as CustomerFormLink,
+      };
+    } catch (error) {
+      console.error('Error getting form link by token:', error);
+      return {
+        success: false,
+        error: 'Προέκυψε ένα απρόσμενο σφάλμα',
+      };
+    }
+  },
+  
+  /**
+   * Update a form link
+   * @param options Form link update options
+   * @returns Form link update response
+   */
+  async updateFormLink(options: FormLinkUpdateOptions): Promise<FormLinkUpdateResponse> {
+    try {
+      const { formLinkId, updatedBy, ...updateData } = options;
+      
+      // Get current form link
+      const formLink = await fetchRecordById<CustomerFormLink>('customer_form_links', formLinkId);
+      
+      if (!formLink) {
+        return {
+          success: false,
+          error: 'Ο σύνδεσμος φόρμας δεν βρέθηκε',
+        };
+      }
+      
+      // Update form link
+      const updated = await updateRecord<CustomerFormLink>('customer_form_links', formLinkId, {
+        ...updateData,
+        updated_by: updatedBy || null,
+      });
+      
+      if (!updated) {
+        return {
+          success: false,
+          error: 'Αποτυχία ενημέρωσης συνδέσμου φόρμας',
+        };
+      }
+      
+      return {
+        success: true,
+        data: updated,
+      };
+    } catch (error) {
+      console.error('Error updating form link:', error);
+      return {
+        success: false,
+        error: 'Προέκυψε ένα απρόσμενο σφάλμα',
+      };
+    }
+  },
+  
+  /**
+   * Delete a form link (soft delete)
+   * @param id Form link ID
+   * @param userId ID of user performing the deletion
+   * @returns True if successful, false otherwise
+   */
+  async deleteFormLink(id: string, userId?: string): Promise<boolean> {
+    try {
+      const deleted = await softDeleteRecord<CustomerFormLink>('customer_form_links', id, userId);
+      return !!deleted;
+    } catch (error) {
+      console.error('Error deleting form link:', error);
+      return false;
+    }
+  },
+  
+  /**
+   * Submit a form
+   * @param token Form link token
+   * @param formData Form data
+   * @returns Form submission response
+   */
+  async submitForm(token: string, formData: Record<string, any>): Promise<FormSubmissionResponse> {
+    try {
+      // Validate form link
+      const validation = await this.validateFormLink(token);
+      
+      if (!validation.isValid) {
+        return {
+          success: false,
+          error: validation.reason,
+        };
+      }
+      
+      const formLink = validation.formLink as CustomerFormLink;
+      
+      // Update form link
+      const updated = await updateRecord<CustomerFormLink>('customer_form_links', formLink.id, {
+        form_data: formData,
+        is_used: true,
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+      });
+      
+      if (!updated) {
+        return {
+          success: false,
+          error: 'Failed to submit form',
+        };
+      }
+      
+      return {
+        success: true,
+        data: {
+          formLinkId: updated.id,
+          submittedAt: updated.submitted_at as string,
+          status: updated.status,
+        },
+      };
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      return {
+        success: false,
+        error: 'An unexpected error occurred',
+      };
+    }
+  },
+}; 

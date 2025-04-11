@@ -7,7 +7,10 @@ CREATE TABLE IF NOT EXISTS public.offer_form_links (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
   is_deleted BOOLEAN DEFAULT FALSE,
-  deleted_at TIMESTAMP WITH TIME ZONE
+  deleted_at TIMESTAMP WITH TIME ZONE,
+  created_by UUID REFERENCES public.users(id),
+  updated_by UUID REFERENCES public.users(id),
+  updated_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Add comment to the table
@@ -25,6 +28,14 @@ CREATE INDEX IF NOT EXISTS offer_form_links_token_idx ON public.offer_form_links
 CREATE INDEX IF NOT EXISTS offer_form_links_is_used_idx ON public.offer_form_links (is_used);
 CREATE INDEX IF NOT EXISTS offer_form_links_expires_at_idx ON public.offer_form_links (expires_at);
 CREATE INDEX IF NOT EXISTS offer_form_links_is_deleted_idx ON public.offer_form_links (is_deleted);
+CREATE INDEX IF NOT EXISTS offer_form_links_created_by_idx ON public.offer_form_links (created_by);
+CREATE INDEX IF NOT EXISTS offer_form_links_updated_by_idx ON public.offer_form_links (updated_by);
+
+-- Create a trigger to automatically update the updated_at timestamp
+CREATE TRIGGER set_offer_form_links_updated_at
+BEFORE UPDATE ON public.offer_form_links
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
 
 -- Add this table to the soft delete cleanup function
 CREATE OR REPLACE FUNCTION cleanup_all_soft_deleted_records()
