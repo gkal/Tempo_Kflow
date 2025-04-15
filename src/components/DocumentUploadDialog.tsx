@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload } from 'lucide-react';
+import { getAllDocuCharacteristics, getAllDocuStatuses } from '@/services/documentSettingsService';
+import { uploadOfferDocument } from '@/services/offerDocumentService';
 
 // Global state to keep the dialog open across re-renders and component unmounts
 let globalIsOpen = false;
@@ -132,10 +134,7 @@ const DocumentUploadDialog = forwardRef<DocumentUploadDialogRef>((props, ref) =>
   // Fetch dropdown data
   const fetchDropdownData = async () => {
     try {
-      // Import dynamically to avoid issues
-      const { getAllDocuCharacteristics, getAllDocuStatuses } = await import('@/services/documentSettingsService');
-      
-      // Fetch document characteristics
+      // Use static imports instead of dynamic imports
       const chars = await getAllDocuCharacteristics();
       setCharacteristics(chars as any[] || []);
 
@@ -198,9 +197,7 @@ const DocumentUploadDialog = forwardRef<DocumentUploadDialogRef>((props, ref) =>
     setErrorMessage('');
 
     try {
-      // Import dynamically to avoid issues
-      const { uploadOfferDocument } = await import('@/services/offerDocumentService');
-      
+      // Use static imports instead of dynamic imports
       // Upload options
       const uploadOptions = {
         category: docCategory,

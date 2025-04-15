@@ -10,21 +10,22 @@ import { ModernDeleteConfirmation } from '@/components/ui/modern-delete-confirma
 import { GlobalTooltip } from '@/components/ui/GlobalTooltip';
 import { createFormLinkForCustomerApi } from '@/services/formApiService';
 import { useAuth } from '@/lib/AuthContext';
+import { FormLinkStatus } from '@/services/formLinkService/types';
 
 // Define the form link data type based on the database schema
-interface FormLink {
+export interface FormLink {
   id: string;
-  customer_id: string;
   token: string;
-  status: 'pending' | 'submitted' | 'approved' | 'rejected';
-  is_used: boolean;
+  customer_id: string;
   created_at: string;
   expires_at: string;
-  submitted_at: string | null;
-  approved_at: string | null;
-  created_by: string | null;
-  updated_by: string | null;
-  approved_by: string | null;
+  status: FormLinkStatus;
+  created_by: string;
+  is_used?: boolean;
+  submitted_at?: string;
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
 }
 
 interface FormLinksTableProps {
@@ -41,6 +42,7 @@ export default function FormLinksTable({ customerId, customerEmail }: FormLinksT
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [isCreatingLink, setIsCreatingLink] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   // Fetch form links when the component mounts
   useEffect(() => {
@@ -71,50 +73,91 @@ export default function FormLinksTable({ customerId, customerEmail }: FormLinksT
   // Function to fetch form links
   const fetchFormLinks = async () => {
     setIsLoading(true);
+    setError(null);
+
     try {
-      // First check if the table exists
-      const { data: tableExists, error: tableCheckError } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public')
-        .eq('table_name', 'customer_form_links')
-        .single();
-      
-      if (tableCheckError || !tableExists) {
-        // Table doesn't exist yet, show no data but don't show error
-        setFormLinks([]);
-        setIsLoading(false);
-        return;
-      }
-      
+      // Query to fetch form links, handling the case where the table may not exist
       let query = supabase
         .from('customer_form_links')
-        .select('*')
-        .eq('customer_id', customerId)
-        .eq('is_deleted', false)
+        .select(`
+          id, 
+          token, 
+          customer_id, 
+          created_at, 
+          expires_at, 
+          status, 
+          created_by,
+          is_used,
+          submitted_at,
+          customers:customers(
+            name,
+            email,
+            phone
+          )
+        `)
         .order('created_at', { ascending: false });
 
+      // Apply customer ID filter if provided
+      if (customerId) {
+        query = query.eq('customer_id', customerId);
+      }
+
       // Apply status filter if set
-      if (statusFilter) {
+      if (statusFilter !== null && statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
       }
 
-      const { data, error } = await query;
+      const { data, error: queryError } = await query;
 
-      if (error) {
-        console.error('Error fetching form links:', error);
-        toast({
-          title: 'Σφάλμα',
-          description: 'Παρουσιάστηκε σφάλμα κατά την ανάκτηση των συνδέσμων φόρμας.',
-          variant: 'destructive'
+      if (queryError) {
+        // Handle the case where the table doesn't exist
+        if (queryError.code === '42P01') { // PostgreSQL error code for "relation does not exist"
+          console.log('Table customer_form_links does not exist');
+          setFormLinks([]);
+          setIsLoading(false);
+          return;
+        }
+        
+        console.error('Error fetching form links:', queryError);
+        setError(new Error(queryError.message));
+        toast({ 
+          title: "Error", 
+          description: 'Failed to load form links',
+          variant: "destructive" 
         });
       } else {
-        setFormLinks(data || []);
+        // Transform the data to match FormLink interface
+        const formattedLinks = (data || []).map((link) => {
+          // Safely extract customer info from the nested join
+          const customerData = link.customers as { name?: string; email?: string; phone?: string } | null;
+          
+          return {
+            id: link.id,
+            token: link.token,
+            customer_id: link.customer_id,
+            created_at: link.created_at,
+            expires_at: link.expires_at,
+            status: link.status as FormLinkStatus,
+            created_by: link.created_by,
+            is_used: link.is_used,
+            submitted_at: link.submitted_at,
+            // Extract customer info with safe fallbacks
+            customer_name: customerData?.name || '',
+            customer_email: customerData?.email || '',
+            customer_phone: customerData?.phone || '',
+          };
+        }) as FormLink[];
+
+        setFormLinks(formattedLinks);
       }
-    } catch (error) {
-      console.error('Error in fetchFormLinks:', error);
-      // Don't show errors, just set empty data
-      setFormLinks([]);
+    } catch (err) {
+      console.error('Unexpected error fetching form links:', err);
+      setError(err instanceof Error ? err : new Error('An unknown error occurred'));
+      toast({ 
+        title: "Error", 
+        description: 'Failed to load form links',
+        variant: "destructive" 
+      });
     } finally {
       setIsLoading(false);
     }
@@ -234,7 +277,7 @@ export default function FormLinksTable({ customerId, customerEmail }: FormLinksT
   };
 
   // Format status for display
-  const formatStatus = (status: string, isUsed: boolean, isExpired: boolean): string => {
+  const formatStatus = (status: string, isUsed: boolean = false, isExpired: boolean): string => {
     if (isExpired && status === 'pending') return 'Έληξε';
     if (status === 'pending' && !isUsed) return 'Εκκρεμεί';
     if (status === 'submitted') return 'Υποβλήθηκε';
@@ -244,7 +287,7 @@ export default function FormLinksTable({ customerId, customerEmail }: FormLinksT
   };
 
   // Get status class for styling
-  const getStatusClass = (status: string, isUsed: boolean, isExpired: boolean): string => {
+  const getStatusClass = (status: string, isUsed: boolean = false, isExpired: boolean): string => {
     if (isExpired && status === 'pending') return 'bg-gray-500/20 text-gray-400';
     switch (status) {
       case 'pending':
@@ -460,8 +503,8 @@ export default function FormLinksTable({ customerId, customerEmail }: FormLinksT
           columns={columns}
           isLoading={isLoading}
           enableVirtualization={true}
-          renderEmptyPlaceholder={renderEmptyState}
         />
+        {formLinks.length === 0 && !isLoading && renderEmptyState()}
       </div>
       
       {/* Delete confirmation dialog */}

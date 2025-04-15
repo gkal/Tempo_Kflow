@@ -36,18 +36,18 @@ const FormPage = () => {
       try {
         const response = await validateFormLinkApi(token);
 
-        if (response.success) {
+        if (response.data?.isValid) {
           setStatus('valid');
           setCustomerInfo(response.data.customer);
         } else {
-          if (response.error.code === 'form_link_expired') {
+          if (response.error?.code === 'form_link_expired') {
             setStatus('expired');
           } else {
             setStatus('error');
           }
           setError({ 
-            message: response.error.message || 'Προέκυψε ένα σφάλμα κατά την επικύρωση του συνδέσμου', 
-            code: response.error.code 
+            message: response.error?.message || 'Προέκυψε ένα σφάλμα κατά την επικύρωση του συνδέσμου', 
+            code: response.error?.code 
           });
         }
       } catch (err) {
@@ -135,7 +135,7 @@ const FormPage = () => {
           </h1>
           {status === 'valid' && customerInfo && (
             <p className="mt-2 text-gray-600">
-              Καλωσορίσατε {customerInfo.firstName} {customerInfo.lastName}
+              Καλωσορίσατε {customerInfo.name}
             </p>
           )}
         </div>

@@ -14,8 +14,6 @@ const Home = lazy(() => import("./components/home"));
 const LoginForm = lazy(() => import("./components/auth/LoginForm"));
 const CustomersPage = lazy(() => import("@/components/customers/CustomersPage"));
 const CustomerDetailPage = lazy(() => import("@/components/customers/CustomerDetailPage"));
-const TestTable = lazy(() => import("@/components/test/TestTable"));
-const TanStackTable = lazy(() => import("@/components/test/TanStackTable"));
 
 /**
  * Main application component that handles routing and global providers

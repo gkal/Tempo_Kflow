@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useUserStore } from '@/stores/userStore';
+import { useAuth } from '@/lib/AuthContext';
+import type { User } from '@/types/auth';
 
 // Permission types supported by the system
 type PermissionType = 
@@ -16,7 +17,7 @@ type PermissionType =
  * @returns Object with permission checking functions
  */
 export const useUserPermissions = () => {
-  const { user } = useUserStore();
+  const { user } = useAuth();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
@@ -32,37 +33,8 @@ export const useUserPermissions = () => {
 
       setIsLoading(true);
       try {
-        // Fetch user role from Supabase
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-
-        if (userError) {
-          throw new Error(userError.message);
-        }
-
-        // Get permissions for the user's role
-        const { data: rolePermissions, error: permissionsError } = await supabase
-          .from('roles')
-          .select('permissions')
-          .eq('name', userData.role)
-          .single();
-
-        if (permissionsError) {
-          throw new Error(permissionsError.message);
-        }
-
-        // Set the permissions
-        setPermissions(rolePermissions.permissions || []);
-      } catch (err) {
-        console.error('Error fetching user permissions:', err);
-        setError(err instanceof Error ? err : new Error('An unknown error occurred'));
-        
-        // Default permissions based on user metadata
-        // This is a fallback if the database tables don't exist yet
-        if (user?.user_metadata?.role === 'admin') {
+        // Default permissions based on user role
+        if (user.role === "Admin" || user.role === "Super User") {
           setPermissions([
             'view_analytics',
             'edit_customer',
@@ -71,22 +43,26 @@ export const useUserPermissions = () => {
             'view_admin',
             'manage_users'
           ]);
-        } else if (user?.user_metadata?.role === 'manager') {
+        } else if (user.role === "User") {
           setPermissions([
             'view_analytics',
             'edit_customer',
             'approve_form'
           ]);
         } else {
-          setPermissions(['edit_customer']);
+          // Read-only role
+          setPermissions(['view_analytics']);
         }
+      } catch (err) {
+        console.error('Error fetching user permissions:', err);
+        setError(err instanceof Error ? err : new Error('An unknown error occurred'));
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchUserPermissions();
-  }, [user?.id, user?.user_metadata?.role]);
+  }, [user?.id, user?.role]);
 
   /**
    * Check if the user has a specific permission
@@ -95,15 +71,15 @@ export const useUserPermissions = () => {
    */
   const hasPermission = useCallback(
     (permission: PermissionType): boolean => {
-      // If user is superadmin, grant all permissions
-      if (user?.user_metadata?.role === 'superadmin') {
+      // If user is Admin or Super User, grant all permissions
+      if (user?.role === "Admin" || user?.role === "Super User") {
         return true;
       }
       
       // Check if user has the specific permission
       return permissions.includes(permission);
     },
-    [permissions, user?.user_metadata?.role]
+    [permissions, user?.role]
   );
 
   /**
@@ -113,15 +89,15 @@ export const useUserPermissions = () => {
    */
   const hasAnyPermission = useCallback(
     (requiredPermissions: PermissionType[]): boolean => {
-      // If user is superadmin, grant all permissions
-      if (user?.user_metadata?.role === 'superadmin') {
+      // If user is Admin or Super User, grant all permissions
+      if (user?.role === "Admin" || user?.role === "Super User") {
         return true;
       }
       
       // Check if user has any of the required permissions
       return requiredPermissions.some(permission => permissions.includes(permission));
     },
-    [permissions, user?.user_metadata?.role]
+    [permissions, user?.role]
   );
 
   /**
@@ -131,15 +107,15 @@ export const useUserPermissions = () => {
    */
   const hasAllPermissions = useCallback(
     (requiredPermissions: PermissionType[]): boolean => {
-      // If user is superadmin, grant all permissions
-      if (user?.user_metadata?.role === 'superadmin') {
+      // If user is Admin or Super User, grant all permissions
+      if (user?.role === "Admin" || user?.role === "Super User") {
         return true;
       }
       
       // Check if user has all of the required permissions
       return requiredPermissions.every(permission => permissions.includes(permission));
     },
-    [permissions, user?.user_metadata?.role]
+    [permissions, user?.role]
   );
 
   /**

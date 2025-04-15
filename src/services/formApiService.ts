@@ -8,6 +8,7 @@ import { logError, logInfo, logDebug } from '@/utils';
 import { createSuccessResponse, createErrorResponse, ApiResponse } from '@/utils/apiUtils';
 import { CustomerFormInfo, CustomerFormSubmission } from './customerFormService/types';
 import { FormLinkValidationResult } from './formLinkService/types';
+import { Database } from '@/types/supabase';
 
 /**
  * Response for form link creation
@@ -73,11 +74,15 @@ export const createFormLinkForCustomerApi = async (
       return createErrorResponse('Αποτυχία λήψης πληροφοριών πελάτη');
     }
     
+    // Calculate expiration date for Gmail URL
+    const expirationDate = new Date(formLink.expiresAt);
+    
     // Generate Gmail URL for sending email manually
     const gmailUrl = await generateFormLinkEmailUrl(
       formLink.token,
-      recipientEmail || customerInfo.email || '',
-      formLink.expiresAt
+      customerInfo,
+      expirationDate,
+      recipientEmail
     );
     
     // Send email if requested
@@ -86,7 +91,7 @@ export const createFormLinkForCustomerApi = async (
         const emailParams = {
           token: formLink.token,
           customerInfo,
-          recipientEmail: recipientEmail || customerInfo.email || ''
+          recipientEmail
         };
         
         const emailResult = await sendFormLinkToCustomer(emailParams);
@@ -259,9 +264,20 @@ export const getFormByTokenApi = async (
       return createErrorResponse<FormDataResponse & Partial<FormLinkValidationResult>>('Αποτυχία λήψης πληροφοριών πελάτη');
     }
     
+    // Create a merged customer object to satisfy both types
+    const mergedCustomer = {
+      ...validationResult.customer,
+      name: customerInfo.name,
+      email: customerInfo.email,
+      phone: customerInfo.phone,
+      address: customerInfo.address,
+      contacts: customerInfo.contacts,
+      createdAt: customerInfo.createdAt
+    };
+    
     // Create response
     return createSuccessResponse<FormDataResponse & Partial<FormLinkValidationResult>>({
-      customer: customerInfo,
+      customer: mergedCustomer as any,
       isValid: true,
       formLink: validationResult.formLink,
       reason: 'Ο σύνδεσμος φόρμας είναι έγκυρος'

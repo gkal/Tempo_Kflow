@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useCustomerForm } from './FormContext';
-import { CustomerFormInfo } from '@/services/customerFormService/types';
+import { CustomerFormInfo, CustomerFormSubmission } from '@/services/customerFormService/types';
 import { submitFormApi } from '@/services/formApiService';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import MobileFormField from './MobileFormField';
@@ -112,12 +112,25 @@ const MobileCustomerForm = ({ token, customerInfo }: MobileCustomerFormProps) =>
     goToStep('submitting');
     
     try {
-      const response = await submitFormApi(token, {
-        ...formData,
-        customerId: customerInfo.id // Ensure we use the correct ID field
-      });
+      const submission: CustomerFormSubmission = {
+        customerData: {
+          name: `${formData.firstName} ${formData.lastName}`.trim(),
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address
+        },
+        serviceRequirements: formData.serviceType || '',
+        additionalNotes: formData.notes,
+        preferredContactMethod: 'any',
+        formMetadata: {
+          submitTime: new Date().toISOString(),
+          browserInfo: navigator.userAgent
+        }
+      };
       
-      if (response.success) {
+      const response = await submitFormApi(token, submission);
+      
+      if (response.data?.success) {
         setSubmitted(true);
       } else {
         setSubmissionError(response.error?.message || 'Προέκυψε σφάλμα κατά την υποβολή της φόρμας');

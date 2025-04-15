@@ -561,7 +561,7 @@ export function DataTableBase({
       <div className="flex flex-col items-center justify-center">
         <LoadingSpinner 
           fullScreen={false} 
-          delayBeforeSpinner={300} // Show spinner faster to reduce perception of slowness
+          // Show spinner immediately
         />
       </div>
     </div>

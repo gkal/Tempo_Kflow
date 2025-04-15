@@ -53,18 +53,23 @@ const CustomerForm = ({ token, customerInfo }: CustomerFormProps) => {
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [submittedData, setSubmittedData] = useState<CustomerFormSubmission | null>(null);
   
+  // Initialize customer name parts
+  const nameParts = customerInfo.name ? customerInfo.name.split(' ') : ['', ''];
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+  
   // Initialize form with customer info
   const { register, handleSubmit, formState: { errors, isValid }, getValues, trigger } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     mode: 'onChange',
     defaultValues: {
-      firstName: customerInfo.firstName || '',
-      lastName: customerInfo.lastName || '',
-      company: customerInfo.company || '',
+      firstName: firstName,
+      lastName: lastName,
+      company: '',
       email: customerInfo.email || '',
       phone: customerInfo.phone || '',
       address: customerInfo.address || '',
-      city: customerInfo.city || '',
+      city: '',
       serviceType: '',
       preferredDate: '',
       notes: '',
@@ -79,13 +84,24 @@ const CustomerForm = ({ token, customerInfo }: CustomerFormProps) => {
     try {
       // Format data for submission
       const formSubmission: CustomerFormSubmission = {
-        ...data,
-        customerId: customerInfo.customerId,
+        customerData: {
+          name: `${data.firstName} ${data.lastName}`.trim(),
+          email: data.email,
+          phone: data.phone,
+          address: data.address
+        },
+        serviceRequirements: data.serviceType,
+        additionalNotes: data.notes,
+        preferredContactMethod: 'any',
+        formMetadata: {
+          submitTime: new Date().toISOString(),
+          browserInfo: navigator.userAgent
+        }
       };
       
       const response = await submitFormApi(token, formSubmission);
       
-      if (response.success) {
+      if (response.data?.success) {
         setSubmittedData(formSubmission);
         setCurrentStep('success');
       } else {
@@ -374,16 +390,20 @@ const CustomerForm = ({ token, customerInfo }: CustomerFormProps) => {
         
       case 'submitting':
         return (
-          <div className="flex flex-col items-center justify-center py-12">
-            <LoadingSpinner size="lg" />
-            <p className="mt-4 text-lg text-gray-700">Υποβολή φόρμας...</p>
-            <p className="text-sm text-gray-500">Παρακαλώ περιμένετε, η φόρμα σας υποβάλλεται.</p>
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-6">
+            <div className="flex flex-col items-center mb-8">
+              <LoadingSpinner className="h-16 w-16 mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Υποβολή Φόρμας</h2>
+              <p className="text-gray-600">Παρακαλώ περιμένετε όσο υποβάλλουμε τη φόρμα σας...</p>
+            </div>
           </div>
         );
         
       case 'success':
         return (
-          <FormSuccess customerName={`${customerInfo.firstName} ${customerInfo.lastName}`} />
+          <div className="py-6 px-4">
+            <FormSuccess customerName={`${firstName} ${lastName}`} />
+          </div>
         );
         
       case 'error':

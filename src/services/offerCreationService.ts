@@ -9,7 +9,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import { createRecord, fetchRecordById, fetchRecords, updateRecord } from '@/services/api/supabaseService';
 import { FormLinkService } from '@/services/formLinkService';
-import { CustomerFormService } from '@/services/customerFormService';
 import { CustomerFormLink, FormLinkStatus } from '@/services/formLinkService/types';
 import { CustomerFormSubmission } from '@/services/customerFormService/types';
 import { Offer, OfferDetail, Contact, Customer } from '@/services/api/types';
@@ -204,7 +203,8 @@ export const OfferCreationService = {
       const offerNumber = `FORM-${datePart}-${randomPart}`;
       
       // Check if this offer number already exists (collision check)
-      const { count, error } = await supabase
+      const client = supabase as any;
+      const { count, error } = await client
         .from('offers')
         .select('*', { count: 'exact', head: true })
         .eq('offer_number', offerNumber);
@@ -249,102 +249,26 @@ export const OfferCreationService = {
       }
 
       const formLink = formLinkResponse.data;
-
-      // Verify form status
-      if (formLink.status !== 'approved') {
-        return {
-          success: false,
-          error: `Cannot create offer: form has not been approved (current status: ${formLink.status})`
-        };
-      }
-
-      // Verify form data exists
-      if (!formLink.form_data) {
-        return {
-          success: false,
-          error: 'Cannot create offer: no form data available'
-        };
-      }
-
-      // Parse and validate form data
       const formData = formLink.form_data as CustomerFormSubmission;
+
+      // Validate form data
       const validation = this.validateFormDataForOffer(formData);
       
       if (!validation.isValid) {
-        let warningMessages: string[] | undefined;
-        if (validation.errors) {
-          warningMessages = [];
-          Object.values(validation.errors).forEach(errArr => {
-            if (Array.isArray(errArr)) {
-              warningMessages!.push(...errArr);
-            }
-          });
-        }
-        
         return {
           success: false,
-          error: 'Form data validation failed',
-          warnings: warningMessages
+          error: validation.message || 'Invalid form data',
+          warnings: validation.warnings ? this.extractWarningMessages(validation.warnings) : undefined
         };
       }
 
-      // Generate offer number
-      const offerNumber = await this.generateOfferNumber();
-
-      // Map form data to offer structure
-      const offerData: Partial<Offer> = {
-        ...this.mapFormDataToOffer(formData, formLink.customer_id, userId),
-        offer_number: offerNumber
-      };
-
-      // Create offer record
-      const { data: createdOffer, error: offerError } = await createRecord<Offer>('offers', offerData);
-
-      if (offerError || !createdOffer) {
-        return {
-          success: false,
-          error: 'Failed to create offer record: ' + (offerError?.message || 'Unknown error')
-        };
-      }
-
-      // Create offer details
-      const offerDetailsData = this.mapFormServiceDetailsToOfferDetails(formData, createdOffer.id);
-      const createdDetails: OfferDetail[] = [];
-      
-      // Create each offer detail
-      for (const detailData of offerDetailsData) {
-        const { data: detail, error: detailError } = await createRecord<OfferDetail>('offer_details', detailData);
-        
-        if (detailError || !detail) {
-          logError('Error creating offer detail:', detailError, 'OfferCreationService');
-          // Continue creating other details even if one fails
-        } else {
-          createdDetails.push(detail);
-        }
-      }
-
-      // Update form link with offer ID reference
-      await FormLinkService.updateFormLink({
-        formLinkId: formLink.id,
-        updatedBy: userId,
-        // Add offer ID to the notes field since there's no direct field for it
-        notes: `Offer created: ${createdOffer.id}`
-      });
-
-      // Log success
-      logInfo(`Created offer ${createdOffer.id} from form submission ${formLinkId}`, 'OfferCreationService');
-
-      return {
-        success: true,
-        offer: createdOffer,
-        offerDetails: createdDetails,
-        warnings: validation.warnings ? this.extractWarningMessages(validation.warnings) : undefined
-      };
+      // Create an offer from the form data
+      return this.createOfferFromForm(formData, formLink.customer_id, userId);
     } catch (error) {
       logError('Error creating offer from form submission:', error, 'OfferCreationService');
       return {
         success: false,
-        error: 'An unexpected error occurred creating the offer: ' + (error instanceof Error ? error.message : String(error))
+        error: 'An unexpected error occurred'
       };
     }
   },

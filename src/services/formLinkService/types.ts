@@ -21,6 +21,7 @@ export interface CustomerFormLink {
   updated_by: string | null;
   approved_by: string | null;
   updated_at: string | null;
+  external_project_id?: string | null; // Added for cross-project functionality
 }
 
 /**
@@ -35,6 +36,8 @@ export interface FormLinkGenerationOptions {
   customerId: string;
   expirationHours?: number; // Default will be 72 hours if not specified
   createdById?: string; // User ID of the creator
+  externalProjectId?: string; // ID of external project that will use this link
+  callbackUrl?: string; // URL to notify when form is submitted
 }
 
 /**
@@ -47,6 +50,7 @@ export interface FormLinkCreationResponse {
     token: string;
     url: string;
     expiresAt: string;
+    externalProjectId?: string;
   };
   error?: string;
 }
@@ -72,6 +76,7 @@ export interface FormLinkFilterOptions {
   createdAfter?: string; // ISO date string
   createdBefore?: string; // ISO date string
   createdBy?: string; // User ID of the creator
+  externalProjectId?: string; // ID of external project
 }
 
 /**
@@ -122,6 +127,8 @@ export interface FormLinkUpdateOptions {
   updatedBy?: string; // User ID of the updater
   status?: FormLinkStatus;
   notes?: string;
+  externalProjectId?: string;
+  callbackUrl?: string;
   // Other fields that can be updated
 }
 

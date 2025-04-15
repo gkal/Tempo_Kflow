@@ -467,7 +467,7 @@ export const CustomerFormService = {
 
       return {
         success: true,
-        offerId: offer.data?.id,
+        offerId: (offer as any).id,
       };
     } catch (error) {
       console.error('Error creating offer from approved form:', error);

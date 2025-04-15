@@ -3,6 +3,25 @@ import { fetchRecordById, fetchRecords, updateRecord, createRecord } from '@/ser
 import { logError, logInfo, logDebug } from '@/utils';
 import type { Offer, Customer, Contact, TableName } from '@/services/api/types';
 
+// Extended types to match the actual database schema
+interface ExtendedContact extends Contact {
+  first_name?: string;
+  last_name?: string;
+  telephone?: string;
+  position?: string;
+}
+
+interface ExtendedCustomer extends Customer {
+  telephone?: string;
+  afm?: string;
+  primary_contact_id?: string;
+}
+
+interface ExtendedOffer extends Offer {
+  offer_number?: string;
+  is_auto_generated?: boolean;
+}
+
 /**
  * Interface for offer data needed for forms
  */
@@ -69,7 +88,7 @@ export const getOfferDataForForm = async (offerId: string): Promise<OfferFormDat
       throw new Error('Offer ID is required');
     }
     
-    const { data, error } = await fetchRecordById<Offer>(
+    const { data, error } = await fetchRecordById<ExtendedOffer>(
       'offers' as TableName,
       offerId,
       'id, customer_id, requirements, amount, special_conditions, status, address, postal_code, town, created_at, is_auto_generated, offer_number'
@@ -100,7 +119,7 @@ export const getCustomerInfoForOffer = async (offerId: string): Promise<Customer
     }
     
     // First get the offer to find the customer_id
-    const { data: offer, error: offerError } = await fetchRecordById<Offer>(
+    const { data: offer, error: offerError } = await fetchRecordById<ExtendedOffer>(
       'offers' as TableName,
       offerId,
       'id, customer_id, contact_id, offer_number'
@@ -112,7 +131,7 @@ export const getCustomerInfoForOffer = async (offerId: string): Promise<Customer
     }
     
     // Get the customer data
-    const { data: customer, error: customerError } = await fetchRecordById<Customer>(
+    const { data: customer, error: customerError } = await fetchRecordById<ExtendedCustomer>(
       'customers' as TableName,
       offer.customer_id,
       'id, company_name, email, telephone, address, afm'
@@ -126,7 +145,7 @@ export const getCustomerInfoForOffer = async (offerId: string): Promise<Customer
     // If the offer has a contact_id, get the contact information
     let contact = null;
     if (offer.contact_id) {
-      const { data: contactData, error: contactError } = await fetchRecordById<Contact>(
+      const { data: contactData, error: contactError } = await fetchRecordById<ExtendedContact>(
         'contacts' as TableName,
         offer.contact_id,
         'id, first_name, last_name, email, telephone, position'
@@ -181,7 +200,7 @@ export const updateOfferFromFormSubmission = async (
     }
     
     // Get the current offer data first, to check if it was auto-generated
-    const { data: currentOffer, error: getOfferError } = await fetchRecordById<Offer>(
+    const { data: currentOffer, error: getOfferError } = await fetchRecordById<ExtendedOffer>(
       'offers' as TableName,
       offerId
     );
@@ -195,13 +214,17 @@ export const updateOfferFromFormSubmission = async (
     const newStatus = formData.accepted ? 'approved' : 'rejected';
     
     // Build update object with submitted data
-    const updateData: Partial<Offer> = {
+    const updateData: Partial<ExtendedOffer> = {
       status: newStatus,
       customer_comments: formData.customer_comments || '',
       special_conditions: formData.special_requests, // Update special conditions if provided
-      preferred_date: formData.preferred_date, // Add preferred date if provided
       updated_by: userId
     };
+
+    // Add preferred date if provided in a type-safe way
+    if (formData.preferred_date) {
+      (updateData as any).preferred_date = formData.preferred_date;
+    }
     
     // If this was an auto-generated offer, and it's been accepted, 
     // update the is_auto_generated flag to false, as it's now a real offer
@@ -255,7 +278,7 @@ async function updateContactInformation(
   userId?: string
 ): Promise<void> {
   try {
-    // Get the offer to find the customer_id
+    // First get the offer to find associated customer and contact
     const { data: offer, error: offerError } = await fetchRecordById<Offer>(
       'offers' as TableName,
       offerId,
@@ -267,67 +290,100 @@ async function updateContactInformation(
       return;
     }
     
-    // If a contact name was provided, we need to update or create a contact
+    // Parse the contact name to get first and last name components if possible
+    let firstName = '';
+    let lastName = '';
+    
     if (formData.contact_name) {
-      // Split the full name into first and last name
-      const nameParts = formData.contact_name.split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      const nameParts = formData.contact_name.trim().split(' ');
+      if (nameParts.length === 1) {
+        firstName = nameParts[0];
+      } else if (nameParts.length > 1) {
+        firstName = nameParts[0];
+        lastName = nameParts.slice(1).join(' ');
+      }
+    }
+    
+    // If the offer already has a contact_id, update that contact
+    if (offer.contact_id) {
+      // Get the current contact data
+      const { data: existingContact } = await fetchRecordById<ExtendedContact>(
+        'contacts' as TableName,
+        offer.contact_id
+      );
       
-      let contactId = offer.contact_id;
+      // Build update object with changes from form
+      const contactUpdateData: Partial<ExtendedContact> = {};
       
-      // If the offer already has a contact, update it
-      if (contactId) {
-        await updateRecord<Contact>(
-          'contacts' as TableName,
-          contactId,
-          {
-            first_name: firstName,
-            last_name: lastName,
-            email: formData.contact_email,
-            telephone: formData.contact_phone,
-            updated_by: userId
-          }
-        );
-        
-        logInfo(`Updated contact ${contactId} from form submission`);
-      } else {
-        // Create a new contact for the customer
-        const { data: newContact, error: createError } = await createRecord<Contact>(
-          'contacts' as TableName,
-          {
-            customer_id: offer.customer_id,
-            first_name: firstName,
-            last_name: lastName,
-            email: formData.contact_email,
-            telephone: formData.contact_phone,
-            is_primary: false, // Not setting as primary automatically
-            created_by: userId
-          }
-        );
-        
-        if (createError) {
-          logError('Error creating contact from form submission:', createError, 'OfferFormService');
-          return;
+      if (firstName || lastName) {
+        contactUpdateData.first_name = firstName;
+        if (lastName) {
+          contactUpdateData.last_name = lastName;
         }
-        
-        if (newContact) {
-          contactId = newContact.id;
-          logInfo(`Created new contact ${contactId} from form submission`);
-          
-          // Link the new contact to the offer
-          await updateRecord<Offer>(
-            'offers' as TableName,
-            offerId,
-            {
-              contact_id: contactId,
-              updated_by: userId
-            }
-          );
-          
-          logInfo(`Linked new contact ${contactId} to offer ${offerId}`);
+        // Only update name if we've derived both parts
+        if (existingContact) {
+          contactUpdateData.name = `${firstName} ${lastName}`.trim();
         }
       }
+      
+      if (formData.contact_email) {
+        contactUpdateData.email = formData.contact_email;
+      }
+      
+      if (formData.contact_phone) {
+        contactUpdateData.telephone = formData.contact_phone;
+        contactUpdateData.phone = formData.contact_phone; // Update standard property too
+      }
+      
+      // Only update if we have changes
+      if (Object.keys(contactUpdateData).length > 0) {
+        await updateRecord<ExtendedContact>(
+          'contacts' as TableName,
+          offer.contact_id,
+          contactUpdateData
+        );
+        
+        logInfo(`Updated contact ${offer.contact_id} with form submission data`);
+      }
+    } 
+    // Otherwise, create a new contact for the customer and associate with the offer
+    else if (firstName || formData.contact_email || formData.contact_phone) {
+      // Create a new contact
+      const newContactData: Partial<ExtendedContact> = {
+        customer_id: offer.customer_id,
+        first_name: firstName,
+        name: `${firstName} ${lastName}`.trim(), // Also set name property
+        email: formData.contact_email,
+        telephone: formData.contact_phone,
+        phone: formData.contact_phone, // Set standard property too
+        created_at: new Date().toISOString()
+      };
+      
+      if (lastName) {
+        newContactData.last_name = lastName;
+      }
+      
+      // Create the contact
+      const { data: newContact, error: createError } = await createRecord<ExtendedContact>(
+        'contacts' as TableName,
+        newContactData
+      );
+      
+      if (createError || !newContact) {
+        logError('Error creating contact from form data:', createError || 'Contact creation failed', 'OfferFormService');
+        return;
+      }
+      
+      logInfo(`Created new contact ${newContact.id} from form submission`);
+      
+      // Associate the new contact with the offer
+      await updateRecord<Offer>(
+        'offers' as TableName,
+        offerId,
+        { contact_id: newContact.id }
+      );
+      
+      logInfo(`Associated new contact ${newContact.id} with offer ${offerId}`);
     }
   } catch (error) {
     logError('Exception in updateContactInformation:', error, 'OfferFormService');
@@ -335,42 +391,35 @@ async function updateContactInformation(
 }
 
 /**
- * Check if a customer has any active offers
+ * Check if a customer has any active offers that can be used for form submissions
  * 
- * @param customerId The customer ID to check
- * @returns Promise with boolean indicating if customer has active offers
+ * @param customerId The customer ID to check for active offers
+ * @returns Promise that resolves to true if customer has active offers
  */
 export const customerHasActiveOffers = async (customerId: string): Promise<boolean> => {
   try {
     if (!customerId) {
-      throw new Error('Customer ID is required');
-    }
-    
-    // Query for active offers (not rejected or completed)
-    const { data, error } = await fetchRecords<Offer>(
-      'offers' as TableName,
-      {
-        filters: { 
-          customer_id: customerId,
-        },
-        select: 'id, status'
-      }
-    );
-    
-    if (error) {
-      logError('Error checking active offers for customer:', error, 'OfferFormService');
       return false;
     }
     
-    // Consider non-rejected/completed offers as active
-    const activeOffers = Array.isArray(data) 
-      ? data.filter(offer => 
-          offer.status !== 'rejected' && 
-          offer.status !== 'completed' &&
-          offer.status !== 'canceled')
-      : [];
+    // Check for any active offers - using any to bypass deep instantiation issue
+    const client = supabase as any;
+    const result = await client
+      .from('offers')
+      .select('id', { count: 'exact', head: true })
+      .eq('customer_id', customerId)
+      .eq('is_deleted', false)
+      .in('status', ['pending', 'approved'])
+      .limit(1);
     
-    return activeOffers.length > 0;
+    const { data, error, count } = result;
+    
+    if (error) {
+      logError('Error checking for active offers:', error, 'OfferFormService');
+      return false;
+    }
+    
+    return !!count && count > 0;
   } catch (error) {
     logError('Exception in customerHasActiveOffers:', error, 'OfferFormService');
     return false;
@@ -378,8 +427,8 @@ export const customerHasActiveOffers = async (customerId: string): Promise<boole
 };
 
 /**
- * Create a new auto-generated offer for a customer
- * This is used when a customer doesn't have any active offers
+ * Create an auto-generated offer for a customer
+ * This is useful for creating placeholder offers for form submissions
  * 
  * @param customerId The customer ID to create an offer for
  * @param userId Optional user ID for audit trail
@@ -394,42 +443,47 @@ export const createAutoGeneratedOffer = async (
       throw new Error('Customer ID is required');
     }
     
-    // First check if customer exists
-    const { data: customer, error: customerError } = await fetchRecordById<Customer>(
+    // Get customer to verify it exists
+    const { data: customer, error: customerError } = await fetchRecordById<ExtendedCustomer>(
       'customers' as TableName,
-      customerId,
-      'id, company_name, primary_contact_id'
+      customerId
     );
     
     if (customerError || !customer) {
-      logError('Error fetching customer for auto-offer creation:', customerError || 'Customer not found', 'OfferFormService');
+      logError('Error fetching customer:', customerError || 'Customer not found', 'OfferFormService');
       return null;
     }
     
-    // Generate a unique offer number based on timestamp
-    const timestamp = new Date().getTime().toString().slice(-6);
-    const offerNumber = `AUTO-${timestamp}`;
+    // Generate a unique offer number for auto-generated offers
+    const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const offerNumber = `AUTO-${dateStr}-${randomSuffix}`;
     
-    // Create a new auto-generated offer
-    const { data: offer, error: createError } = await createRecord<Offer>(
+    // Create the auto-generated offer
+    const offerData: Partial<ExtendedOffer> = {
+      customer_id: customerId,
+      requirements: 'Auto-generated offer for form submission',
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      is_auto_generated: true,
+      contact_id: customer.primary_contact_id || null,
+      offer_number: offerNumber,
+      created_by: userId
+    };
+    
+    const { data, error } = await createRecord<ExtendedOffer>(
       'offers' as TableName,
-      {
-        customer_id: customerId,
-        contact_id: customer.primary_contact_id || null,
-        offer_number: offerNumber,
-        status: 'pending',
-        is_auto_generated: true,
-        created_by: userId
-      }
+      offerData
     );
     
-    if (createError) {
-      logError('Error creating auto-generated offer:', createError, 'OfferFormService');
+    if (error || !data) {
+      logError('Error creating auto-generated offer:', error || 'Offer creation failed', 'OfferFormService');
       return null;
     }
     
-    logInfo(`Created auto-generated offer ${offer?.id} for customer ${customerId}`);
-    return offer;
+    logInfo(`Created auto-generated offer ${data.id} for customer ${customerId}`);
+    
+    return data;
   } catch (error) {
     logError('Exception in createAutoGeneratedOffer:', error, 'OfferFormService');
     return null;
@@ -437,13 +491,11 @@ export const createAutoGeneratedOffer = async (
 };
 
 /**
- * Get or create an offer for a customer
- * If the customer has active offers, returns the most recent one
- * Otherwise, creates a new auto-generated offer
+ * Get an existing active offer for a customer, or create a new auto-generated one
  * 
  * @param customerId The customer ID to get or create an offer for
  * @param userId Optional user ID for audit trail
- * @returns Promise with the offer
+ * @returns Promise with offer
  */
 export const getOrCreateCustomerOffer = async (
   customerId: string,
@@ -454,38 +506,32 @@ export const getOrCreateCustomerOffer = async (
       throw new Error('Customer ID is required');
     }
     
-    // First check if customer has any active offers
-    const { data, error } = await fetchRecords<Offer>(
-      'offers' as TableName,
-      {
-        filters: { 
-          customer_id: customerId
-        },
-        order: { column: 'created_at', ascending: false },
-        select: '*'
-      }
-    );
+    // First check if customer already has an active offer
+    // Using any to work around the typescript deep instantiation issue
+    const result = await (supabase as any)
+      .from('offers')
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('is_deleted', false)
+      .in('status', ['pending', 'in_progress'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    const { data, error } = result;
     
     if (error) {
-      logError('Error fetching offers for customer:', error, 'OfferFormService');
+      logError('Error fetching existing offers:', error, 'OfferFormService');
       return null;
     }
     
-    // Filter to get non-rejected/completed offers
-    const activeOffers = Array.isArray(data) 
-      ? data.filter(offer => 
-          offer.status !== 'rejected' && 
-          offer.status !== 'completed' &&
-          offer.status !== 'canceled')
-      : [];
-    
-    if (activeOffers.length > 0) {
-      // Return the most recent active offer (already sorted by created_at desc)
-      return activeOffers[0] as Offer;
+    // If an active offer exists, return it
+    if (data && data.length > 0) {
+      logInfo(`Using existing offer ${data[0].id} for customer ${customerId}`);
+      return data[0] as Offer;
     }
     
-    // No active offers found, create a new auto-generated one
-    return await createAutoGeneratedOffer(customerId, userId);
+    // Otherwise create a new auto-generated offer
+    return createAutoGeneratedOffer(customerId, userId);
   } catch (error) {
     logError('Exception in getOrCreateCustomerOffer:', error, 'OfferFormService');
     return null;
