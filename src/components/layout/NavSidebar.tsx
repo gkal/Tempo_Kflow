@@ -5,6 +5,11 @@ export function NavSidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   return (
     <div className="w-64 bg-[#2f3e46] text-white p-4">
       {/* Your sidebar content */}
@@ -31,7 +36,7 @@ export function NavSidebar() {
         <div className="absolute bottom-4 left-4 right-4">
           <div className="text-sm">{user?.fullname}</div>
           <button 
-            onClick={() => logout()}
+            onClick={handleLogout}
             className="mt-2 w-full px-4 py-2 bg-[#52796f] hover:bg-[#84a98c] rounded"
           >
             Logout
