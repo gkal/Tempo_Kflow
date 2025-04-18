@@ -11,6 +11,7 @@ import { GlobalTooltip } from '@/components/ui/GlobalTooltip';
 import { createFormLinkForCustomerApi } from '@/services/formApiService';
 import { useAuth } from '@/lib/AuthContext';
 import { FormLinkStatus } from '@/services/formLinkService/types';
+import { Loader } from "@/components/ui/Loader";
 
 // Define the form link data type based on the database schema
 export interface FormLink {
@@ -484,7 +485,7 @@ export default function FormLinksTable({ customerId, customerEmail }: FormLinksT
         >
           {isCreatingLink ? (
             <>
-              <div className="h-4 w-4 animate-spin mr-2 border-2 border-[#cad2c5] border-t-transparent rounded-full" />
+              <Loader size={16} className="mr-2" />
               Δημιουργία...
             </>
           ) : (

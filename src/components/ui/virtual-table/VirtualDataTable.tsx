@@ -22,7 +22,7 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, ChevronUp, Filter, ChevronsUpDown, GripVertical, GripHorizontal, Grid, Grip } from "lucide-react";
 import { cn } from "@/lib/utils";
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { Loader } from "@/components/ui/Loader";
 import { SearchBar } from "@/components/ui/search-bar";
 import {
   Select,
@@ -203,6 +203,8 @@ export interface VirtualDataTableProps<T> {
   onCustomerTypeChange?: (types: string[]) => void;
   tableId?: string;
   stabilizeExpandedRows?: boolean;
+  initialSortColumn?: string;
+  initialSortDirection?: 'asc' | 'desc';
 }
 
 export function VirtualDataTable<T extends Record<string, any>>({
@@ -226,9 +228,31 @@ export function VirtualDataTable<T extends Record<string, any>>({
   onCustomerTypeChange = () => {},
   tableId = 'default',
   stabilizeExpandedRows = true,
+  initialSortColumn = "",
+  initialSortDirection = 'asc',
 }: VirtualDataTableProps<T>) {
   // State
-  const [sorting, setSorting] = useState<SortingState>(() => []);
+  const [sorting, setSorting] = useState<SortingState>(() => {
+    // Initialize with provided sort column if specified
+    if (initialSortColumn) {
+      // Find the column definition to check if sortDescFirst is specified
+      const columnDef = columns.find(col => (col.id || col.accessorKey) === initialSortColumn);
+      const shouldSortDesc = initialSortDirection === 'desc' || columnDef?.sortDescFirst === true;
+      
+      return [{ id: initialSortColumn, desc: shouldSortDesc }];
+    }
+    
+    // If no initialSortColumn but a column has sortDescFirst=true, use that
+    const defaultSortColumn = columns.find(col => col.enableSorting !== false && col.sortDescFirst === true);
+    if (defaultSortColumn) {
+      const columnId = defaultSortColumn.id || defaultSortColumn.accessorKey;
+      if (columnId) {
+        return [{ id: columnId, desc: true }];
+      }
+    }
+    
+    return [];
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -317,10 +341,19 @@ export function VirtualDataTable<T extends Record<string, any>>({
       const columnId = column.id || column.accessorKey || "";
       const width = columnSizing[columnId] || column.meta?.initialWidth || 150;
       
+      // Common properties for all column types
+      const commonProps = {
+        id: columnId,
+        header: () => column.header,
+        enableSorting: column.enableSorting !== false,
+        sortDescFirst: column.sortDescFirst, // Respect column's sortDescFirst property
+        meta: column.meta,
+        size: width,
+      };
+      
       if (column.accessorKey) {
         return columnHelper.accessor(column.accessorKey as any, {
-          id: columnId,
-          header: () => column.header,
+          ...commonProps,
           cell: column.cell ? 
             ({ getValue, row }) => (
               <div style={{ width: width - 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -332,14 +365,10 @@ export function VirtualDataTable<T extends Record<string, any>>({
                 {(getValue() as string) || <span className="text-xs text-[#52796f]">-</span>}
               </div>
             ),
-          enableSorting: column.enableSorting !== false,
-          meta: column.meta,
-          size: width,
         });
       } else {
         return columnHelper.display({
-          id: columnId,
-          header: () => column.header,
+          ...commonProps,
           cell: column.cell ? 
             ({ row }) => (
               <div style={{ width: width - 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -351,8 +380,6 @@ export function VirtualDataTable<T extends Record<string, any>>({
                 {""}
               </div>
             ),
-          meta: column.meta,
-          size: width,
         });
       }
     });
@@ -464,7 +491,28 @@ export function VirtualDataTable<T extends Record<string, any>>({
       columnSizing,
     },
     onColumnOrderChange: setColumnOrder,
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      // Custom sorting handler to prevent the "none" state
+      if (typeof updater === 'function') {
+        setSorting((old) => {
+          const updated = updater(old);
+          
+          // If the update would clear sorting (entering "none" state)
+          if (updated.length === 0 && old.length > 0) {
+            // Instead, toggle the direction of the last sorted column
+            return [{ ...old[0], desc: !old[0].desc }];
+          }
+          
+          // Ensure consistent sorting behavior
+          return updated;
+        });
+      } else {
+        // If direct value is provided, ensure it's not empty
+        setSorting(updater.length === 0 && sorting.length > 0 
+          ? [{ ...sorting[0], desc: !sorting[0].desc }] 
+          : updater);
+      }
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -473,6 +521,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
     getFacetedMinMaxValues: getFacetedMinMaxValues(),
     enableMultiSort: false,
     enableColumnResizing: false,
+    sortDescFirst: false, // Prioritize ascending order first
     defaultColumn: {
       size: 150
     }
@@ -818,7 +867,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16 bg-[#2f3e46] rounded-lg border border-[#52796f]">
-        <LoadingSpinner fullScreen={false} />
+        <Loader fullScreen={false} />
         <span className="ml-3 text-[#cad2c5]">{loadingStateMessage}</span>
       </div>
     );
@@ -970,7 +1019,10 @@ export function VirtualDataTable<T extends Record<string, any>>({
                             
                             {/* Header text and sort icon */}
                             <div 
-                              className="flex-1 flex items-center justify-center"
+                              className={cn(
+                                "flex-1 flex items-center justify-center group",
+                                header.column.getCanSort() && "hover:bg-[#354f52]/40 rounded"
+                              )}
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -979,11 +1031,19 @@ export function VirtualDataTable<T extends Record<string, any>>({
                                 }
                               }}
                             >
-                              <div className="inline-flex items-center">
-                                <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                                {header.column.getCanSort() && header.column.getIsSorted() && (
+                              <div className="inline-flex items-center py-1.5 px-2">
+                                <span className={cn(
+                                  header.column.getIsSorted() ? "text-white font-medium" : "",
+                                  header.column.getCanSort() && "group-hover:text-white transition-colors duration-150" // Add hover effect
+                                )}>
+                                  {flexRender(header.column.columnDef.header, header.getContext())}
+                                </span>
+                                {header.column.getCanSort() && (
                                   <ChevronUp className={cn(
-                                    "h-4 w-4 text-white ml-3",
+                                    "h-4 w-4 ml-3 transition-all duration-200 ease-in-out",
+                                    header.column.getIsSorted() 
+                                      ? "text-white opacity-100" 
+                                      : "text-[#52796f] opacity-60 group-hover:opacity-100 group-hover:text-white", // Enhance hover effect
                                     header.column.getIsSorted() === "desc" && "rotate-180"
                                   )} />
                                 )}
@@ -1033,7 +1093,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
                   <tr>
                     <td colSpan={tableColumns.length} className="text-center py-8">
                       <div className="flex justify-center items-center text-[#84a98c]">
-                        <LoadingSpinner fullScreen={false} />
+                        <Loader fullScreen={false} />
                         <span className="ml-3">{loadingStateMessage || 'Loading...'}</span>
                       </div>
                     </td>

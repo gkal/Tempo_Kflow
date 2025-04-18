@@ -6,9 +6,10 @@ import {
   type MRT_Row,
   type MRT_RowData,
 } from 'material-react-table';
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down';
 import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right';
+import { Loader } from "@/components/ui/Loader";
 
 // Define props interface that matches your existing DataTable
 export interface DataTableWrapperProps<T extends Record<string, any>> {
@@ -156,8 +157,8 @@ export function DataTableWrapper<T extends Record<string, any>>({
           borderRadius: '0.5rem',
         }}
       >
-        <CircularProgress size={24} sx={{ color: '#84a98c', mr: 2 }} />
-        <Typography sx={{ color: '#cad2c5' }}>
+        <Loader size={24} />
+        <Typography sx={{ color: '#cad2c5', ml: 2 }}>
           {loadingStateMessage}
         </Typography>
       </Box>

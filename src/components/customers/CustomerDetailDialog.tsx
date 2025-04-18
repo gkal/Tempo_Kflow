@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { el } from 'date-fns/locale';
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 import DocumentViewer from '@/components/documents/DocumentViewer';
+import { Loader } from "@/components/ui/Loader";
 
 interface CustomerDetailDialogProps {
   open: boolean;
@@ -159,7 +160,7 @@ export function CustomerDetailDialog({
     >
       {loading ? (
         <div className="flex justify-center items-center p-8">
-          <Loader2 className="h-8 w-8 animate-spin text-[#84a98c]" />
+          <Loader size={32} />
         </div>
       ) : error ? (
         <div className="text-red-400 p-4">{error}</div>

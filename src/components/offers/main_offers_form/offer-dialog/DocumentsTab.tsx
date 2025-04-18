@@ -31,6 +31,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { PlusCircle, Edit, Trash, FileText, Eye, Upload, ArrowLeft, Save, X } from 'lucide-react';
 import { CloseButton } from '@/components/ui/close-button';
 import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
+import { Loader } from "@/components/ui/Loader";
 
 // Create a custom hook to use the OfferDialogContext with error handling
 const useOfferDialog = () => {
@@ -700,7 +701,7 @@ const DocumentsTab: React.FC = () => {
             title="Προσθήκη στη λίστα εγγράφων"
           >
             {isUploading ? (
-              <div className="animate-spin h-3.5 w-3.5 border-t-2 border-b-2 border-white rounded-full"></div>
+              <Loader size={16} />
             ) : (
               <div className="flex flex-col items-center">
                 <ArrowLeft className="h-3.5 w-3.5 transform -rotate-90 group-hover:translate-y-0.5 transition-transform" />
@@ -749,7 +750,7 @@ const DocumentsTab: React.FC = () => {
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#52796f]"></div>
+          <Loader size={48} />
         </div>
       ) : (
         // Only show the document table or the drag area

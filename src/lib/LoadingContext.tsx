@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { Loader } from '@/components/ui/Loader';
 
 interface LoadingContextType {
   showLoading: () => void;
@@ -25,11 +25,7 @@ export function LoadingProvider({ children }: { children: ReactNode }) {
       {children}
       {isLoading && (
         <div className="fixed inset-0 z-50">
-          <LoadingSpinner 
-            fullScreen={true}
-            size={35}
-            color="#84a98c"
-          />
+          <Loader fullScreen={true} size={35} />
         </div>
       )}
     </LoadingContext.Provider>

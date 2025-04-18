@@ -29,6 +29,7 @@ import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
 import { logDebug, createPrefixedLogger } from "@/utils/loggingUtils";
 import { useDataService } from '@/hooks/useDataService';
+import { Loader } from "@/components/ui/Loader";
 
 /**************************************************************************
  * ⚠️ CRITICAL WARNING - REAL-TIME SUBSCRIPTION FUNCTIONALITY ⚠️
@@ -658,7 +659,7 @@ export default function CustomerOffersPage() {
     if (isLoadingOffers) {
       content = (
         <div className="flex justify-center items-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
+          <Loader size={24} />
         </div>
       );
     } else if (offers.length === 0) {
@@ -987,8 +988,7 @@ export default function CustomerOffersPage() {
       
       {isLoadingAllOffers && (
         <div className="flex justify-center items-center mb-4 text-[#84a98c]">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#84a98c] mr-2"></div>
-          <span>Φιλτράρισμα προσφορών...</span>
+          <Loader size={24} />
         </div>
       )}
       

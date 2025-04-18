@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { CustomerFormInfo, CustomerFormSubmission } from '@/services/customerFormService/types';
 import { submitFormApi } from '@/services/formApiService';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { Loader } from '@/components/ui/Loader';
 import FormSuccess from './FormSuccess';
 import FormError from './FormError';
 
@@ -392,7 +392,7 @@ const CustomerForm = ({ token, customerInfo }: CustomerFormProps) => {
         return (
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-6">
             <div className="flex flex-col items-center mb-8">
-              <LoadingSpinner className="h-16 w-16 mb-4" />
+              <Loader className="h-16 w-16 mb-4" />
               <h2 className="text-xl font-semibold mb-2">Υποβολή Φόρμας</h2>
               <p className="text-gray-600">Παρακαλώ περιμένετε όσο υποβάλλουμε τη φόρμα σας...</p>
             </div>

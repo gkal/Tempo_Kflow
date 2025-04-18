@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useCustomerForm } from './FormContext';
 import { CustomerFormInfo, CustomerFormSubmission } from '@/services/customerFormService/types';
 import { submitFormApi } from '@/services/formApiService';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { Loader } from '@/components/ui/Loader';
 import MobileFormField from './MobileFormField';
 import MobileFormSelect from './MobileFormSelect';
 import MobileFormDatePicker from './MobileFormDatePicker';
@@ -339,7 +339,7 @@ const MobileCustomerForm = ({ token, customerInfo }: MobileCustomerFormProps) =>
       case 'submitting':
         return (
           <div className="flex flex-col items-center justify-center py-12">
-            <LoadingSpinner size={50} />
+            <Loader size={50} />
             <p className="mt-4 text-lg text-gray-700">Υποβολή φόρμας...</p>
             <p className="text-sm text-gray-500">Παρακαλώ περιμένετε, η φόρμα σας υποβάλλεται.</p>
           </div>

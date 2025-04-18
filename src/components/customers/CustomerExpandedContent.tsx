@@ -7,7 +7,7 @@ import React from "react";
 import { Trash2 } from "lucide-react";
 import { Customer, CustomerOffer } from "./types/interfaces";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { Loader } from "@/components/ui/Loader";
 import { openEditOfferDialog } from '@/components/offers/main_offers_form/OfferDialogManager';
 import { 
   formatDate, 
@@ -40,7 +40,7 @@ export const CustomerExpandedContent: React.FC<CustomerExpandedContentProps> = (
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-4">
-        <LoadingSpinner fullScreen={false} />
+        <Loader fullScreen={false} />
         <span className="ml-3 text-[#cad2c5]">Φόρτωση προσφορών...</span>
       </div>
     );

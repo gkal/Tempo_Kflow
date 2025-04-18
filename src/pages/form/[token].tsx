@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { validateFormLinkApi } from '@/services/formApiService';
 import { CustomerFormInfo } from '@/services/customerFormService/types';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import Loader from '@/components/ui/Loader';
 import DeviceAwareForm from '@/components/forms/DeviceAwareForm';
 
 // Status types for form validation
@@ -66,7 +66,7 @@ const FormPage = () => {
       case 'loading':
         return (
           <div className="flex flex-col items-center justify-center min-h-[400px]">
-            <LoadingSpinner size={50} />
+            <Loader size={50} />
             <p className="mt-4 text-gray-600">Φόρτωση φόρμας...</p>
           </div>
         );

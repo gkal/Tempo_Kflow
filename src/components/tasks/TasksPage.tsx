@@ -12,6 +12,7 @@ import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/componen
 import { openEditOfferDialog } from "@/components/offers/main_offers_form/OfferDialogManager";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader } from "@/components/ui/Loader";
 
 // Define interfaces
 interface Task {
@@ -844,7 +845,7 @@ export default function TasksPage() {
 
         {loading ? (
           <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
+            <Loader size={24} />
           </div>
         ) : filteredTasks.length === 0 ? (
           <div className="text-center py-8 text-[#84a98c]">
@@ -912,7 +913,7 @@ export default function TasksPage() {
 
               {loading ? (
                 <div className="flex justify-center items-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#84a98c]"></div>
+                  <Loader size={24} />
                 </div>
               ) : processedOfferTasks.length === 0 ? (
                 <div className="text-center py-8 text-[#84a98c]">

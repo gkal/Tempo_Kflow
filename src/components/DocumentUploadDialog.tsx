@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Upload } from 'lucide-react';
 import { getAllDocuCharacteristics, getAllDocuStatuses } from '@/services/documentSettingsService';
 import { uploadOfferDocument } from '@/services/offerDocumentService';
+import { Loader } from "@/components/ui/Loader";
 
 // Global state to keep the dialog open across re-renders and component unmounts
 let globalIsOpen = false;
@@ -414,7 +415,7 @@ const DocumentUploadDialog = forwardRef<DocumentUploadDialogRef>((props, ref) =>
           >
             {isUploading ? (
               <>
-                <div className="animate-spin mr-2 h-4 w-4 border-t-2 border-b-2 border-white rounded-full"></div>
+                <Loader size={16} className="mr-2" />
                 Uploading...
               </>
             ) : 'Upload'}

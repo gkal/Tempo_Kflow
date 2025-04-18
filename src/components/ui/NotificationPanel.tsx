@@ -8,6 +8,7 @@ import { el } from 'date-fns/locale';
 import { notifyNotificationRead } from '@/lib/notificationEvents';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/utils/styleUtils';
+import { Loader } from './Loader';
 
 // Define strict types
 type NotificationType = 'task' | 'message' | 'system' | 'offer';
@@ -445,7 +446,7 @@ export function NotificationPanel({ isOpen, onClose }: NotificationPanelProps) {
           <div className="overflow-y-auto h-[calc(100%-8rem)]">
             {loading ? (
               <div className="flex justify-center items-center h-32">
-                <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+                <Loader size={32} />
               </div>
             ) : error ? (
               <div className="text-center p-4 text-red-500">{error}</div>

@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import LoadingSpinner from './ui/LoadingSpinner';
+import { Loader } from './ui/Loader';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -22,7 +22,7 @@ export default function ProtectedRoute({
 
   // Show loader while auth status is being verified
   if (loading) {
-    return <LoadingSpinner />;
+    return <Loader />;
   }
 
   // Redirect unauthenticated users to login page

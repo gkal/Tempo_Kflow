@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
 import { supabase } from '@/lib/supabaseClient';
 import { toast } from "@/components/ui/use-toast";
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { Loader } from "@/components/ui/Loader";
 import { useFormRegistration } from '@/lib/FormContext';
 
 interface PositionDialogProps {
@@ -191,7 +191,7 @@ export function PositionDialog({
             >
               {isSubmitting ? (
                 <>
-                  <LoadingSpinner className="mr-2" />
+                  <Loader className="mr-2" />
                   Αποθήκευση...
                 </>
               ) : (

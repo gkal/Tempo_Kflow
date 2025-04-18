@@ -3,6 +3,7 @@ import { useRealtimeSubscription, createFilter } from '@/hooks/useRealtimeSubscr
 import { supabase } from '@/lib/supabaseClient';
 import { RealtimeStatus } from '@/components/ui/RealtimeStatus';
 import { Database } from '@/types/supabase';
+import { Loader } from '@/components/ui/Loader';
 
 // Define valid table names from the database schema
 type TableNames = keyof Database['public']['Tables'];
@@ -124,7 +125,7 @@ export function RealTimeDataView({
       
       {loading ? (
         <div className="flex justify-center py-8">
-          <div className="animate-spin h-8 w-8 border-b-2 rounded-full"></div>
+          <Loader size={32} />
         </div>
       ) : data.length === 0 ? (
         <div className="text-center py-8 text-gray-500">

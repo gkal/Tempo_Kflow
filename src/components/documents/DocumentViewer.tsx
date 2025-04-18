@@ -16,6 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Loader } from "@/components/ui/Loader";
 
 interface DocumentViewerProps {
   customerId: string;
@@ -207,7 +208,7 @@ export default function DocumentViewer({ customerId, customerName }: DocumentVie
           >
             {isUploading ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader size={16} className="mr-2" />
                 Φόρτωση...
               </>
             ) : (
@@ -222,7 +223,7 @@ export default function DocumentViewer({ customerId, customerName }: DocumentVie
 
       {loading ? (
         <div className="p-8 flex justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[#84a98c]" />
+          <Loader size={32} />
         </div>
       ) : error ? (
         <div className="p-4 text-red-400">{error}</div>

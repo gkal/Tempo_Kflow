@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Mail, ExternalLink, Copy, Check, Loader2, AlertCircle } from "lucide-react";
+import { Mail, ExternalLink, Copy, Check, AlertCircle } from "lucide-react";
 import { createFormLinkForCustomerApi, FormLinkCreationResponse } from "@/services/formApiService";
 import { ApiResponse, ApiError } from "@/utils/apiUtils";
 import { useAuth } from "@/lib/AuthContext";
 import { cn } from "@/lib/utils";
+import { Loader } from "@/components/ui/Loader";
 
 interface SendFormLinkButtonProps {
   customerId: string;
@@ -208,7 +209,7 @@ export default function SendFormLinkButton({
       tabIndex={0}
     >
       {loading ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Loader size={16} />
       ) : (
         <ExternalLink className="h-4 w-4" />
       )}

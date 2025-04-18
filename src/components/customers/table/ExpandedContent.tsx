@@ -2,7 +2,7 @@ import React from 'react';
 import { Customer, CustomerOffer } from '@/types/customer.types';
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { Loader } from "@/components/ui/Loader";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 import { formatDate, formatStatus, formatResult, getStatusClass, getResultClass } from '@/utils/customer.utils';
 import { openEditOfferDialog } from '@/components/offers/main_offers_form/OfferDialogManager';
@@ -25,7 +25,7 @@ export const ExpandedContent: React.FC<ExpandedContentProps> = ({
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-4">
-        <LoadingSpinner fullScreen={false} />
+        <Loader fullScreen={false} />
         <span className="ml-3 text-[#cad2c5]">Φόρτωση προσφορών...</span>
       </div>
     );

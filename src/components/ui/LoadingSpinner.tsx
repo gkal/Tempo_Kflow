@@ -1,99 +1,31 @@
 import React from "react";
-import { DotLoader } from "react-spinners";
+import { Loader, LoaderProps } from "./Loader";
 
+/**
+ * Loading spinner component with customizable size and color
+ * Uses the global Loader component for consistent styling throughout the application
+ */
 export interface LoadingSpinnerProps {
   size?: number;
-  color?: string;
-  thickness?: number;
+  color?: string; // Color prop kept for backward compatibility
+  thickness?: number; // Thickness prop kept for backward compatibility
   fullScreen?: boolean;
   className?: string;
 }
 
-/**
- * Loading spinner component with customizable size and color
- * Used for loading states throughout the application
- */
 const LoadingSpinner = ({
   size = 40,
-  color = '#3b82f6', // Default to blue-500
-  thickness = 4,
   fullScreen = false,
   className = '',
 }: LoadingSpinnerProps) => {
-  // Calculate spinner dimensions based on size
-  const viewBoxSize = 24;
-  const centerPoint = viewBoxSize / 2;
-  const radius = (viewBoxSize - thickness) / 2;
-  const circumference = 2 * Math.PI * radius;
+  // Create props for Loader component
+  const loaderProps: LoaderProps = {
+    size,
+    fullScreen,
+    className
+  };
   
-  // Apply full screen styling if needed
-  if (fullScreen) {
-    return (
-      <div className={`fixed inset-0 flex items-center justify-center z-50 bg-[#2f3e46]/70 ${className}`}>
-        <div className="inline-block" style={{ width: size, height: size }}>
-          <svg
-            width={size}
-            height={size}
-            viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}
-            xmlns="http://www.w3.org/2000/svg"
-            className="animate-spin"
-          >
-            <circle
-              cx={centerPoint}
-              cy={centerPoint}
-              r={radius}
-              fill="none"
-              stroke="#e5e7eb" // Default to gray-200
-              strokeWidth={thickness}
-            />
-            <circle
-              cx={centerPoint}
-              cy={centerPoint}
-              r={radius}
-              fill="none"
-              stroke={color}
-              strokeWidth={thickness}
-              strokeDasharray={circumference}
-              strokeDashoffset={circumference * 0.75} // Show 25% of the circle
-              strokeLinecap="round"
-            />
-          </svg>
-        </div>
-      </div>
-    );
-  }
-  
-  return (
-    <div className={`inline-block ${className}`} style={{ width: size, height: size }}>
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}
-        xmlns="http://www.w3.org/2000/svg"
-        className="animate-spin"
-      >
-        <circle
-          cx={centerPoint}
-          cy={centerPoint}
-          r={radius}
-          fill="none"
-          stroke="#e5e7eb" // Default to gray-200
-          strokeWidth={thickness}
-        />
-        <circle
-          cx={centerPoint}
-          cy={centerPoint}
-          r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth={thickness}
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * 0.75} // Show 25% of the circle
-          strokeLinecap="round"
-        />
-      </svg>
-    </div>
-  );
+  return <Loader {...loaderProps} />;
 };
 
 export default LoadingSpinner;

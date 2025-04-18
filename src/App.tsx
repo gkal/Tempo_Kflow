@@ -1,7 +1,7 @@
-import { Suspense, lazy } from "react";
+import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
-import LoadingSpinner from './components/ui/LoadingSpinner';
+import { Loader } from './components/ui/Loader';
 import MuiThemeProvider from './theme/MuiThemeProvider';
 import { LoadingProvider } from './lib/LoadingContext';
 import { FormProvider } from './lib/FormContext';
@@ -24,8 +24,9 @@ function App() {
   // Show loading indicator while auth is being checked
   if (loading) {
     return (
-      <LoadingSpinner 
-        fullScreen={true}
+      <Loader
+        fullScreen={true} 
+        size={35}
       />
     );
   }
@@ -38,7 +39,7 @@ function App() {
           <FormProvider>
             <GlobalDialogProvider>
               <Suspense 
-                fallback={<LoadingSpinner fullScreen={true} />}
+                fallback={<Loader fullScreen={true} />}
               >
                 <Routes>
                   {/* Public routes */}

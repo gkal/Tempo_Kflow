@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ const Sidebar = lazy(() => import("./layout/Sidebar"));
 const TopBar = lazy(() => import("./layout/TopBar"));
 const MetricCards = lazy(() => import("./dashboard/MetricCards"));
 const SettingsPage = lazy(() => import("./settings/SettingsPage"));
-const LoadingSpinner = lazy(() => import('./ui/LoadingSpinner'));
+const Loader = lazy(() => import('./ui/Loader').then(module => ({ default: module.Loader })));
 const DialogUtilities = lazy(() => import("@/components/ui/DialogUtilities").then(module => ({ default: module.DialogUtilities })));
 const ErrorBoundary = lazy(() => import('./ErrorBoundary'));
 const RecoveryPage = lazy(() => import("./admin/RecoveryPage"));
@@ -38,7 +38,7 @@ const OffersPage = lazy(() => import("./offers/customer_offers/CustomerOffersPag
  * Loading spinner component used across lazy-loaded routes
  */
 const LoadingContent = () => (
-  <LoadingSpinner 
+  <Loader 
     fullScreen={false} 
     className="p-8"
   />
