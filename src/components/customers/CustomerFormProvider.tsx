@@ -229,14 +229,18 @@ export const CustomerFormProvider: React.FC<CustomerFormProviderProps> = ({
   // Fetch contacts for this customer
   const fetchContacts = async () => {
     try {
-      // Use DataService instead of direct supabase call
-      const contacts = await fetchAllContacts({
-        filters: {
-          customer_id: customerId,
-          status: "active",
-          deleted_at: null
-        }
-      });
+      // Directly use a Supabase query to work around the API filter issue
+      const { data: contacts, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('customer_id', customerId)
+        .is('deleted_at', null)
+        .order('full_name', { ascending: true });
+
+      if (error) {
+        console.error("Error fetching contacts:", error);
+        return;
+      }
 
       setContacts(contacts || []);
 

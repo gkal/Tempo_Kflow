@@ -5,8 +5,6 @@ import { TableHead, TableRow, TableHeader, TableBody, TableCell, Table } from '@
 import { cn } from '@/lib/utils';
 import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
 
-// VirtualTable with white sorting indicators
-
 // Add debug logging only in development
 const debugLog = (message: string, data?: any) => {
   if (process.env.NODE_ENV === 'development') {
@@ -36,7 +34,6 @@ interface VirtualTableProps<TData extends object, TValue = any> {
   loadingMessage?: string;
   enableVirtualization?: boolean;
   initialSortingState?: SortingState;
-  changedRowId?: string; // New prop to identify rows that just changed
 }
 
 export function VirtualTable<TData extends object, TValue = any>({
@@ -54,7 +51,6 @@ export function VirtualTable<TData extends object, TValue = any>({
   loadingMessage = 'Loading more data...',
   enableVirtualization = true,
   initialSortingState,
-  changedRowId,
 }: VirtualTableProps<TData, TValue>) {
   // All state hooks must be defined at the top and in the same order every render
   const [sorting, setSorting] = useState<SortingState>(initialSortingState || []);
@@ -256,7 +252,7 @@ export function VirtualTable<TData extends object, TValue = any>({
                               header.column.columnDef.header,
                               header.getContext()
                             )}
-                        {/* Sorting indicators */}
+                        {/* Simple white sorting indicators */}
                         {isSortable && (
                           <div className="ml-1 flex items-center">
                             {header.column.getIsSorted() ? (
@@ -327,7 +323,6 @@ export function VirtualTable<TData extends object, TValue = any>({
                       
                       const rowId = keyExtractor ? keyExtractor(row.original) : row.id;
                       const isExpanded = isRowExpanded ? isRowExpanded(rowId) : false;
-                      const isChanged = changedRowId === rowId;
                       
                       return (
                         <div
@@ -344,8 +339,7 @@ export function VirtualTable<TData extends object, TValue = any>({
                             data-state={row.getIsSelected() ? "selected" : undefined}
                             className={cn(
                               "border-b border-[#52796f]/30 hover:bg-[#354f52]/50 cursor-pointer bg-transparent",
-                              isExpanded && "bg-[#354f52]/30",
-                              isChanged && "animate-row-glow"
+                              isExpanded && "bg-[#354f52]/30"
                             )}
                             onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                           >
@@ -382,7 +376,6 @@ export function VirtualTable<TData extends object, TValue = any>({
               rows.slice(0, 8).map(row => {
                 const rowId = keyExtractor ? keyExtractor(row.original) : row.id;
                 const isExpanded = isRowExpanded ? isRowExpanded(rowId) : false;
-                const isChanged = changedRowId === rowId;
                 
                 return (
                   <React.Fragment key={rowId || row.id}>
@@ -390,8 +383,7 @@ export function VirtualTable<TData extends object, TValue = any>({
                       data-state={row.getIsSelected() ? "selected" : undefined}
                       className={cn(
                         "border-b border-[#52796f]/30 hover:bg-[#354f52]/50 cursor-pointer bg-transparent",
-                        isExpanded && "bg-[#354f52]/30",
-                        isChanged && "animate-row-glow"
+                        isExpanded && "bg-[#354f52]/30"
                       )}
                       onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                     >

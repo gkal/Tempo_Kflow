@@ -45,8 +45,6 @@ import { CustomerDialog } from "./CustomerDialog";
 import { TruncateWithTooltip } from "@/components/ui/GlobalTooltip";
 import { AppTabs, AppTabsList, AppTabsTrigger, AppTabsContent } from "@/components/ui/app-tabs";
 import { GlobalTooltip } from "@/components/ui/GlobalTooltip";
-import CustomerFormLinkButton from "@/components/forms/CustomerFormLinkButton";
-import FormLinksTable from "@/components/forms/FormLinksTable";
 import { Loader } from "@/components/ui/Loader";
 
 export default function CustomerDetailPage() {
@@ -825,18 +823,13 @@ export default function CustomerDetailPage() {
             <GlobalTooltip content="Edit customer">
               <Button
                 onClick={() => setShowCustomerDialog(true)}
-                className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5]"
+                className="bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] h-9"
+                size="sm"
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Επεξεργασία
               </Button>
             </GlobalTooltip>
-            
-            {/* Add Customer Form Link Button */}
-            <CustomerFormLinkButton 
-              customerId={id || ''} 
-              customerEmail={customer?.email}
-            />
             
             <CloseButton 
               size="md" 
@@ -1164,23 +1157,6 @@ export default function CustomerDetailPage() {
                             </div>
                           </div>
 
-                          {/* Form Links Section */}
-                          <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden mb-6">
-                            <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f]">
-                              <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                                ΦΟΡΜΕΣ ΠΕΛΑΤΗ
-                              </h2>
-                            </div>
-                            <div className="p-4">
-                              {id && (
-                                <FormLinksTable 
-                                  customerId={id} 
-                                  customerEmail={customer?.email}
-                                />
-                              )}
-                            </div>
-                          </div>
-                          
                           {/* History Section */}
                           <div className="w-full bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
                             <div className="bg-[#3a5258] px-4 py-2 border-b border-[#52796f] flex justify-between items-center">

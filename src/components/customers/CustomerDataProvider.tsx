@@ -4,7 +4,7 @@
  * Handles data fetching, filtering, and real-time updates for customers
  */
 
-import React, { useEffect, useState, useCallback, ReactNode } from 'react';
+import React, { useEffect, useState, useCallback, ReactNode, useRef } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
@@ -42,6 +42,7 @@ interface CustomerDataProviderProps {
     setLastRealtimeUpdate: React.Dispatch<React.SetStateAction<number>>;
     handleCustomerTypeChange: (types: string[]) => void;
     handleExpandCustomer: (customerId: string) => Promise<void>;
+    changedRowId: string | null;
   }) => ReactNode;
 }
 
@@ -74,6 +75,10 @@ export const CustomerDataProvider: React.FC<CustomerDataProviderProps> = ({ chil
   const [customerIdBeingExpanded, setCustomerIdBeingExpanded] = useState<string | null>(null);
   const [lastRealtimeUpdate, setLastRealtimeUpdate] = useState(Date.now());
   
+  // Track changed row for animation
+  const [changedRowId, setChangedRowId] = useState<string | null>(null);
+  const clearChangedRowTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Check user permissions
   const isAdminUser = user?.role?.toLowerCase() === 'admin';
   const isAdminOrSuperUser = isAdminUser || 
@@ -82,6 +87,19 @@ export const CustomerDataProvider: React.FC<CustomerDataProviderProps> = ({ chil
   
   // Reference to track recently deleted offers
   const recentlyDeletedOffersRef = React.useRef<Set<string>>(new Set());
+
+  // Clear the changed row ID after animation (but without transition back)
+  const clearChangedRowId = useCallback(() => {
+    if (clearChangedRowTimeoutRef.current) {
+      clearTimeout(clearChangedRowTimeoutRef.current);
+    }
+    
+    // Simple direct timeout to clear the ID - with zero transition back
+    clearChangedRowTimeoutRef.current = setTimeout(() => {
+      setChangedRowId(null);
+      clearChangedRowTimeoutRef.current = null;
+    }, 1200); // 0.8s for animation appearance + 0.4s visibility
+  }, []);
 
   // Fetch customer offers
   const fetchCustomerOffers = useCallback(async (customerId: string, forceRefresh = false) => {
@@ -171,31 +189,47 @@ export const CustomerDataProvider: React.FC<CustomerDataProviderProps> = ({ chil
   // Setup real-time subscriptions for offers
   useRealtimeSubscription(
     { table: 'offers' },
-    (payload) => handleOffersRealtimeEvent(
-      payload,
-      customers,
-      setCustomers,
-      customerOffers,
-      setCustomerOffers,
-      expandedCustomerIds,
-      setLastRealtimeUpdate,
-      setRealtimeStatus,
-      fetchCustomerOffers
-    )
+    (payload) => {
+      // Set the changed row ID (customer ID) when an offer update is received
+      if (payload.new && payload.new.customer_id) {
+        setChangedRowId(payload.new.customer_id);
+        clearChangedRowId();
+      }
+      
+      handleOffersRealtimeEvent(
+        payload,
+        customers,
+        setCustomers,
+        customerOffers,
+        setCustomerOffers,
+        expandedCustomerIds,
+        setLastRealtimeUpdate,
+        setRealtimeStatus,
+        fetchCustomerOffers
+      );
+    }
   );
   
   // Setup real-time subscriptions for customers
   useRealtimeSubscription(
     { table: 'customers' },
-    (payload) => handleCustomersRealtimeEvent(
-      payload,
-      setCustomers,
-      expandedCustomerIds,
-      setExpandedCustomerIds,
-      customerOffers,
-      setCustomerOffers,
-      setRealtimeStatus
-    )
+    (payload) => {
+      // Set the changed row ID (customer ID) when a customer update is received
+      if (payload.new) {
+        setChangedRowId(payload.new.id);
+        clearChangedRowId();
+      }
+      
+      handleCustomersRealtimeEvent(
+        payload,
+        setCustomers,
+        expandedCustomerIds,
+        setExpandedCustomerIds,
+        customerOffers,
+        setCustomerOffers,
+        setRealtimeStatus
+      );
+    }
   );
 
   // Initial data fetch
@@ -309,6 +343,15 @@ export const CustomerDataProvider: React.FC<CustomerDataProviderProps> = ({ chil
     }
   }, [lastRealtimeUpdate, expandedCustomerIds, fetchCustomerOffers]);
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (clearChangedRowTimeoutRef.current) {
+        clearTimeout(clearChangedRowTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Handle customer type filter change
   const handleCustomerTypeChange = useCallback((types: string[]) => {
     setSelectedCustomerTypes(types);
@@ -361,7 +404,8 @@ export const CustomerDataProvider: React.FC<CustomerDataProviderProps> = ({ chil
         lastRealtimeUpdate,
         setLastRealtimeUpdate,
         handleCustomerTypeChange,
-        handleExpandCustomer
+        handleExpandCustomer,
+        changedRowId
       })}
     </>
   );

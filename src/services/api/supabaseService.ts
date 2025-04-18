@@ -41,12 +41,24 @@ interface SoftDeleteFields {
 }
 
 /**
- * Fetch records from a table with optional filters and sorting
- * Automatically excludes soft-deleted records unless explicitly included
+ * Fetch multiple records from the specified table with filtering options
  * 
  * @param table - Database table name
- * @param options - Query options including filters, sorting, etc.
- * @returns Promise with typed data response
+ * @param options - Query options for filtering, sorting, and pagination
+ * @returns Promise with the fetched records
+ * 
+ * @example
+ * ```tsx
+ * // Basic fetch
+ * const { data, error } = await fetchRecords<Customer[]>('customers');
+ * 
+ * // With filtering and ordering
+ * const { data } = await fetchRecords<Customer[]>('customers', {
+ *   filters: { status: 'active' },
+ *   order: { column: 'created_at', ascending: false },
+ *   limit: 10
+ * });
+ * ```
  */
 export async function fetchRecords<T>(
   table: TableName,
@@ -66,7 +78,14 @@ export async function fetchRecords<T>(
 
     // Add soft delete filter unless explicitly including deleted records
     if (!options?.includeSoftDeleted) {
-      query = query.eq('is_deleted', false);
+      // Different tables use different column names for soft delete
+      if (table === 'contacts') {
+        // Contacts table uses 'deleted' column
+        query = query.is('deleted_at', null);
+      } else {
+        // Most tables use 'is_deleted' column
+        query = query.eq('is_deleted', false);
+      }
     }
 
     // Apply additional filters

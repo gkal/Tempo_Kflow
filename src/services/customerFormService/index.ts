@@ -108,35 +108,42 @@ export const CustomerFormService = {
     } = {}
   ): Promise<CustomerContactInfo[]> {
     try {
-      // Build query options
-      const queryOptions: any = {
-        filters: { customer_id: customerId },
-        order: { column: 'is_primary', ascending: false },
-      };
+      // Use direct Supabase query for better control
+      let query = supabase
+        .from('contacts')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('full_name', { ascending: true });
 
+      // Apply soft delete filter unless includeDeleted is true
       if (!options.includeDeleted) {
-        queryOptions.filters.is_deleted = false;
+        query = query.is('deleted_at', null);
       }
 
+      // Apply limit if specified
       if (options.limit) {
-        queryOptions.limit = options.limit;
+        query = query.limit(options.limit);
       }
 
-      // Fetch contacts
-      const { data, error } = await fetchRecords<Contact>('contacts', queryOptions);
-      
-      if (error || !data || !Array.isArray(data)) {
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error retrieving customer contacts:', error);
+        return [];
+      }
+
+      if (!data || !Array.isArray(data)) {
         return [];
       }
 
       // Map to CustomerContactInfo format
       return data.map(contact => ({
         id: contact.id,
-        name: contact.name,
-        position: contact.position_id || null,
+        name: contact.full_name || '',
+        position: contact.position || null,
         email: contact.email || null,
-        phone: contact.phone || contact.mobile || null,
-        isPrimary: contact.is_primary || false,
+        phone: contact.telephone || contact.mobile || null,
+        isPrimary: false, // There's no is_primary field, assuming false as default
       }));
     } catch (error) {
       console.error('Error retrieving customer contacts:', error);
@@ -350,7 +357,7 @@ export const CustomerFormService = {
 
       // If approved and createOffer is true, create an offer from the form data
       let offerId: string | undefined;
-      if (newStatus === 'approved' && createOffer && formLink.form_data) {
+      if (newStatus === 'approved' && createOffer && formLink.submission_data) {
         const createOfferResult = await this.createOfferFromApprovedForm(formLinkId);
         if (createOfferResult.success && createOfferResult.offerId) {
           offerId = createOfferResult.offerId;
@@ -430,7 +437,7 @@ export const CustomerFormService = {
       }
 
       // Check if form data exists
-      if (!formLink.form_data) {
+      if (!formLink.submission_data) {
         return {
           success: false,
           error: 'Cannot create offer: no form data available',
@@ -438,7 +445,7 @@ export const CustomerFormService = {
       }
 
       // Extract form data
-      const formData = formLink.form_data as CustomerFormSubmission;
+      const formData = formLink.submission_data as CustomerFormSubmission;
 
       // Create offer
       // This is a simplified version - in a real implementation, you would map

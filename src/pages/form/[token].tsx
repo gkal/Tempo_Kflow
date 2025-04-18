@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { validateFormLinkApi } from '@/services/formApiService';
 import { CustomerFormInfo } from '@/services/customerFormService/types';
-import Loader from '@/components/ui/Loader';
+import { Loader } from '@/components/ui/Loader';
 import DeviceAwareForm from '@/components/forms/DeviceAwareForm';
 
 // Status types for form validation
@@ -19,10 +19,16 @@ interface FormErrorState {
  */
 const FormPage = () => {
   const { token } = useParams<{ token: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const [status, setStatus] = useState<FormPageStatus>('loading');
   const [customerInfo, setCustomerInfo] = useState<CustomerFormInfo | null>(null);
   const [error, setError] = useState<FormErrorState | null>(null);
+  
+  // Extract query parameters
+  const queryParams = new URLSearchParams(location.search);
+  const customerRef = queryParams.get('ref');
+  const appId = queryParams.get('app');
 
   useEffect(() => {
     // Validate token when component mounts
@@ -58,7 +64,7 @@ const FormPage = () => {
     };
 
     validateToken();
-  }, [token]);
+  }, [token, customerRef, appId]);
 
   // Render different content based on form status
   const renderContent = () => {
@@ -73,7 +79,12 @@ const FormPage = () => {
 
       case 'valid':
         return customerInfo ? (
-          <DeviceAwareForm token={token!} customerInfo={customerInfo} />
+          <DeviceAwareForm 
+            token={token!} 
+            customerInfo={customerInfo} 
+            customerRef={customerRef || undefined}
+            appId={appId || undefined}
+          />
         ) : (
           <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
             <h2 className="text-xl font-semibold text-yellow-800">Δεν βρέθηκαν πληροφορίες πελάτη</h2>

@@ -58,6 +58,22 @@
   animation: fadeIn 0.15s ease-out;
 }
 
+/* Custom row glow transition for data changes */
+.row-glow-transition {
+  /* Transition only for applying the glow, not removing it */
+  transition-property: border-color, background-color;
+  transition-duration: 0.8s;
+  transition-timing-function: ease;
+}
+
+/* Applying the glow */
+.row-changed {
+  border-color: rgba(144, 238, 144, 0.9);
+  background-color: rgba(144, 238, 144, 0.15);
+  /* No transition timing when removing the glow - instant return to normal */
+  transition: none;
+}
+
 /* Loading animations */
 @keyframes dots-blue {
   0%, 20% {

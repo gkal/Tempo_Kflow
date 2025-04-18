@@ -12,6 +12,8 @@ import FormError from './FormError';
 interface CustomerFormProps {
   token: string;
   customerInfo: CustomerFormInfo;
+  customerRef?: string;  // Secure customer reference for external apps
+  appId?: string;        // External application identifier
 }
 
 // Form steps
@@ -48,7 +50,7 @@ type FormData = z.infer<typeof formSchema>;
  * Mobile-optimized customer form component
  * Handles the form submission and validation
  */
-const CustomerForm = ({ token, customerInfo }: CustomerFormProps) => {
+const CustomerForm = ({ token, customerInfo, customerRef, appId }: CustomerFormProps) => {
   const [currentStep, setCurrentStep] = useState<FormStep>('personal');
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [submittedData, setSubmittedData] = useState<CustomerFormSubmission | null>(null);

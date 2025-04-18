@@ -3,6 +3,17 @@
  * 
  * This module is maintained for backward compatibility only.
  * Please import tooltip components from @/components/ui/GlobalTooltip instead.
+ * 
+ * Usage examples:
+ * 
+ * Old import (deprecated):
+ * import { SimpleTooltip } from '@/components/ui/tooltip';
+ * 
+ * New import:
+ * import { SafeTooltip } from '@/components/ui/GlobalTooltip';
+ * 
+ * Tip: To prevent tooltip flickering issues, always wrap the target element with GlobalTooltip
+ * and add pointer-events-none to elements that shouldn't capture mouse events.
  */
 
 import { logDeprecationWarning } from '@/utils/componentUtils';
@@ -25,7 +36,8 @@ import {
   if (typeof window !== 'undefined') {
     logDeprecationWarning(
       'tooltip.tsx',
-      'Please import tooltip components from @/components/ui/GlobalTooltip instead.'
+      'Please import tooltip components from @/components/ui/GlobalTooltip instead. ' +
+      'See the component file header for migration examples and tips to prevent flickering.'
     );
   }
 })();
@@ -39,7 +51,8 @@ export {
   TooltipPortal,
   TooltipArrow,
   GlobalTooltip as RadixTooltip,
-  SafeTooltip as SimpleTooltip
+  SafeTooltip as SimpleTooltip,
+  TruncateWithTooltip
 };
 
 // Default export for backward compatibility

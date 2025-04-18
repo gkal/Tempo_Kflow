@@ -700,7 +700,7 @@ export type Database = {
           id: string
           customer_id: string
           token: string
-          form_data: Json | null
+          submission_data: Json | null
           status: string
           notes: string | null
           is_used: boolean
@@ -719,7 +719,7 @@ export type Database = {
           id?: string
           customer_id: string
           token: string
-          form_data?: Json | null
+          submission_data?: Json | null
           status?: string
           notes?: string | null
           is_used?: boolean
@@ -738,7 +738,7 @@ export type Database = {
           id?: string
           customer_id?: string
           token?: string
-          form_data?: Json | null
+          submission_data?: Json | null
           status?: string
           notes?: string | null
           is_used?: boolean

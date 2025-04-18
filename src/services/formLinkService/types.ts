@@ -7,7 +7,7 @@ export interface CustomerFormLink {
   id: string;
   customer_id: string;
   token: string;
-  form_data: Record<string, any> | null;
+  submission_data: Record<string, any> | null;
   status: FormLinkStatus;
   notes: string | null;
   is_used: boolean;
@@ -21,7 +21,6 @@ export interface CustomerFormLink {
   updated_by: string | null;
   approved_by: string | null;
   updated_at: string | null;
-  external_project_id?: string | null; // Added for cross-project functionality
 }
 
 /**
@@ -36,8 +35,7 @@ export interface FormLinkGenerationOptions {
   customerId: string;
   expirationHours?: number; // Default will be 72 hours if not specified
   createdById?: string; // User ID of the creator
-  externalProjectId?: string; // ID of external project that will use this link
-  callbackUrl?: string; // URL to notify when form is submitted
+  externalProjectId?: string; // Used for URL parameter, not stored in DB
 }
 
 /**
@@ -127,8 +125,7 @@ export interface FormLinkUpdateOptions {
   updatedBy?: string; // User ID of the updater
   status?: FormLinkStatus;
   notes?: string;
-  externalProjectId?: string;
-  callbackUrl?: string;
+  // Remove fields that don't exist in DB
   // Other fields that can be updated
 }
 
@@ -152,4 +149,30 @@ export interface FormSubmissionResponse {
     status: FormLinkStatus;
   };
   error?: string;
+}
+
+/**
+ * Request for external form link verification
+ */
+export interface ExternalFormVerificationRequest {
+  token: string;
+  apiKey: string; // API key for authentication
+  projectId?: string;
+}
+
+/**
+ * Response for external form link verification
+ */
+export interface ExternalFormVerificationResponse {
+  success: boolean;
+  error?: string;
+  data?: {
+    formLinkId: string;
+    customerId: string;
+    customerName?: string;
+    customerRef?: string;
+    status: FormLinkStatus;
+    expiresAt: string;
+    metadata?: Record<string, any>;
+  };
 } 

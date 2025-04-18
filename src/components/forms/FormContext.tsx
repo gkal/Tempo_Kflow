@@ -10,6 +10,8 @@ interface CustomerFormContextState {
   customerInfo: CustomerFormInfo | null;
   formData: Partial<CustomerFormSubmission>;
   formToken: string | null;
+  customerRef: string | null;  // Secure customer reference
+  appId: string | null;        // External app identifier
   
   // Form state
   currentStep: FormStep;
@@ -56,6 +58,8 @@ interface CustomerFormProviderProps {
   children: ReactNode;
   initialCustomerInfo?: CustomerFormInfo;
   initialToken?: string;
+  externalReference?: string;  // Secure customer reference
+  externalAppId?: string;      // External application identifier
 }
 
 /**
@@ -64,12 +68,16 @@ interface CustomerFormProviderProps {
 export function CustomerFormProvider({ 
   children, 
   initialCustomerInfo = null,
-  initialToken = null 
+  initialToken = null,
+  externalReference = null,
+  externalAppId = null
 }: CustomerFormProviderProps) {
   // State
   const [customerInfo, setCustomerInfoState] = useState<CustomerFormInfo | null>(initialCustomerInfo);
   const [formData, setFormData] = useState<Partial<CustomerFormSubmission>>({});
   const [formToken, setFormTokenState] = useState<string | null>(initialToken);
+  const [customerRef, setCustomerRef] = useState<string | null>(externalReference);
+  const [appId, setAppId] = useState<string | null>(externalAppId);
   
   const [currentStep, setCurrentStep] = useState<FormStep>('personal');
   const [isLoading, setLoadingState] = useState(false);
@@ -239,6 +247,8 @@ export function CustomerFormProvider({
     customerInfo,
     formData,
     formToken,
+    customerRef,
+    appId,
     currentStep,
     isLoading,
     error,

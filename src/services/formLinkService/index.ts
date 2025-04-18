@@ -1,10 +1,11 @@
 import { supabase } from '@/lib/supabaseClient';
 import { createRecord, fetchRecordById, fetchRecords, softDeleteRecord, updateRecord } from '@/services/api/supabaseService';
 import { generateRandomString } from '@/utils/stringUtils';
+import { generateExternalAppParams } from '@/utils/securityUtils';
 import { 
   CustomerFormLink, 
-  CrossProjectVerificationRequest,
-  CrossProjectVerificationResponse,
+  ExternalFormVerificationRequest,
+  ExternalFormVerificationResponse,
   FormLinkCreationResponse, 
   FormLinkFilterOptions, 
   FormLinkGenerationOptions, 
@@ -23,13 +24,12 @@ import { Database } from '@/types/supabase';
 import { DbResponse } from '@/services/api/types';
 
 // Helper type to work around TableName constraints
-type AnyTableName = string & { __brand: 'TableName' };
+type AnyTableName = string;
 
 // Configuration
 const TOKEN_LENGTH = 32;
 const TOKEN_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const DEFAULT_EXPIRATION_HOURS = 24; // 1 day
-const API_KEYS_TABLE = 'project_api_keys';
 
 /**
  * Service for managing customer form links
@@ -69,8 +69,7 @@ export const FormLinkService = {
         customerId, 
         expirationHours = DEFAULT_EXPIRATION_HOURS, 
         createdById,
-        externalProjectId,
-        callbackUrl
+        externalProjectId
       } = options;
       
       // Validate customerId
@@ -99,40 +98,40 @@ export const FormLinkService = {
           is_used: false,
           status: 'pending' as FormLinkStatus,
           created_by: createdById || null,
-          external_project_id: externalProjectId || null,
-          callback_url: callbackUrl || null,
         })
         .select()
         .single();
       
       if (error || !formLink) {
+        console.error('Error creating form link:', error);
         return {
           success: false,
           error: 'Αποτυχία δημιουργίας συνδέσμου φόρμας',
         };
       }
       
-      // Generate URL - different URL formats depending on where it will be used
+      // Generate URL with secure customer reference if possible
       let url = '';
       
-      if (externalProjectId) {
-        // For external projects, generate a URL that points to their domain
-        // This will be configured in the external project's database
-        const { data: projectConfig } = await supabase
-          .from('external_projects')
-          .select('base_url')
-          .eq('id', externalProjectId)
-          .single();
-          
-        if (projectConfig && projectConfig.base_url) {
-          url = `${projectConfig.base_url}/form/${token}`;
+      try {
+        // Generate secure customer reference
+        const customerParams = generateExternalAppParams(customerId, externalProjectId);
+        
+        if (externalProjectId) {
+          // For external projects, use a standard URL format with the token and secure customer reference
+          url = `${getBaseUrl()}/form/${token}?${customerParams}`;
         } else {
-          // Fallback to our form URL
+          // For internal usage - still include the secure reference
+          url = `${getBaseUrl()}/form/${token}?${customerParams}`;
+        }
+      } catch (error) {
+        console.error("Error generating secure reference:", error);
+        // Fallback to basic URL without reference if generation fails
+        if (externalProjectId) {
+          url = `${getBaseUrl()}/form/${token}?external=${externalProjectId}`;
+        } else {
           url = `${getBaseUrl()}/form/${token}`;
         }
-      } else {
-        // For internal usage
-        url = `${getBaseUrl()}/form/${token}`;
       }
       
       return {
@@ -142,7 +141,6 @@ export const FormLinkService = {
           token: formLink.token,
           url,
           expiresAt: formLink.expires_at,
-          externalProjectId: formLink.external_project_id,
         },
       };
     } catch (error) {
@@ -231,92 +229,50 @@ export const FormLinkService = {
    * @returns Verification response with limited customer data
    */
   async verifyExternalFormLink(
-    verificationRequest: CrossProjectVerificationRequest
-  ): Promise<CrossProjectVerificationResponse> {
+    verificationRequest: ExternalFormVerificationRequest
+  ): Promise<ExternalFormVerificationResponse> {
     try {
-      const { token, projectApiKey } = verificationRequest;
+      const { token, apiKey } = verificationRequest;
       
-      // Verify the project API key
-      const { data: apiKeyData, error: apiKeyError } = await supabase
-        .from(API_KEYS_TABLE)
-        .select('project_id, is_active')
-        .eq('api_key', projectApiKey)
-        .eq('is_active', true)
-        .single();
-      
-      if (apiKeyError || !apiKeyData || !apiKeyData.is_active) {
+      // Validate API key (should be implemented according to your security needs)
+      // This is a placeholder for actual API key validation
+      if (!this.validateApiKey(apiKey)) {
         return {
           success: false,
           error: 'Invalid API key',
         };
       }
       
-      // Get the project ID from the API key
-      const projectId = apiKeyData.project_id;
-      
       // Validate the form link
-      const { data: formLink, error: formLinkError } = await supabase
-        .from('customer_form_links')
-        .select('*')
-        .eq('token', token)
-        .eq('is_deleted', false)
-        .eq('external_project_id', projectId)
-        .single();
+      const validation = await this.validateFormLink(token);
       
-      if (formLinkError || !formLink) {
+      if (!validation.isValid) {
         return {
-          success: true,
-          data: {
-            isValid: false,
-          },
+          success: false,
+          error: validation.reason || 'Invalid form link',
         };
       }
       
-      // Check expiration
-      if (new Date(formLink.expires_at) < new Date()) {
-        return {
-          success: true,
-          data: {
-            isValid: false,
-          },
-        };
-      }
+      // Get the form link
+      const formLink = validation.formLink!;
       
-      // Check form status
-      if (formLink.status !== 'pending') {
-        return {
-          success: true,
-          data: {
-            isValid: false,
-          },
-        };
-      }
-      
-      // Get limited customer data for the external project
-      const { data: customer, error: customerError } = await supabase
+      // Get customer information but only return limited fields
+      const { data: customer } = await supabase
         .from('customers')
-        .select('id, name, email, phone')
+        .select('id, company_name, afm')
         .eq('id', formLink.customer_id)
         .single();
-      
-      if (customerError || !customer) {
-        return {
-          success: true,
-          data: {
-            isValid: false,
-          },
-        };
-      }
-      
-      // Create a copy of the form link without sensitive data
-      const { token: _, ...safeFormLink } = formLink;
       
       return {
         success: true,
         data: {
-          isValid: true,
-          formLink: safeFormLink as Omit<CustomerFormLink, 'token'>,
-          customer,
+          formLinkId: formLink.id,
+          customerId: formLink.customer_id,
+          customerName: customer?.company_name || 'Unknown Customer',
+          customerRef: (formLink.metadata as any)?.customerReference || `c-${formLink.customer_id.substring(0, 8)}`,
+          status: formLink.status,
+          expiresAt: formLink.expires_at,
+          metadata: formLink.metadata,
         },
       };
     } catch (error) {
@@ -329,10 +285,22 @@ export const FormLinkService = {
   },
   
   /**
-   * Submit form data from an external project
+   * Validate API key for external project access
+   * @param apiKey API key to validate
+   * @returns Whether the API key is valid
+   */
+  validateApiKey(apiKey: string): boolean {
+    // TODO: Implement actual API key validation against a secure store
+    // This is a placeholder implementation
+    const validApiKeys = process.env.VALID_API_KEYS?.split(',') || [];
+    return validApiKeys.includes(apiKey);
+  },
+  
+  /**
+   * Submit a form from an external project
    * @param token Form link token
-   * @param projectApiKey API key of the external project
-   * @param formData Form data to submit
+   * @param projectApiKey API key for the external project
+   * @param formData Form data
    * @returns Form submission response
    */
   async submitExternalForm(
@@ -341,53 +309,23 @@ export const FormLinkService = {
     formData: Record<string, any>
   ): Promise<FormSubmissionResponse> {
     try {
-      // Verify the project API key
-      const { data: apiKeyData, error: apiKeyError } = await supabase
-        .from(API_KEYS_TABLE)
-        .select('project_id, is_active')
-        .eq('api_key', projectApiKey)
-        .eq('is_active', true)
-        .single();
+      // Validate form link
+      const validation = await this.validateFormLink(token);
       
-      if (apiKeyError || !apiKeyData || !apiKeyData.is_active) {
+      if (!validation.isValid) {
         return {
           success: false,
-          error: 'Invalid API key',
+          error: validation.reason,
         };
       }
       
-      // Get the project ID from the API key
-      const projectId = apiKeyData.project_id;
-      
-      // Get form link by token
-      const { data: formLink, error: formLinkError } = await supabase
-        .from('customer_form_links')
-        .select('id, is_used, expires_at, status, external_project_id')
-        .eq('token', token)
-        .eq('is_deleted', false)
-        .eq('external_project_id', projectId)
-        .single();
-      
-      if (formLinkError || !formLink) {
-        return {
-          success: false,
-          error: 'Form link not found',
-        };
-      }
+      const formLink = validation.formLink!;
       
       // Check if already used or expired
       if (formLink.is_used || new Date(formLink.expires_at) < new Date()) {
         return {
           success: false,
           error: formLink.is_used ? 'Form link already used' : 'Form link expired',
-        };
-      }
-      
-      // Check project ID match
-      if (formLink.external_project_id !== projectId) {
-        return {
-          success: false,
-          error: 'Project ID mismatch',
         };
       }
       
@@ -399,7 +337,7 @@ export const FormLinkService = {
           is_used: true,
           submitted_at: submittedAt,
           status: 'submitted',
-          form_data: formData,
+          submission_data: formData,
         })
         .eq('id', formLink.id);
       
@@ -667,6 +605,7 @@ export const FormLinkService = {
         .single();
       
       if (updateError || !updated) {
+        console.error('Error updating form link:', updateError);
         return {
           success: false,
           error: 'Αποτυχία ενημέρωσης συνδέσμου φόρμας',
@@ -737,7 +676,7 @@ export const FormLinkService = {
       const { data: updated, error } = await supabase
         .from('customer_form_links')
         .update({
-          form_data: formData,
+          submission_data: formData,
           is_used: true,
           status: 'submitted',
           submitted_at: new Date().toISOString(),
@@ -747,6 +686,7 @@ export const FormLinkService = {
         .single();
       
       if (error || !updated) {
+        console.error('Error submitting form:', error);
         return {
           success: false,
           error: 'Failed to submit form',

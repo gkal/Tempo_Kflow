@@ -14,15 +14,18 @@ import FormError from './FormError';
 interface MobileCustomerFormProps {
   token: string;
   customerInfo: CustomerFormInfo;
+  customerRef?: string;  // Secure customer reference for external apps
+  appId?: string;        // External application identifier
 }
 
 // Gesture handler for swipe navigation
 const SWIPE_THRESHOLD = 50;
 
 /**
- * Mobile-optimized form component with touch-friendly controls
+ * Mobile-optimized customer form component
+ * Uses a step-by-step wizard format with swipe navigation
  */
-const MobileCustomerForm = ({ token, customerInfo }: MobileCustomerFormProps) => {
+const MobileCustomerForm = ({ token, customerInfo, customerRef, appId }: MobileCustomerFormProps) => {
   const {
     formData,
     updateFormData,

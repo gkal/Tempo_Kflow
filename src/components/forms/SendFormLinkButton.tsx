@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Mail, ExternalLink, Copy, Check, AlertCircle } from "lucide-react";
+import { Mail, Link, Copy, Check, AlertCircle } from "lucide-react";
 import { createFormLinkForCustomerApi, FormLinkCreationResponse } from "@/services/formApiService";
 import { ApiResponse, ApiError } from "@/utils/apiUtils";
 import { useAuth } from "@/lib/AuthContext";
@@ -38,7 +38,7 @@ export default function SendFormLinkButton({
   variant = "default",
   withLabel = true,
   emailRecipient,
-  expirationHours = 72,
+  expirationHours = 24,
 }: SendFormLinkButtonProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -132,17 +132,13 @@ export default function SendFormLinkButton({
   // Show success actions if form link was created
   if (formLinkData) {
     return (
-      <div className="flex flex-col space-y-3">
-        <div className="text-sm text-[#cad2c5] mb-1">
-          Ο σύνδεσμος φόρμας δημιουργήθηκε με επιτυχία! Επιλέξτε μια ενέργεια:
-        </div>
-        
+      <div className="flex flex-col space-y-2">
         <div className="flex flex-wrap gap-2">
           <Button
             onClick={handleOpenGmail}
             variant="secondary"
             size={size}
-            className="gap-2"
+            className="gap-2 h-9"
           >
             <Mail className="h-4 w-4" />
             Άνοιγμα Gmail
@@ -152,7 +148,7 @@ export default function SendFormLinkButton({
             onClick={handleCopyLink}
             variant="outline"
             size={size}
-            className="gap-2"
+            className="gap-2 h-9"
           >
             {copySuccess ? (
               <Check className="h-4 w-4 text-green-500" />
@@ -161,10 +157,6 @@ export default function SendFormLinkButton({
             )}
             {copySuccess ? "Αντιγράφηκε!" : "Αντιγραφή Συνδέσμου"}
           </Button>
-        </div>
-        
-        <div className="text-xs text-[#cad2c5]/70 mt-1">
-          Ο σύνδεσμος λήγει: {new Date(formLinkData.expiresAt).toLocaleString('el-GR')}
         </div>
       </div>
     );
@@ -211,7 +203,7 @@ export default function SendFormLinkButton({
       {loading ? (
         <Loader size={16} />
       ) : (
-        <ExternalLink className="h-4 w-4" />
+        <Link className="h-4 w-4" />
       )}
       
       {withLabel && (loading ? "Αποστολή..." : "Αποστολή Φόρμας")}

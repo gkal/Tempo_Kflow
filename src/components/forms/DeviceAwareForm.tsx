@@ -7,13 +7,15 @@ import { CustomerFormProvider } from './FormContext';
 interface DeviceAwareFormProps {
   token: string;
   customerInfo: CustomerFormInfo;
+  customerRef?: string;  // Secure customer reference for external apps
+  appId?: string;        // External application identifier
 }
 
 /**
  * Device-aware form component that renders the appropriate form based on device type
  * Uses a mobile-first approach with touch-optimized components for small screens
  */
-const DeviceAwareForm = ({ token, customerInfo }: DeviceAwareFormProps) => {
+const DeviceAwareForm = ({ token, customerInfo, customerRef, appId }: DeviceAwareFormProps) => {
   const [isMobile, setIsMobile] = useState(false);
   
   // Check device type on mount and window resize
@@ -38,10 +40,17 @@ const DeviceAwareForm = ({ token, customerInfo }: DeviceAwareFormProps) => {
   // For a better user experience, don't change the form type after initial render
   // based on orientation changes alone - this prevents jarring changes mid-form
   const renderForm = () => {
+    const formProps = { 
+      token, 
+      customerInfo,
+      customerRef,
+      appId
+    };
+    
     return isMobile ? (
-      <MobileCustomerForm token={token} customerInfo={customerInfo} />
+      <MobileCustomerForm {...formProps} />
     ) : (
-      <CustomerForm token={token} customerInfo={customerInfo} />
+      <CustomerForm {...formProps} />
     );
   };
   
@@ -49,6 +58,8 @@ const DeviceAwareForm = ({ token, customerInfo }: DeviceAwareFormProps) => {
     <CustomerFormProvider 
       initialCustomerInfo={customerInfo} 
       initialToken={token}
+      externalReference={customerRef}
+      externalAppId={appId}
     >
       {renderForm()}
     </CustomerFormProvider>

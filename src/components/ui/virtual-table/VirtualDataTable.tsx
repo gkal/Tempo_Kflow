@@ -35,6 +35,7 @@ import { Check } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { normalizePhone } from "@/services/duplicate-detection/normalizers";
+import { VirtualTable } from "@/components/ui/virtual-table/VirtualTable";
 
 // Define interfaces
 interface ColumnMeta {
@@ -203,8 +204,7 @@ export interface VirtualDataTableProps<T> {
   onCustomerTypeChange?: (types: string[]) => void;
   tableId?: string;
   stabilizeExpandedRows?: boolean;
-  initialSortColumn?: string;
-  initialSortDirection?: 'asc' | 'desc';
+  changedRowId?: string | null;
 }
 
 export function VirtualDataTable<T extends Record<string, any>>({
@@ -228,31 +228,10 @@ export function VirtualDataTable<T extends Record<string, any>>({
   onCustomerTypeChange = () => {},
   tableId = 'default',
   stabilizeExpandedRows = true,
-  initialSortColumn = "",
-  initialSortDirection = 'asc',
+  changedRowId,
 }: VirtualDataTableProps<T>) {
   // State
-  const [sorting, setSorting] = useState<SortingState>(() => {
-    // Initialize with provided sort column if specified
-    if (initialSortColumn) {
-      // Find the column definition to check if sortDescFirst is specified
-      const columnDef = columns.find(col => (col.id || col.accessorKey) === initialSortColumn);
-      const shouldSortDesc = initialSortDirection === 'desc' || columnDef?.sortDescFirst === true;
-      
-      return [{ id: initialSortColumn, desc: shouldSortDesc }];
-    }
-    
-    // If no initialSortColumn but a column has sortDescFirst=true, use that
-    const defaultSortColumn = columns.find(col => col.enableSorting !== false && col.sortDescFirst === true);
-    if (defaultSortColumn) {
-      const columnId = defaultSortColumn.id || defaultSortColumn.accessorKey;
-      if (columnId) {
-        return [{ id: columnId, desc: true }];
-      }
-    }
-    
-    return [];
-  });
+  const [sorting, setSorting] = useState<SortingState>(() => []);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -341,19 +320,10 @@ export function VirtualDataTable<T extends Record<string, any>>({
       const columnId = column.id || column.accessorKey || "";
       const width = columnSizing[columnId] || column.meta?.initialWidth || 150;
       
-      // Common properties for all column types
-      const commonProps = {
-        id: columnId,
-        header: () => column.header,
-        enableSorting: column.enableSorting !== false,
-        sortDescFirst: column.sortDescFirst, // Respect column's sortDescFirst property
-        meta: column.meta,
-        size: width,
-      };
-      
       if (column.accessorKey) {
         return columnHelper.accessor(column.accessorKey as any, {
-          ...commonProps,
+          id: columnId,
+          header: () => column.header,
           cell: column.cell ? 
             ({ getValue, row }) => (
               <div style={{ width: width - 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -365,10 +335,14 @@ export function VirtualDataTable<T extends Record<string, any>>({
                 {(getValue() as string) || <span className="text-xs text-[#52796f]">-</span>}
               </div>
             ),
+          enableSorting: column.enableSorting !== false,
+          meta: column.meta,
+          size: width,
         });
       } else {
         return columnHelper.display({
-          ...commonProps,
+          id: columnId,
+          header: () => column.header,
           cell: column.cell ? 
             ({ row }) => (
               <div style={{ width: width - 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -380,6 +354,8 @@ export function VirtualDataTable<T extends Record<string, any>>({
                 {""}
               </div>
             ),
+          meta: column.meta,
+          size: width,
         });
       }
     });
@@ -491,28 +467,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
       columnSizing,
     },
     onColumnOrderChange: setColumnOrder,
-    onSortingChange: (updater) => {
-      // Custom sorting handler to prevent the "none" state
-      if (typeof updater === 'function') {
-        setSorting((old) => {
-          const updated = updater(old);
-          
-          // If the update would clear sorting (entering "none" state)
-          if (updated.length === 0 && old.length > 0) {
-            // Instead, toggle the direction of the last sorted column
-            return [{ ...old[0], desc: !old[0].desc }];
-          }
-          
-          // Ensure consistent sorting behavior
-          return updated;
-        });
-      } else {
-        // If direct value is provided, ensure it's not empty
-        setSorting(updater.length === 0 && sorting.length > 0 
-          ? [{ ...sorting[0], desc: !sorting[0].desc }] 
-          : updater);
-      }
-    },
+    onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -521,10 +476,9 @@ export function VirtualDataTable<T extends Record<string, any>>({
     getFacetedMinMaxValues: getFacetedMinMaxValues(),
     enableMultiSort: false,
     enableColumnResizing: false,
-    sortDescFirst: false, // Prioritize ascending order first
     defaultColumn: {
       size: 150
-    }
+    },
   });
   
   // Setup virtualization
@@ -1019,10 +973,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
                             
                             {/* Header text and sort icon */}
                             <div 
-                              className={cn(
-                                "flex-1 flex items-center justify-center group",
-                                header.column.getCanSort() && "hover:bg-[#354f52]/40 rounded"
-                              )}
+                              className="flex-1 flex items-center justify-center"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -1031,19 +982,14 @@ export function VirtualDataTable<T extends Record<string, any>>({
                                 }
                               }}
                             >
-                              <div className="inline-flex items-center py-1.5 px-2">
-                                <span className={cn(
-                                  header.column.getIsSorted() ? "text-white font-medium" : "",
-                                  header.column.getCanSort() && "group-hover:text-white transition-colors duration-150" // Add hover effect
-                                )}>
-                                  {flexRender(header.column.columnDef.header, header.getContext())}
-                                </span>
+                              <div className="inline-flex items-center">
+                                <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
                                 {header.column.getCanSort() && (
                                   <ChevronUp className={cn(
-                                    "h-4 w-4 ml-3 transition-all duration-200 ease-in-out",
+                                    "h-4 w-4 ml-3",
                                     header.column.getIsSorted() 
-                                      ? "text-white opacity-100" 
-                                      : "text-[#52796f] opacity-60 group-hover:opacity-100 group-hover:text-white", // Enhance hover effect
+                                      ? "text-white" 
+                                      : "text-[#52796f] opacity-60",
                                     header.column.getIsSorted() === "desc" && "rotate-180"
                                   )} />
                                 )}
@@ -1119,15 +1065,18 @@ export function VirtualDataTable<T extends Record<string, any>>({
                     const rowData = row.original as T;
                     const rowId = getRowId(rowData);
                     const isExpanded = !!expandedRowIds[rowId];
+                    const isChanged = changedRowId === rowId;
                     
                     return (
                       <React.Fragment key={rowId}>
                         {/* Main row */}
                         <tr
                           className={cn(
-                            "hover:bg-[#354f52]/50 transition-colors duration-150",
+                            "hover:bg-[#354f52]/50 relative border border-transparent",
+                            !isChanged && "row-glow-transition",
                             onRowClick && "cursor-pointer",
-                            isExpanded && "bg-[#354f52]/30 sticky top-0 z-10"
+                            isExpanded && "bg-[#354f52]/30 sticky top-0 z-10",
+                            isChanged && "row-changed"
                           )}
                           onClick={e => onRowClick && handleRowClick(e, rowData)}
                           data-customer-id={rowId}

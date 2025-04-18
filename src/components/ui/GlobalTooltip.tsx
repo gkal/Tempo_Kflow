@@ -1,4 +1,4 @@
-import React, { ReactNode, useState, useEffect, memo } from "react";
+import React, { ReactNode, useState, useEffect, memo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { createPortal } from "react-dom";
@@ -55,8 +55,14 @@ export function GlobalTooltip({
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const timerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const contentRef = useRef<string | ReactNode>(content);
+  
+  // Store content in ref to prevent unnecessary re-renders
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
   
   // Add effect to handle delay and position calculation
   useEffect(() => {
@@ -109,7 +115,7 @@ export function GlobalTooltip({
   if (disabled) return <>{children}</>;
   
   // Format content based on length
-  const formattedContent = formatTooltipContent(content);
+  const formattedContent = formatTooltipContent(contentRef.current);
   
   // Arrow styling based on position
   const arrowStyle = position === "top" 
@@ -138,9 +144,9 @@ export function GlobalTooltip({
         <>
           <div 
             className={cn(
-              "fixed z-[9999] rounded-md bg-[#1a2e35] px-4 py-2 text-xs text-[#cad2c5] border border-[#52796f] shadow-lg",
+              "fixed z-[99999] rounded-md bg-[#1a2e35] px-4 py-2 text-xs text-[#cad2c5] border border-[#52796f] shadow-lg",
               "min-w-[120px] max-w-[800px] transition-opacity duration-200",
-              "break-words whitespace-pre-wrap",
+              "break-words whitespace-pre-wrap pointer-events-none",
               className
             )}
             style={{ 
@@ -155,7 +161,7 @@ export function GlobalTooltip({
             {formattedContent}
           </div>
           <div 
-            className={`fixed z-[9999] ${arrowStyle}`} 
+            className={`fixed z-[99999] pointer-events-none ${arrowStyle}`} 
             style={{
               top: position === "top" ? `${tooltipPosition.top}px` : `${tooltipPosition.top - 8}px`,
               left: `${tooltipPosition.left}px`
@@ -263,7 +269,7 @@ export function TruncateWithTooltip({
         delay={delay}
       >
         <span 
-          className={cn("cursor-pointer line-clamp-2 overflow-hidden text-ellipsis", className)}
+          className={cn("cursor-default line-clamp-2 overflow-hidden text-ellipsis", className)}
           style={maxLines > 2 ? {
             display: '-webkit-box',
             WebkitLineClamp: maxLines,
@@ -288,7 +294,7 @@ export function TruncateWithTooltip({
       disabled={disabled}
       delay={delay}
     >
-      <span className={cn("cursor-pointer truncate inline-block", className)}>
+      <span className={cn("cursor-default whitespace-nowrap overflow-hidden text-ellipsis inline-block", className)}>
         {text.length > maxLength 
           ? `${text.substring(0, maxLength)}...` 
           : text
@@ -375,7 +381,6 @@ InfoTrigger.displayName = 'InfoTrigger';
 
 /**
  * EllipsisWithTooltip - Shows a tooltip
- * COMPLETELY CHANGED: Now uses a red box with neon green text for maximum visibility
  */
 export function EllipsisWithTooltip({
   content,
@@ -389,8 +394,6 @@ export function EllipsisWithTooltip({
     return <InfoTrigger />;
   }
   
-  console.log("RENDERING UPDATED ELLIPSIS WITH TOOLTIP"); // Debug log
-  
   return (
     <GlobalTooltip
       content={content}
@@ -399,7 +402,9 @@ export function EllipsisWithTooltip({
       className={className}
       delay={delay}
     >
-      <InfoTrigger />
+      <div className="inline-block"> {/* Added wrapper div to prevent flashing */}
+        <InfoTrigger />
+      </div>
     </GlobalTooltip>
   );
 }

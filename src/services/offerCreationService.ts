@@ -249,7 +249,7 @@ export const OfferCreationService = {
       }
 
       const formLink = formLinkResponse.data;
-      const formData = formLink.form_data as CustomerFormSubmission;
+      const formData = formLink.submission_data as CustomerFormSubmission;
 
       // Validate form data
       const validation = this.validateFormDataForOffer(formData);

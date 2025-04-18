@@ -100,7 +100,8 @@ const CustomersPage: React.FC = () => {
         isLoading,
         isAdminOrSuperUser,
         handleCustomerTypeChange,
-        handleExpandCustomer
+        handleExpandCustomer,
+        changedRowId
       }) => {
         // Define search columns
         const searchColumns = [
@@ -384,6 +385,7 @@ const CustomersPage: React.FC = () => {
                   onCustomerTypeChange={handleCustomerTypeChange}
                   stabilizeExpandedRows={true}
                   tableId="customers-table"
+                  changedRowId={changedRowId}
                 />
               </CustomerContextMenu>
             </div>

@@ -121,17 +121,17 @@ export const CustomerFormService = {
       });
 
       // If approved, create an offer from the form data
-      if (approved && formLink.customer_id && formLink.form_data) {
-        await createOfferFromFormSubmission(formLink.customer_id, formLink.form_data);
+      if (approved && formLink.customer_id && formLink.submission_data) {
+        await createOfferFromFormSubmission(formLink.customer_id, formLink.submission_data);
       }
 
       // Send email notification to customer
-      const customerEmail = formLink.form_data?.email || '';
+      const customerEmail = formLink.submission_data?.email || '';
       if (customerEmail) {
         // Create a customer info object from form data for the email template
         const customerInfo: CustomerFormInfo = {
           id: formLink.customer_id,
-          name: formLink.form_data?.company_name || '',
+          name: formLink.submission_data?.company_name || '',
           email: customerEmail,
           createdAt: formLink.created_at
         };
