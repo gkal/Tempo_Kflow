@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import { ChevronDown, ChevronRight, Edit, Trash2 } from "lucide-react";
 import { VirtualDataTable } from "@/components/ui/virtual-table/VirtualDataTable";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/GlobalTooltip";
 import { formatDateTime } from "@/utils/formatUtils";
 import { supabase } from "@/lib/supabaseClient";
 import type { Database } from "@/types/supabase";

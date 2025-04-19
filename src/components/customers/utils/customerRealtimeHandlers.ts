@@ -249,7 +249,7 @@ export const handleOffersRealtimeEvent = (
       );
       
       // Remove the deleted offer from the list regardless of expansion state
-      console.log(`🔴 [RT-DELETE] Removing offer ${offerId} from UI for customer ${customerId}`);
+      // console.log(`🔴 [RT-DELETE] Removing offer ${offerId} from UI for customer ${customerId}`);
       
       setCustomerOffers(prev => {
         if (!prev[customerId]) return prev;
@@ -275,9 +275,7 @@ export const handleCustomersRealtimeEvent = (
   setCustomerOffers: React.Dispatch<React.SetStateAction<Record<string, CustomerOffer[]>>>,
   setRealtimeStatus: React.Dispatch<React.SetStateAction<string | null>>
 ) => {
-  console.log('🔵 Realtime Customers Event:', payload);
-  if (payload.new) console.log('🔵 Payload NEW:', JSON.stringify(payload.new));
-  if (payload.old) console.log('🔵 Payload OLD:', JSON.stringify(payload.old));
+  // Console logs removed
   
   setRealtimeStatus(`Received ${payload.eventType} at ${new Date().toLocaleTimeString()}`);
   
@@ -312,7 +310,6 @@ export const handleCustomersRealtimeEvent = (
           (a.company_name || '').localeCompare(b.company_name || '')
         );
         
-        console.log('🔵 Added new customer to UI:', newCustomer.company_name);
         return newList;
       });
     }
@@ -323,8 +320,6 @@ export const handleCustomersRealtimeEvent = (
       const isSoftDelete = !payload.old.deleted_at && payload.new.deleted_at;
       
       if (isSoftDelete) {
-        console.log('🔵 Customer soft-deleted:', payload.new.company_name);
-        
         // Remove the customer from state
         setCustomers(prevCustomers => 
           prevCustomers.filter(customer => customer.id !== payload.new.id)
@@ -346,8 +341,6 @@ export const handleCustomersRealtimeEvent = (
           });
         }
       } else {
-        console.log('🔵 Customer updated:', payload.new.company_name);
-        
         // Update the customer in state
         setCustomers(prevCustomers => 
           prevCustomers.map(customer => {
@@ -374,8 +367,6 @@ export const handleCustomersRealtimeEvent = (
   } else if (payload.eventType === 'DELETE') {
     // A customer was hard deleted (rare, as we usually use soft deletes)
     if (payload.old) {
-      console.log('🔵 Customer deleted:', payload.old.company_name);
-      
       // Remove the customer from state
       setCustomers(prevCustomers => 
         prevCustomers.filter(customer => customer.id !== payload.old.id)
