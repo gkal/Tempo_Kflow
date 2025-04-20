@@ -1,18 +1,35 @@
-/**
- * Customer form utilities
- * Extracted from CustomerForm.tsx to improve modularity
- */
-
-import { CustomerFormData, CustomerFormSubmissionData, Customer, CUSTOMER_TYPE_MAP } from '../types/CustomerTypes';
-import { createPrefixedLogger } from '@/utils/loggingUtils';
+// Customer form utility functions and constants
+import { createPrefixedLogger } from "@/utils/loggingUtils";
+import { CustomerFormData, CustomerFormSubmissionData } from "../types/CustomerTypes";
 
 // Create a logger for this utilities file
 const logger = createPrefixedLogger('CustomerFormUtils');
 
-/**
- * CSS styles for select elements and notes textarea
- */
-export const formStyles = `
+// Map of normalized customer types that match the database constraint
+export const CUSTOMER_TYPE_MAP = {
+  "Εταιρεία": "Εταιρεία",
+  "Ιδιώτης": "Ιδιώτης",
+  "Δημόσιο": "Δημόσιο",
+  "Οικοδομές": "Οικοδομές",
+  "Εκτακτος Πελάτης": "Εκτακτος Πελάτης",
+  "Εκτακτη Εταιρία": "Εκτακτη Εταιρία"
+};
+
+// List of valid customer types that satisfy the database check constraint
+export const VALID_CUSTOMER_TYPES = ["Εταιρεία", "Ιδιώτης", "Δημόσιο", "Οικοδομές", "Εκτακτος Πελάτης", "Εκτακτη Εταιρία"];
+
+// Display options for customer types - these are what users see
+export const CUSTOMER_TYPE_OPTIONS = [
+  "Εταιρεία", 
+  "Ιδιώτης", 
+  "Δημόσιο", 
+  "Οικοδομές",
+  "Εκτακτος Πελάτης",
+  "Εκτακτη Εταιρία"
+];
+
+// CSS styles for the form
+export const selectStyles = `
   select {
     -webkit-appearance: none !important;
     -moz-appearance: none !important;
@@ -58,15 +75,82 @@ export const formStyles = `
   }
 `;
 
-/**
- * Convert customer data from the database to form data
- */
+// Form styles for CustomerFormFields
+export const formStyles = selectStyles;
+
+// Validates if form data has minimum required fields
+export const isFormValid = (companyName: string, phoneValue: string) => {
+  // Get trimmed values for validation
+  const companyNameValue = companyName.trim();
+  const telephoneValue = phoneValue.trim();
+  
+  // Check both required fields individually
+  const hasCompanyName = companyNameValue !== '';
+  const hasTelephone = telephoneValue !== '';
+  
+  // Both fields must be filled for the form to be valid
+  return hasCompanyName && hasTelephone;
+};
+
+// Processes form data for submission
+export const processFormDataForSubmission = (formData: any, phoneValue: string, tempCustomerType: string | null, userId: string | undefined, customerId?: string) => {
+  // Apply the temporary customer type immediately to ensure it's in formData
+  const currentCustomerType = tempCustomerType !== null ? tempCustomerType : formData.customer_type;
+  
+  // CRITICAL FIX: Ensure customer_type is ALWAYS one of the allowed values BEFORE creating submission data
+  const safeCustomerType = VALID_CUSTOMER_TYPES.includes(currentCustomerType) 
+    ? currentCustomerType 
+    : "Εταιρεία"; // Use a safe default value
+  
+  // Create a copy of the form data with the correct customer type and phone value
+  const submissionData = {
+    ...formData,
+    customer_type: safeCustomerType,
+    // Use the phoneValue which contains the correctly formatted number
+    telephone: phoneValue,
+    // For new records, ensure primary_contact_id is null, not empty string
+    primary_contact_id: formData.primary_contact_id || null,
+    // Add user IDs for tracking who created/modified the record
+    ...(customerId ? { modified_by: userId } : { created_by: userId })
+  };
+  
+  // Clean up the data before submission
+  // Remove empty strings for fields that should be null
+  Object.keys(submissionData).forEach(key => {
+    if (submissionData[key] === "") {
+      submissionData[key] = null;
+    }
+  });
+
+  return submissionData;
+};
+
+// Returns a highlighted version of the text - implemented as a pure string function, not JSX
+export const highlightMatchingText = (value: string, isMatch: boolean, highConfidence: boolean = false): string => {
+  if (!value || !isMatch) return value;
+  
+  // Different highlight styles based on confidence level
+  let highlightClass = '';
+  
+  if (highConfidence) {
+    // High confidence match (red highlight)
+    highlightClass = 'bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-100 px-1 rounded-sm high-confidence';
+  } else {
+    // Normal confidence match (yellow highlight)
+    highlightClass = 'bg-yellow-200 dark:bg-yellow-800 text-yellow-900 dark:text-yellow-100 px-1 rounded-sm normal-confidence';
+  }
+  
+  // Return a formatted string that indicates highlight should be applied
+  return `<span class="${highlightClass}">${value}</span>`;
+};
+
+// Convert customer data from API to form data structure
 export const customerToFormData = (customer: any): CustomerFormData => {
   return {
     company_name: customer.company_name || "",
     afm: customer.afm || "",
     doy: customer.doy || "",
-    customer_type: CUSTOMER_TYPE_MAP[customer.customer_type] || customer.customer_type || "Εταιρεία",
+    customer_type: customer.customer_type || "Εταιρεία",
     address: customer.address || "",
     postal_code: customer.postal_code || "",
     town: customer.town || "",
@@ -75,53 +159,11 @@ export const customerToFormData = (customer: any): CustomerFormData => {
     webpage: customer.webpage || "",
     fax_number: customer.fax_number || "",
     notes: customer.notes || "",
-    primary_contact_id: customer.primary_contact_id || ""
+    primary_contact_id: customer.primary_contact_id || "",
   };
 };
 
-/**
- * Prepare form data for submission
- */
-export const prepareSubmissionData = (
-  formData: CustomerFormData, 
-  userId?: string
-): CustomerFormSubmissionData => {
-  return {
-    customer_type: formData.customer_type,
-    company_name: formData.company_name,
-    afm: formData.afm,
-    doy: formData.doy,
-    address: formData.address,
-    postal_code: formData.postal_code,
-    town: formData.town,
-    telephone: formData.telephone,
-    email: formData.email,
-    webpage: formData.webpage,
-    fax_number: formData.fax_number,
-    notes: formData.notes,
-    primary_contact_id: formData.primary_contact_id,
-    status: "active",
-    created_by: userId,
-    modified_by: userId
-  };
-};
-
-/**
- * Get duplicate match message based on match reasons
- */
-export const getDuplicateMatchReasons = (matchReasons: any): string => {
-  const reasons = [];
-  
-  if (matchReasons.companyName) reasons.push('Όνομα εταιρείας');
-  if (matchReasons.telephone) reasons.push('Τηλέφωνο');
-  if (matchReasons.afm) reasons.push('ΑΦΜ');
-  
-  return reasons.join(', ');
-};
-
-/**
- * Initialize empty form data
- */
+// Get initial form data for a new customer
 export const getInitialFormData = (): CustomerFormData => {
   return {
     company_name: "",
@@ -136,6 +178,35 @@ export const getInitialFormData = (): CustomerFormData => {
     webpage: "",
     fax_number: "",
     notes: "",
-    primary_contact_id: ""
+    primary_contact_id: "",
   };
+};
+
+/**
+ * Format the match reasons to display to the user
+ * @param matchReasons Object containing the reasons for a match
+ * @returns Formatted string explaining match reasons
+ */
+export const getDuplicateMatchReasons = (matchReasons: {
+  companyName?: boolean;
+  telephone?: boolean;
+  afm?: boolean;
+}): string => {
+  const reasons: string[] = [];
+  
+  if (matchReasons.companyName) {
+    reasons.push("Επωνυμία");
+  }
+  
+  if (matchReasons.telephone) {
+    reasons.push("Τηλέφωνο");
+  }
+  
+  if (matchReasons.afm) {
+    reasons.push("ΑΦΜ");
+  }
+  
+  return reasons.length > 0 
+    ? reasons.join(", ") 
+    : "Μερική ομοιότητα σε πολλαπλά πεδία";
 }; 

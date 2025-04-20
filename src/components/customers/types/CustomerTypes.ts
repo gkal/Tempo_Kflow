@@ -64,6 +64,11 @@ export interface Customer {
     telephone?: boolean;
     afm?: boolean;
   };
+  originalScores?: {
+    phoneSimilarity: number;
+    nameSimilarity: number;
+    afmSimilarity: number;
+  };
 }
 
 /**
@@ -133,4 +138,12 @@ export interface CustomerOffer {
   customer_id?: string;
   name?: string;
   requirements?: string;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  customer_id: string;
 } 

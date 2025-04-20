@@ -121,6 +121,10 @@ const highlightMatch = (text: any, searchTerm: string): React.ReactNode => {
       return textStr;
     }
     
+    // Import the highlighting functions only when needed
+    const { highlightMatchingText } = require('../customers/utils/customerFormUtils');
+    const { dangerouslyRenderHighlight } = require('../customers/utils/displayUtils');
+    
     // Escape special regex characters in the search term
     const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
@@ -128,25 +132,20 @@ const highlightMatch = (text: any, searchTerm: string): React.ReactNode => {
     const regex = new RegExp(`(${escapedSearchTerm})`, 'gi');
     const parts = textStr.split(regex);
     
+    // Return a React fragment with highlighted parts
     return (
-      <span key={`highlight-${searchTerm}-${textStr.substring(0, 10)}`}>
+      <>
         {parts.map((part, index) => {
           const isMatch = part.toLowerCase() === searchTermLower;
-          
           if (isMatch) {
-            return (
-              <span 
-                key={index} 
-                className="bg-[#52796f] text-white px-0.5 rounded-sm"
-                aria-label={`Highlighted text: ${part}`}
-              >
-                {part}
-              </span>
+            // Use our standard highlighting function for the matching part
+            return dangerouslyRenderHighlight(
+              highlightMatchingText(part, true, false)
             );
           }
           return part;
         })}
-      </span>
+      </>
     );
   } catch (error) {
     console.error("Error in highlighting:", error);

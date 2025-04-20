@@ -50,6 +50,8 @@ import { useNavigate } from "react-router-dom";
 import * as duplicateDetectionService from '@/services/duplicate-detection';
 import CustomerDetailDialog from './CustomerDetailDialog';
 import * as fuzzball from 'fuzzball';
+import { CustomerFormProvider } from './CustomerFormProvider';
+import CustomerFormFields from './CustomerFormFields';
 
 // Map of normalized customer types that match the database constraint
 const CUSTOMER_TYPE_MAP = {
@@ -1267,7 +1269,7 @@ const CustomerForm = ({
                                     : 'border-b-2 border-yellow-400' /* Low score: yellow underline */
                                   : '' /* No underline if company name didn't match */
                               }`}>
-                                {match.company_name}
+                                {renderHighlightedField(match.company_name, !!match.matchReasons?.companyName)}
                               </span>
                               {match.deleted && (
                                 <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-1 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/20 dark:text-red-200">
