@@ -29,7 +29,7 @@ type AnyTableName = string;
 // Configuration
 const TOKEN_LENGTH = 32;
 const TOKEN_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-const DEFAULT_EXPIRATION_HOURS = 24; // 1 day
+const DEFAULT_EXPIRATION_HOURS = 72; // 3 days
 
 /**
  * Service for managing customer form links
