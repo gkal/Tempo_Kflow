@@ -17,6 +17,7 @@ import { createPrefixedLogger } from "@/utils/loggingUtils";
 import { ContactList } from "@/components/contacts/ContactList";
 import { Plus } from "lucide-react";
 import { CustomerFormSubmissionData, CustomerFormData } from './types/CustomerTypes';
+import CustomerFormLinkButton from "@/components/forms/CustomerFormLinkButton";
 
 // Initialize logger
 const logger = createPrefixedLogger('CustomerFormFields');
@@ -244,57 +245,87 @@ const CustomerFormFields: React.FC<CustomerFormFieldsProps> = ({
           </div>
         </div>
 
-        {/* Address Section */}
-        <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-          <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
-            <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-              ΣΤΟΙΧΕΙΑ ΔΙΕΥΘΥΝΣΕΩΣ
-            </h2>
+        {/* Modified Address Section - Reduced Height */}
+        <div className="w-full md:w-1/2 space-y-2">
+          {/* Address Information - Reduced Height */}
+          <div className="bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+            <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
+              <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                ΣΤΟΙΧΕΙΑ ΔΙΕΥΘΥΝΣΕΩΣ
+              </h2>
+            </div>
+            <div className="p-2 grid grid-cols-2 gap-2">
+              <div className="col-span-2">
+                <div className="flex items-center">
+                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Διεύθυνση</div>
+                  <div className="w-3/4">
+                    <Input
+                      id="address"
+                      name="address"
+                      value={formData.address || ''}
+                      onChange={handleInputChange}
+                      className="app-input"
+                      disabled={viewOnly || navigatingToCustomer}
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-span-1">
+                <div className="flex items-center">
+                  <div className="w-2/5 text-[#a8c5b5] text-sm pr-1">Τ.Κ.</div>
+                  <div className="w-3/5">
+                    <Input
+                      id="postal_code"
+                      name="postal_code"
+                      value={formData.postal_code || ''}
+                      onChange={handleInputChange}
+                      className="app-input"
+                      disabled={viewOnly || navigatingToCustomer}
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-span-1">
+                <div className="flex items-center">
+                  <div className="w-2/5 text-[#a8c5b5] text-sm pr-1">Πόλη</div>
+                  <div className="w-3/5">
+                    <Input
+                      id="town"
+                      name="town"
+                      value={formData.town || ''}
+                      onChange={handleInputChange}
+                      className="app-input"
+                      disabled={viewOnly || navigatingToCustomer}
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="p-2">
-            <div className="flex items-center" style={{ marginBottom: '12px' }}>
-              <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Οδός</div>
-              <div className="w-3/4">
-                <Input
-                  id="address"
-                  name="address"
-                  value={formData.address || ''}
-                  onChange={handleInputChange}
-                  className="app-input"
-                  disabled={viewOnly || navigatingToCustomer}
-                  autoComplete="off"
-                />
-              </div>
-            </div>
 
-            <div className="flex items-center" style={{ marginBottom: '12px' }}>
-              <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Πόλη</div>
-              <div className="w-3/4">
-                <Input
-                  id="town"
-                  name="town"
-                  value={formData.town || ''}
-                  onChange={handleInputChange}
-                  className="app-input"
-                  disabled={viewOnly || navigatingToCustomer}
-                  autoComplete="off"
-                />
-              </div>
+          {/* New Section - Form Link Generation */}
+          <div className="bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+            <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
+              <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                ΔΗΜΙΟΥΡΓΙΑ LINK ΦΟΡΜΑΣ ΠΕΛΑΤΗ
+              </h2>
             </div>
-
-            <div className="flex items-center" style={{ marginBottom: '12px' }}>
-              <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Τ.Κ.</div>
-              <div className="w-3/4">
-                <Input
-                  id="postal_code"
-                  name="postal_code"
-                  value={formData.postal_code || ''}
-                  onChange={handleInputChange}
-                  className="app-input"
-                  disabled={viewOnly || navigatingToCustomer}
-                  autoComplete="off"
+            <div className="p-4 flex justify-center items-center">
+              {customerId ? (
+                <CustomerFormLinkButton 
+                  customerId={customerId} 
+                  customerEmail={formData.email as string} 
                 />
-              </div>
+              ) : (
+                <div className="text-[#a8c5b5] text-sm italic">
+                  Αποθηκεύστε πρώτα τον πελάτη για να δημιουργήσετε σύνδεσμο φόρμας
+                </div>
+              )}
             </div>
           </div>
         </div>

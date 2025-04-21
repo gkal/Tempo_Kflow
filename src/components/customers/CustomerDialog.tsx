@@ -24,7 +24,6 @@ import { PlusIcon } from "lucide-react";
 import { useFormRegistration } from '@/lib/FormContext';
 import { useFormContext } from '@/lib/FormContext';
 import { logDebug } from "@/utils/loggingUtils";
-import CustomerCreationSuccess from "@/components/forms/CustomerCreationSuccess";
 import { useNavigate } from "react-router-dom";
 
 interface CustomerFormData {
@@ -81,7 +80,6 @@ export function CustomerDialog({
   const [isFormValid, setIsFormValid] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [savedCustomerName, setSavedCustomerName] = useState<string>("");
   const navigate = useNavigate();
   const formRef = useRef(null);
@@ -96,7 +94,6 @@ export function CustomerDialog({
       setSavedCustomerId(null);
       setSavedCustomerName("");
       setShowContactDialog(false);
-      setShowSuccessDialog(false);
       setIsFormValid(false);
     }
   }, [open, customer]);
@@ -124,9 +121,6 @@ export function CustomerDialog({
       setSaving(false);
       
       if (isNewCustomer) {
-        // Show success dialog for new customers with form link option
-        setShowSuccessDialog(true);
-        
         if (refreshData) {
           try {
             refreshData();
@@ -134,6 +128,10 @@ export function CustomerDialog({
             // Error handling without logging
           }
         }
+        
+        setTimeout(() => {
+          onOpenChange(false);
+        }, 1500);
       } else {
         setTimeout(() => {
           onOpenChange(false);
@@ -333,22 +331,6 @@ export function CustomerDialog({
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Customer Creation Success Dialog */}
-      {showSuccessDialog && savedCustomerId && (
-        <CustomerCreationSuccess
-          open={showSuccessDialog}
-          onOpenChange={setShowSuccessDialog}
-          customerId={savedCustomerId}
-          customerName={savedCustomerName}
-          customerEmail={customer?.email}
-          onView={handleViewCustomer}
-          onClose={() => {
-            setShowSuccessDialog(false);
-            onOpenChange(false);
-          }}
-        />
-      )}
     </>
   );
 }

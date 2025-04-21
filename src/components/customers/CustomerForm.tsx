@@ -52,6 +52,7 @@ import CustomerDetailDialog from './CustomerDetailDialog';
 import * as fuzzball from 'fuzzball';
 import { CustomerFormProvider } from './CustomerFormProvider';
 import CustomerFormFields from './CustomerFormFields';
+import CustomerFormLinkButton from "@/components/forms/CustomerFormLinkButton";
 
 // Map of normalized customer types that match the database constraint
 const CUSTOMER_TYPE_MAP = {
@@ -954,8 +955,8 @@ const CustomerForm = ({
                   ΣΤΟΙΧΕΙΑ ΠΕΛΑΤΗ
                 </h2>
               </div>
-              <div className="p-2">
-                <div className="flex items-center" style={{ marginBottom: '12px' }}>
+              <div className="p-1.5">
+                <div className="flex items-center" style={{ marginBottom: '6px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">
                     Επωνυμία <span className="text-red-500">*</span>
                   </div>
@@ -981,7 +982,7 @@ const CustomerForm = ({
                 {/* Removed as we're now showing matches in the Surprise section */}
                 
                 
-                <div className="flex items-center" style={{ marginBottom: '12px' }}>
+                <div className="flex items-center" style={{ marginBottom: '6px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">
                     Τηλέφωνο <span className="text-red-500">*</span>
                   </div>
@@ -1004,7 +1005,7 @@ const CustomerForm = ({
                   </div>
                 </div>
 
-                <div className="flex items-center" style={{ marginBottom: '12px' }}>
+                <div className="flex items-center" style={{ marginBottom: '6px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">ΑΦΜ</div>
                   <div className="w-2/3">
                     <Input
@@ -1034,7 +1035,7 @@ const CustomerForm = ({
                   </div>
                 </div>
 
-                <div className="flex items-center" style={{ marginBottom: '12px' }}>
+                <div className="flex items-center" style={{ marginBottom: '6px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Δ.Ο.Υ.</div>
                   <div className="w-2/3">
                     <Input
@@ -1049,7 +1050,7 @@ const CustomerForm = ({
                   </div>
                 </div>
 
-                <div className="flex items-center" style={{ marginBottom: '12px' }}>
+                <div className="flex items-center" style={{ marginBottom: '6px' }}>
                   <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">
                     Τύπος Πελάτη
                   </div>
@@ -1092,57 +1093,84 @@ const CustomerForm = ({
               </div>
             </div>
 
-            {/* Address Section */}
-            <div className="w-full md:w-1/2 bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
-              <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
-                <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
-                  ΣΤΟΙΧΕΙΑ ΔΙΕΥΘΥΝΣΕΩΣ
-                </h2>
+            {/* Address Section - Reduced Height */}
+            <div className="w-full md:w-1/2 space-y-2">
+              {/* Address Section with Reduced Size */}
+              <div className="bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden">
+                <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
+                  <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                    ΣΤΟΙΧΕΙΑ ΔΙΕΥΘΥΝΣΕΩΣ
+                  </h2>
+                </div>
+                <div className="p-2">
+                  <div className="flex items-center" style={{ marginBottom: '8px' }}>
+                    <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Διεύθυνση</div>
+                    <div className="w-3/4">
+                      <Input
+                        id="address"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleInputChange}
+                        className="app-input"
+                        disabled={viewOnly || navigatingToCustomer}
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center" style={{ marginBottom: '8px' }}>
+                    <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Τ.Κ.</div>
+                    <div className="w-3/4">
+                      <Input
+                        id="postal_code"
+                        name="postal_code"
+                        value={formData.postal_code}
+                        onChange={handleInputChange}
+                        className="app-input"
+                        disabled={viewOnly || navigatingToCustomer}
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center" style={{ marginBottom: '0' }}>
+                    <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Πόλη</div>
+                    <div className="w-3/4">
+                      <Input
+                        id="town"
+                        name="town"
+                        value={formData.town}
+                        onChange={handleInputChange}
+                        className="app-input"
+                        disabled={viewOnly || navigatingToCustomer}
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="p-2">
-                <div className="flex items-center" style={{ marginBottom: '12px' }}>
-                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Οδός</div>
-                  <div className="w-3/4">
-                    <Input
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      className="app-input"
-                      disabled={viewOnly || navigatingToCustomer}
-                      autoComplete="off"
-                    />
-                  </div>
+              
+              {/* New Section - Form Link Generation */}
+              <div className="bg-[#3a5258] rounded-md border border-[#52796f] shadow-md overflow-hidden flex flex-col">
+                <div className="bg-[#3a5258] px-4 py-1 border-b border-[#52796f]">
+                  <h2 className="text-sm font-semibold text-[#a8c5b5] uppercase tracking-wider">
+                    ΔΗΜΙΟΥΡΓΙΑ LINK ΦΟΡΜΑΣ ΠΕΛΑΤΗ
+                  </h2>
                 </div>
-
-                <div className="flex items-center" style={{ marginBottom: '12px' }}>
-                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Πόλη</div>
-                  <div className="w-3/4">
-                    <Input
-                      id="town"
-                      name="town"
-                      value={formData.town}
-                      onChange={handleInputChange}
-                      className="app-input"
-                      disabled={viewOnly || navigatingToCustomer}
-                      autoComplete="off"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center" style={{ marginBottom: '12px' }}>
-                  <div className="w-1/4 text-[#a8c5b5] text-sm pr-1">Τ.Κ.</div>
-                  <div className="w-3/4">
-                    <Input
-                      id="postal_code"
-                      name="postal_code"
-                      value={formData.postal_code}
-                      onChange={handleInputChange}
-                      className="app-input"
-                      disabled={viewOnly || navigatingToCustomer}
-                      autoComplete="off"
-                    />
-                  </div>
+                <div className="p-3 flex-grow flex justify-center items-center min-h-[80px]">
+                  {customerId ? (
+                    <div className="flex justify-center w-full">
+                      <CustomerFormLinkButton 
+                        customerId={customerId} 
+                        customerEmail={formData.email} 
+                        className="mx-auto"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-[#a8c5b5] text-sm italic text-center">
+                      Αποθηκεύστε πρώτα τον πελάτη για να δημιουργήσετε σύνδεσμο φόρμας
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
