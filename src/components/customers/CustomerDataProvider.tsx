@@ -78,6 +78,8 @@ export const CustomerDataProvider: React.FC<CustomerDataProviderProps> = ({ chil
   // Track changed row for animation
   const [changedRowId, setChangedRowId] = useState<string | null>(null);
   const clearChangedRowTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track when a row was last updated to prevent spam animations
+  const recentlyUpdatedRowsRef = useRef<Map<string, number>>(new Map());
   
   // Check user permissions
   const isAdminUser = user?.role?.toLowerCase() === 'admin';
@@ -100,6 +102,41 @@ export const CustomerDataProvider: React.FC<CustomerDataProviderProps> = ({ chil
       clearChangedRowTimeoutRef.current = null;
     }, 1200); // 0.8s for animation appearance + 0.4s visibility
   }, []);
+
+  // Enhanced function to set changed row ID with debounce logic
+  const setChangedRowWithDebounce = useCallback((id: string | null) => {
+    if (!id) return;
+    
+    // Current timestamp
+    const now = Date.now();
+    
+    // Check if this row was recently updated (within last 3 seconds)
+    const lastUpdateTime = recentlyUpdatedRowsRef.current.get(id);
+    if (lastUpdateTime && now - lastUpdateTime < 3000) {
+      // Skip animation if row was recently updated to prevent spam
+      console.log(`🔴 [RT-ANIM] Skipping animation for recently updated row ${id}`);
+      return;
+    }
+    
+    // Set the animation
+    console.log(`🔴 [RT-ANIM] Setting animation for row ${id}`);
+    setChangedRowId(id);
+    clearChangedRowId();
+    
+    // Record this update time
+    recentlyUpdatedRowsRef.current.set(id, now);
+    
+    // Clean up old entries to prevent memory leaks
+    if (recentlyUpdatedRowsRef.current.size > 100) {
+      // Remove entries older than 1 minute
+      const oldTime = now - 60000;
+      for (const [recordId, time] of recentlyUpdatedRowsRef.current.entries()) {
+        if (time < oldTime) {
+          recentlyUpdatedRowsRef.current.delete(recordId);
+        }
+      }
+    }
+  }, [clearChangedRowId]);
 
   // Fetch customer offers
   const fetchCustomerOffers = useCallback(async (customerId: string, forceRefresh = false) => {
@@ -192,8 +229,8 @@ export const CustomerDataProvider: React.FC<CustomerDataProviderProps> = ({ chil
     (payload) => {
       // Set the changed row ID (customer ID) when an offer update is received
       if (payload.new && payload.new.customer_id) {
-        setChangedRowId(payload.new.customer_id);
-        clearChangedRowId();
+        console.log(`🔴 [RT-ANIM] Offer change for customer: ${payload.new.customer_id}`);
+        setChangedRowWithDebounce(payload.new.customer_id);
       }
       
       handleOffersRealtimeEvent(
@@ -215,9 +252,13 @@ export const CustomerDataProvider: React.FC<CustomerDataProviderProps> = ({ chil
     { table: 'customers' },
     (payload) => {
       // Set the changed row ID (customer ID) when a customer update is received
-      if (payload.new) {
-        setChangedRowId(payload.new.id);
-        clearChangedRowId();
+      if (payload.new && payload.new.id) {
+        console.log(`🔴 [RT-ANIM] Customer update for ID: ${payload.new.id}`);
+        setChangedRowWithDebounce(payload.new.id);
+      } else if (payload.old && payload.old.id) {
+        console.log(`🔴 [RT-ANIM] Customer deletion for ID: ${payload.old.id}`);
+        // For DELETE events, we need to use the old ID
+        setChangedRowWithDebounce(payload.old.id);
       }
       
       handleCustomersRealtimeEvent(

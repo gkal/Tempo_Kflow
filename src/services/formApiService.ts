@@ -59,7 +59,8 @@ export const createFormLinkForCustomerApi = async (
     const formLinkResult = await FormLinkService.generateFormLinkForCustomer({
       customerId,
       expirationHours,
-      createdById: userId
+      createdById: userId,
+      externalProjectId: 'external-form'
     });
     
     if (!formLinkResult.success || !formLinkResult.data) {

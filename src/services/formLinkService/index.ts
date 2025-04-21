@@ -119,7 +119,7 @@ export const FormLinkService = {
         
         if (externalProjectId) {
           // For external projects, use a standard URL format with the token and secure customer reference
-          url = `${getBaseUrl()}/form/${token}?${customerParams}`;
+          url = `https://custkflow.vercel.app/form/${token}?${customerParams}`;
         } else {
           // For internal usage - still include the secure reference
           url = `${getBaseUrl()}/form/${token}?${customerParams}`;
@@ -128,7 +128,7 @@ export const FormLinkService = {
         console.error("Error generating secure reference:", error);
         // Fallback to basic URL without reference if generation fails
         if (externalProjectId) {
-          url = `${getBaseUrl()}/form/${token}?external=${externalProjectId}`;
+          url = `https://custkflow.vercel.app/form/${token}?external=${externalProjectId}`;
         } else {
           url = `${getBaseUrl()}/form/${token}`;
         }
