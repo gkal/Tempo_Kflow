@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Link as LinkIcon, ExternalLink, Copy, Check, AlertCircle } from "lucide-react";
-import { createFormLinkForCustomerApi } from "@/services/formApiService";
+import { createFormLinkForCustomerApi, getActiveFormLinksForCustomerApi } from "@/services/formApiService";
 import { ApiResponse } from "@/utils/apiUtils";
 import { useAuth } from "@/lib/AuthContext";
 import { toast } from "@/components/ui/use-toast";
@@ -32,6 +32,64 @@ export default function CustomerFormLinkButton({
   const [copySuccess, setCopySuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [checkingExistingLinks, setCheckingExistingLinks] = useState(true);
+  
+  // Check for existing active form links on component mount
+  useEffect(() => {
+    const checkExistingLinks = async () => {
+      if (!customerId) return;
+      
+      try {
+        // First check localStorage for a previously created link
+        const storedLinkData = localStorage.getItem(`formLink_${customerId}`);
+        if (storedLinkData) {
+          try {
+            const parsedData = JSON.parse(storedLinkData);
+            
+            // Validate the URL before setting state
+            if (parsedData && parsedData.url && typeof parsedData.url === 'string') {
+              console.log("Found valid link in localStorage:", parsedData.url);
+              setFormLinkData(parsedData);
+              setCheckingExistingLinks(false);
+              return;
+            } else {
+              console.error("Invalid URL in stored link data:", parsedData);
+              // Continue to check API if localStorage data is invalid
+              localStorage.removeItem(`formLink_${customerId}`);
+            }
+          } catch (err) {
+            console.error("Error parsing stored form link data:", err);
+            // Continue to check API if localStorage parsing fails
+            localStorage.removeItem(`formLink_${customerId}`);
+          }
+        }
+        
+        // If nothing in localStorage, check for active links in the database
+        const response: ApiResponse<any> = await getActiveFormLinksForCustomerApi(customerId);
+        
+        if (response.status === 'success' && response.data) {
+          // Validate the response data before setting state
+          if (response.data.url && typeof response.data.url === 'string') {
+            console.log("Found valid link in API response:", response.data.url);
+            
+            // Found an active link, set it as the current link
+            setFormLinkData(response.data);
+            
+            // Also store in localStorage for future use
+            localStorage.setItem(`formLink_${customerId}`, JSON.stringify(response.data));
+          } else {
+            console.error("Invalid URL in API response:", response.data);
+          }
+        }
+      } catch (err) {
+        console.error("Error checking for existing form links:", err);
+      } finally {
+        setCheckingExistingLinks(false);
+      }
+    };
+    
+    checkExistingLinks();
+  }, [customerId]);
   
   // Reset success message after 2 seconds
   useEffect(() => {
@@ -71,11 +129,23 @@ export default function CustomerFormLinkButton({
       if (response.status === 'success' && response.data) {
         const { formLink, gmailUrl } = response.data;
         
+        // Validate the URL before setting state
+        if (!formLink || !formLink.url || typeof formLink.url !== 'string') {
+          throw new Error("API returned invalid form link data");
+        }
+        
+        console.log("Created valid form link:", formLink.url);
+        
         // Set the form link data to display the success state
-        setFormLinkData({
+        const linkData = {
           url: formLink.url,
-          gmailUrl
-        });
+          gmailUrl: gmailUrl || ''
+        };
+        
+        setFormLinkData(linkData);
+        
+        // Store form link data in localStorage to persist across navigation
+        localStorage.setItem(`formLink_${customerId}`, JSON.stringify(linkData));
         
         // Show success message for 2 seconds
         setShowSuccessMessage(true);
@@ -115,76 +185,279 @@ export default function CustomerFormLinkButton({
     e.preventDefault();
     e.stopPropagation();
     
-    if (!formLinkData?.url) return;
+    if (!formLinkData?.url) {
+      console.error("No URL available to copy");
+      toast({
+        title: "Σφάλμα",
+        description: "Δεν υπάρχει διαθέσιμος σύνδεσμος για αντιγραφή",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Ensure the URL is valid and not undefined
+    let formUrl = formLinkData.url;
+    
+    // Extra validation to ensure URL is defined and valid
+    if (!formUrl || typeof formUrl !== 'string') {
+      console.error("Invalid form URL", formLinkData);
+      toast({
+        title: "Σφάλμα",
+        description: "Ο σύνδεσμος φόρμας είναι μη έγκυρος",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Fix the URL if it starts with "undefined/"
+    if (formUrl.startsWith("undefined/")) {
+      // Extract the token part from the URL
+      const urlParts = formUrl.split('/');
+      if (urlParts.length >= 2) {
+        const formToken = urlParts[1]; // This should be "form"
+        const tokenValue = urlParts[2]; // This should be the actual token
+        
+        // Always use the external URL format with custkflow.vercel.app
+        formUrl = `https://custkflow.vercel.app/form/${tokenValue}`;
+        console.log("Fixed malformed URL with external domain:", formUrl);
+      }
+    }
+    
+    console.log("Attempting to copy URL:", formUrl);
     
     try {
       // Create a friendly HTML link that looks nicer when pasted
-      const friendlyLinkHtml = `<a href="${formLinkData.url}" style="display:inline-block;background-color:#52796f;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:4px;font-family:Arial,sans-serif;">Πατήστε εδώ για να συμπληρώσετε τα στοιχεία της προσφοράς</a>`;
+      const friendlyLinkHtml = `<a href="${formUrl}" style="display:inline-block;background-color:#52796f;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:4px;font-family:Arial,sans-serif;">Πατήστε εδώ για να συμπληρώσετε τα στοιχεία της προσφοράς</a>`;
       
       // For plain text fallback
-      const plainTextLink = `Πατήστε εδώ για να συμπληρώσετε τα στοιχεία της προσφοράς: ${formLinkData.url}`;
+      const plainTextLink = `Πατήστε εδώ για να συμπληρώσετε τα στοιχεία της προσφοράς: ${formUrl}`;
       
+      let copySucceeded = false;
+      
+      // Method 1: Try to use modern clipboard API with HTML content
       try {
-        // Try to use the clipboard API with HTML content
         await navigator.clipboard.write([
           new ClipboardItem({
             'text/html': new Blob([friendlyLinkHtml], { type: 'text/html' }),
             'text/plain': new Blob([plainTextLink], { type: 'text/plain' })
           })
         ]);
+        console.log("Copied with navigator.clipboard.write() method");
+        copySucceeded = true;
       } catch (clipboardError) {
-        // Fallback to plain text if HTML clipboard isn't supported
-        await navigator.clipboard.writeText(plainTextLink);
+        console.error("Method 1 failed:", clipboardError);
+        // Proceed to fallback methods
       }
       
-      setCopySuccess(true);
+      // Method 2: Try to use simple clipboard API (widest browser support)
+      if (!copySucceeded) {
+        try {
+          await navigator.clipboard.writeText(plainTextLink);
+          console.log("Copied with navigator.clipboard.writeText() method");
+          copySucceeded = true;
+        } catch (clipboardError2) {
+          console.error("Method 2 failed:", clipboardError2);
+          // Proceed to next fallback
+        }
+      }
       
-      toast({
-        title: "Επιτυχία",
-        description: "Ο σύνδεσμος αντιγράφηκε στο πρόχειρο",
-      });
+      // Method 3: Use document.execCommand (older browsers)
+      if (!copySucceeded) {
+        try {
+          // Create a temporary textarea element
+          const textarea = document.createElement('textarea');
+          textarea.value = plainTextLink;
+          
+          // Make it invisible but part of the document
+          textarea.style.position = 'absolute';
+          textarea.style.left = '-9999px';
+          textarea.style.top = '0';
+          document.body.appendChild(textarea);
+          
+          // Select and copy
+          textarea.select();
+          const successful = document.execCommand('copy');
+          document.body.removeChild(textarea);
+          
+          if (successful) {
+            console.log("Copied with document.execCommand() method");
+            copySucceeded = true;
+          } else {
+            console.error("Method 3 execCommand returned false");
+          }
+        } catch (execCommandError) {
+          console.error("Method 3 failed:", execCommandError);
+        }
+      }
       
-      // Reset copy success state after 2 seconds
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy link:", err);
-      
-      // Fallback to basic text copy if advanced clipboard fails
-      try {
-        await navigator.clipboard.writeText(formLinkData.url);
+      if (copySucceeded) {
         setCopySuccess(true);
+        
         toast({
           title: "Επιτυχία",
-          description: "Ο σύνδεσμος αντιγράφηκε στο πρόχειρο (απλό κείμενο)",
+          description: "Ο σύνδεσμος αντιγράφηκε στο πρόχειρο",
         });
+        
+        // Reset copy success state after 2 seconds
         setTimeout(() => setCopySuccess(false), 2000);
-      } catch (fallbackError) {
-        toast({
-          title: "Σφάλμα",
-          description: "Αποτυχία αντιγραφής συνδέσμου στο πρόχειρο",
-          variant: "destructive",
-        });
+      } else {
+        throw new Error("All clipboard methods failed");
       }
+    } catch (err) {
+      console.error("All clipboard methods failed:", err);
+      
+      toast({
+        title: "Σφάλμα",
+        description: "Αποτυχία αντιγραφής συνδέσμου στο πρόχειρο. Προσπαθήστε να δώσετε άδεια στο πρόγραμμα περιήγησης για πρόσβαση στο πρόχειρο.",
+        variant: "destructive",
+      });
     }
   };
   
   // Handle opening Gmail compose
-  const handleOpenGmail = (e: React.MouseEvent) => {
+  const handleOpenGmail = async (e: React.MouseEvent) => {
     // Prevent event from propagating to parent form
     e.preventDefault();
     e.stopPropagation();
     
-    if (!formLinkData?.url) return;
+    if (!formLinkData?.url) {
+      console.error("No URL available for Gmail");
+      toast({
+        title: "Σφάλμα",
+        description: "Δεν υπάρχει διαθέσιμος σύνδεσμος",
+        variant: "destructive",
+      });
+      return;
+    }
     
     try {
+      // Store form link data in localStorage before opening Gmail
+      // This ensures the link can be copied even after navigating back from Gmail
+      localStorage.setItem(`formLink_${customerId}`, JSON.stringify(formLinkData));
+      
       // Create a better Gmail URL that uses an HTML button in an anchor tag
-      const formUrl = formLinkData.url;
+      let formUrl = formLinkData.url;
+      
+      // Extra validation to ensure URL is defined
+      if (!formUrl) {
+        console.error("Form URL is undefined", formLinkData);
+        toast({
+          title: "Σφάλμα",
+          description: "Ο σύνδεσμος φόρμας είναι μη έγκυρος",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Fix the URL if it starts with "undefined/"
+      if (formUrl.startsWith("undefined/")) {
+        // Extract the token part from the URL
+        const urlParts = formUrl.split('/');
+        if (urlParts.length >= 2) {
+          const formToken = urlParts[1]; // This should be "form"
+          const tokenValue = urlParts[2]; // This should be the actual token
+          
+          // Always use the external URL format with custkflow.vercel.app
+          formUrl = `https://custkflow.vercel.app/form/${tokenValue}`;
+          console.log("Fixed Gmail URL with external domain:", formUrl);
+        }
+      }
+      
+      console.log("Opening Gmail with URL:", formUrl);
+      
+      // First, automatically copy the formatted HTML link to clipboard for easy pasting
+      // Create a friendly HTML link that looks nicer when pasted - same as in handleCopyLink
+      const friendlyLinkHtml = `<a href="${formUrl}" style="display:inline-block;background-color:#52796f;color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:4px;font-family:Arial,sans-serif;">Πατήστε εδώ για να συμπληρώσετε τα στοιχεία της προσφοράς</a>`;
+      
+      // For plain text fallback
+      const plainTextLink = `Πατήστε εδώ για να συμπληρώσετε τα στοιχεία της προσφοράς: ${formUrl}`;
+      
+      let copySucceeded = false;
+      
+      // Method 1: Try to use modern clipboard API with HTML content
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': new Blob([friendlyLinkHtml], { type: 'text/html' }),
+            'text/plain': new Blob([plainTextLink], { type: 'text/plain' })
+          })
+        ]);
+        console.log("Copied with navigator.clipboard.write() method for Gmail");
+        copySucceeded = true;
+      } catch (clipErr) {
+        console.error("Gmail Method 1 failed:", clipErr);
+      }
+      
+      // Method 2: Try to use simple clipboard API (widest browser support)
+      if (!copySucceeded) {
+        try {
+          await navigator.clipboard.writeText(plainTextLink);
+          console.log("Copied with navigator.clipboard.writeText() method for Gmail");
+          copySucceeded = true;
+        } catch (clipErr) {
+          console.error("Gmail Method 2 failed:", clipErr);
+        }
+      }
+      
+      // Method 3: Use document.execCommand (older browsers)
+      if (!copySucceeded) {
+        try {
+          // Create a temporary textarea element
+          const textarea = document.createElement('textarea');
+          textarea.value = plainTextLink;
+          
+          // Make it invisible but part of the document
+          textarea.style.position = 'absolute';
+          textarea.style.left = '-9999px';
+          textarea.style.top = '0';
+          document.body.appendChild(textarea);
+          
+          // Select and copy
+          textarea.select();
+          const successful = document.execCommand('copy');
+          document.body.removeChild(textarea);
+          
+          if (successful) {
+            console.log("Copied with document.execCommand() method for Gmail");
+            copySucceeded = true;
+          }
+        } catch (execCommandErr) {
+          console.error("Gmail Method 3 failed:", execCommandErr);
+        }
+      }
+      
+      if (copySucceeded) {
+        setCopySuccess(true);
+        
+        // Show a small toast notification that the link is ready to paste
+        toast({
+          title: "Έτοιμο για επικόλληση",
+          description: "Ο σύνδεσμος αντιγράφηκε και είναι έτοιμος για επικόλληση",
+        });
+        
+        // Reset copy success state after 5 seconds
+        setTimeout(() => setCopySuccess(false), 5000);
+      }
       
       // Create nicer email subject
       const subject = "ΚΡΟΝΟΣ Α.Ε / Φόρμα συμπλήρωσης στοιχείων προσφοράς";
       
       // Determine recipient email address (if available)
       const recipientEmail = customerEmail || '';
+      
+      // Prepare the email body content with the form URL
+      const emailBodyContent = `
+Αγαπητέ Πελάτη,
+
+Σας στέλνουμε αυτόν τον σύνδεσμο για να συμπληρώσετε τα στοιχεία σας για την προσφορά.
+
+ΠΑΤΗΣΤΕ ΕΔΩ ΓΙΑ ΤΗ ΦΟΡΜΑ:
+${formUrl}
+
+Ο σύνδεσμος αυτός θα είναι ενεργός για 72 ώρες (3 ημέρες) από τη στιγμή που λάβατε αυτό το email.
+
+Ευχαριστούμε,
+Η ομάδα μας`;
       
       // Create HTML email with a styled button
       // Note: Gmail supports limited HTML in emails, so we use a simple styled anchor tag
@@ -203,36 +476,13 @@ export default function CustomerFormLinkButton({
 
       // For Gmail compose with HTML body, we need to use a direct approach
       // We'll create a new mailto: URL with HTML content
-      const mailtoUrl = `mailto:${recipientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(
-        `Αγαπητέ Πελάτη,
-
-Σας στέλνουμε αυτόν τον σύνδεσμο για να συμπληρώσετε τα στοιχεία σας για την προσφορά.
-
-ΠΑΤΗΣΤΕ ΕΔΩ ΓΙΑ ΤΗ ΦΟΡΜΑ:
-${formUrl}
-
-Ο σύνδεσμος αυτός θα είναι ενεργός για 72 ώρες (3 ημέρες) από τη στιγμή που λάβατε αυτό το email.
-
-Ευχαριστούμε,
-Η ομάδα μας`
-      )}`;
+      const mailtoUrl = `mailto:${recipientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyContent)}`;
 
       // Add recipient email to the Gmail URL if available
       const toParam = recipientEmail ? `&to=${encodeURIComponent(recipientEmail)}` : '';
       
-      // Open Gmail compose with the URL
-      window.open(`https://mail.google.com/mail/?view=cm&fs=1&tf=1${toParam}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(`
-Αγαπητέ Πελάτη,
-
-Σας στέλνουμε αυτόν τον σύνδεσμο για να συμπληρώσετε τα στοιχεία σας για την προσφορά.
-
-ΠΑΤΗΣΤΕ ΕΔΩ ΓΙΑ ΤΗ ΦΟΡΜΑ:
-${formUrl}
-
-Ο σύνδεσμος αυτός θα είναι ενεργός για 72 ώρες (3 ημέρες) από τη στιγμή που λάβατε αυτό το email.
-
-Ευχαριστούμε,
-Η ομάδα μας`)}`, "_blank");
+      // Open Gmail compose with the URL - using the same emailBodyContent to ensure consistency
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&tf=1${toParam}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyContent)}`, "_blank");
 
     } catch (error) {
       console.error("Failed to open Gmail:", error);
@@ -249,6 +499,23 @@ ${formUrl}
       }
     }
   };
+  
+  // If still checking for existing links, show loading state
+  if (checkingExistingLinks) {
+    return (
+      <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <Button
+          disabled={true}
+          className={`bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] h-9 ${className}`}
+          size="sm"
+          aria-label="Έλεγχος συνδέσμων φόρμας"
+          type="button"
+        >
+          <Loader size={16} />
+        </Button>
+      </div>
+    );
+  }
   
   // If form link has been created, show the success buttons
   if (formLinkData) {
@@ -296,6 +563,7 @@ ${formUrl}
     );
   }
   
+  // If no form link exists, show the create link button
   return (
     <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
       <GlobalTooltip content="Δημιουργία συνδέσμου φόρμας πελάτη">

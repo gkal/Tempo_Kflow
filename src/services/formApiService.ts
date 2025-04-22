@@ -418,4 +418,70 @@ export const getUserApprovalPermissionsApi = async (
     logError('Exception in getUserApprovalPermissionsApi:', error, 'FormApiService');
     return createErrorResponse(error);
   }
+};
+
+/**
+ * Get active form links for a customer
+ * 
+ * @param customerId ID of the customer to check for active form links
+ * @returns API response with active form links
+ */
+export const getActiveFormLinksForCustomerApi = async (
+  customerId: string
+): Promise<ApiResponse<{url: string, gmailUrl: string} | null>> => {
+  try {
+    if (!customerId) {
+      return createErrorResponse('Απαιτείται το ID του πελάτη');
+    }
+    
+    // Use FormLinkService to get active, unexpired, unused links for this customer
+    const formLinksResult = await FormLinkService.getFormLinks({
+      filter: {
+        customerId,
+        isUsed: false,
+        isExpired: false,
+        status: 'pending'
+      },
+      pagination: {
+        page: 1,
+        pageSize: 1
+      }
+    });
+    
+    if (!formLinksResult.success || !formLinksResult.data || formLinksResult.data.formLinks.length === 0) {
+      // No active form links found - this is not an error, just return null
+      return createSuccessResponse(null);
+    }
+    
+    // Found an active form link, get the URL and Gmail URL
+    const formLink = formLinksResult.data.formLinks[0];
+    
+    // Get customer information for email generation
+    const customerInfo = await CustomerFormService.getCustomerInfoForForm(customerId, { includeContacts: true });
+    if (!customerInfo) {
+      return createErrorResponse('Αποτυχία λήψης πληροφοριών πελάτη');
+    }
+    
+    // Calculate expiration date for Gmail URL
+    const expirationDate = new Date(formLink.expires_at);
+    
+    // Generate Gmail URL
+    const gmailUrl = await generateFormLinkEmailUrl(
+      formLink.token,
+      customerInfo,
+      expirationDate,
+      customerInfo.email
+    );
+    
+    // Construct the complete form URL with the token
+    const formUrl = `${import.meta.env.VITE_EXTERNAL_FORM_BASE_URL}/form/${formLink.token}`;
+    
+    return createSuccessResponse({
+      url: formUrl,
+      gmailUrl
+    });
+  } catch (error) {
+    logError('Exception in getActiveFormLinksForCustomerApi:', error, 'FormApiService');
+    return createErrorResponse(error);
+  }
 }; 
