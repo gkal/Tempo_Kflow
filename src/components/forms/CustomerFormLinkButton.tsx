@@ -40,49 +40,18 @@ export default function CustomerFormLinkButton({
       if (!customerId) return;
       
       try {
-        // First check localStorage for a previously created link
-        const storedLinkData = localStorage.getItem(`formLink_${customerId}`);
-        if (storedLinkData) {
-          try {
-            const parsedData = JSON.parse(storedLinkData);
-            
-            // Validate the URL before setting state
-            if (parsedData && parsedData.url && typeof parsedData.url === 'string') {
-              console.log("Found valid link in localStorage:", parsedData.url);
-              setFormLinkData(parsedData);
-              setCheckingExistingLinks(false);
-              return;
-            } else {
-              console.error("Invalid URL in stored link data:", parsedData);
-              // Continue to check API if localStorage data is invalid
-              localStorage.removeItem(`formLink_${customerId}`);
-            }
-          } catch (err) {
-            console.error("Error parsing stored form link data:", err);
-            // Continue to check API if localStorage parsing fails
-            localStorage.removeItem(`formLink_${customerId}`);
-          }
-        }
-        
-        // If nothing in localStorage, check for active links in the database
+        // Check for active links in the database - always query the database for the latest state
         const response: ApiResponse<any> = await getActiveFormLinksForCustomerApi(customerId);
         
         if (response.status === 'success' && response.data) {
           // Validate the response data before setting state
           if (response.data.url && typeof response.data.url === 'string') {
-            console.log("Found valid link in API response:", response.data.url);
-            
             // Found an active link, set it as the current link
             setFormLinkData(response.data);
-            
-            // Also store in localStorage for future use
-            localStorage.setItem(`formLink_${customerId}`, JSON.stringify(response.data));
-          } else {
-            console.error("Invalid URL in API response:", response.data);
           }
         }
       } catch (err) {
-        console.error("Error checking for existing form links:", err);
+        // Error handling remains silent without logs
       } finally {
         setCheckingExistingLinks(false);
       }
@@ -134,8 +103,6 @@ export default function CustomerFormLinkButton({
           throw new Error("API returned invalid form link data");
         }
         
-        console.log("Created valid form link:", formLink.url);
-        
         // Set the form link data to display the success state
         const linkData = {
           url: formLink.url,
@@ -143,9 +110,6 @@ export default function CustomerFormLinkButton({
         };
         
         setFormLinkData(linkData);
-        
-        // Store form link data in localStorage to persist across navigation
-        localStorage.setItem(`formLink_${customerId}`, JSON.stringify(linkData));
         
         // Show success message for 2 seconds
         setShowSuccessMessage(true);
@@ -166,7 +130,6 @@ export default function CustomerFormLinkButton({
         });
       }
     } catch (err) {
-      console.error("Error creating form link:", err);
       setError("Προέκυψε απρόσμενο σφάλμα κατά τη δημιουργία του συνδέσμου");
       
       toast({
@@ -186,7 +149,6 @@ export default function CustomerFormLinkButton({
     e.stopPropagation();
     
     if (!formLinkData?.url) {
-      console.error("No URL available to copy");
       toast({
         title: "Σφάλμα",
         description: "Δεν υπάρχει διαθέσιμος σύνδεσμος για αντιγραφή",
@@ -200,7 +162,6 @@ export default function CustomerFormLinkButton({
     
     // Extra validation to ensure URL is defined and valid
     if (!formUrl || typeof formUrl !== 'string') {
-      console.error("Invalid form URL", formLinkData);
       toast({
         title: "Σφάλμα",
         description: "Ο σύνδεσμος φόρμας είναι μη έγκυρος",
@@ -219,11 +180,8 @@ export default function CustomerFormLinkButton({
         
         // Always use the external URL format with custkflow.vercel.app
         formUrl = `https://custkflow.vercel.app/form/${tokenValue}`;
-        console.log("Fixed malformed URL with external domain:", formUrl);
       }
     }
-    
-    console.log("Attempting to copy URL:", formUrl);
     
     try {
       // Create a friendly HTML link that looks nicer when pasted
@@ -242,22 +200,18 @@ export default function CustomerFormLinkButton({
             'text/plain': new Blob([plainTextLink], { type: 'text/plain' })
           })
         ]);
-        console.log("Copied with navigator.clipboard.write() method");
         copySucceeded = true;
       } catch (clipboardError) {
-        console.error("Method 1 failed:", clipboardError);
-        // Proceed to fallback methods
+        // Silent error handling
       }
       
       // Method 2: Try to use simple clipboard API (widest browser support)
       if (!copySucceeded) {
         try {
           await navigator.clipboard.writeText(plainTextLink);
-          console.log("Copied with navigator.clipboard.writeText() method");
           copySucceeded = true;
         } catch (clipboardError2) {
-          console.error("Method 2 failed:", clipboardError2);
-          // Proceed to next fallback
+          // Silent error handling
         }
       }
       
@@ -280,13 +234,10 @@ export default function CustomerFormLinkButton({
           document.body.removeChild(textarea);
           
           if (successful) {
-            console.log("Copied with document.execCommand() method");
             copySucceeded = true;
-          } else {
-            console.error("Method 3 execCommand returned false");
           }
         } catch (execCommandError) {
-          console.error("Method 3 failed:", execCommandError);
+          // Silent error handling
         }
       }
       
@@ -304,8 +255,6 @@ export default function CustomerFormLinkButton({
         throw new Error("All clipboard methods failed");
       }
     } catch (err) {
-      console.error("All clipboard methods failed:", err);
-      
       toast({
         title: "Σφάλμα",
         description: "Αποτυχία αντιγραφής συνδέσμου στο πρόχειρο. Προσπαθήστε να δώσετε άδεια στο πρόγραμμα περιήγησης για πρόσβαση στο πρόχειρο.",
@@ -321,7 +270,6 @@ export default function CustomerFormLinkButton({
     e.stopPropagation();
     
     if (!formLinkData?.url) {
-      console.error("No URL available for Gmail");
       toast({
         title: "Σφάλμα",
         description: "Δεν υπάρχει διαθέσιμος σύνδεσμος",
@@ -331,16 +279,11 @@ export default function CustomerFormLinkButton({
     }
     
     try {
-      // Store form link data in localStorage before opening Gmail
-      // This ensures the link can be copied even after navigating back from Gmail
-      localStorage.setItem(`formLink_${customerId}`, JSON.stringify(formLinkData));
-      
       // Create a better Gmail URL that uses an HTML button in an anchor tag
       let formUrl = formLinkData.url;
       
       // Extra validation to ensure URL is defined
       if (!formUrl) {
-        console.error("Form URL is undefined", formLinkData);
         toast({
           title: "Σφάλμα",
           description: "Ο σύνδεσμος φόρμας είναι μη έγκυρος",
@@ -359,11 +302,8 @@ export default function CustomerFormLinkButton({
           
           // Always use the external URL format with custkflow.vercel.app
           formUrl = `https://custkflow.vercel.app/form/${tokenValue}`;
-          console.log("Fixed Gmail URL with external domain:", formUrl);
         }
       }
-      
-      console.log("Opening Gmail with URL:", formUrl);
       
       // First, automatically copy the formatted HTML link to clipboard for easy pasting
       // Create a friendly HTML link that looks nicer when pasted - same as in handleCopyLink
@@ -382,20 +322,18 @@ export default function CustomerFormLinkButton({
             'text/plain': new Blob([plainTextLink], { type: 'text/plain' })
           })
         ]);
-        console.log("Copied with navigator.clipboard.write() method for Gmail");
         copySucceeded = true;
       } catch (clipErr) {
-        console.error("Gmail Method 1 failed:", clipErr);
+        // Silent error handling
       }
       
       // Method 2: Try to use simple clipboard API (widest browser support)
       if (!copySucceeded) {
         try {
           await navigator.clipboard.writeText(plainTextLink);
-          console.log("Copied with navigator.clipboard.writeText() method for Gmail");
           copySucceeded = true;
         } catch (clipErr) {
-          console.error("Gmail Method 2 failed:", clipErr);
+          // Silent error handling
         }
       }
       
@@ -418,11 +356,10 @@ export default function CustomerFormLinkButton({
           document.body.removeChild(textarea);
           
           if (successful) {
-            console.log("Copied with document.execCommand() method for Gmail");
             copySucceeded = true;
           }
         } catch (execCommandErr) {
-          console.error("Gmail Method 3 failed:", execCommandErr);
+          // Silent error handling
         }
       }
       
@@ -485,8 +422,6 @@ ${formUrl}
       window.open(`https://mail.google.com/mail/?view=cm&fs=1&tf=1${toParam}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyContent)}`, "_blank");
 
     } catch (error) {
-      console.error("Failed to open Gmail:", error);
-      
       // Fallback to using the original gmailUrl if available
       if (formLinkData.gmailUrl) {
         window.open(formLinkData.gmailUrl, "_blank");

@@ -142,6 +142,10 @@ if (typeof window !== 'undefined') {
 }
 
 // TEMPORARY FIX: Define a hardcoded admin ID as fallback
+/**
+ * @deprecated This should not be used as a fallback anymore. Always use the actual logged-in user's ID.
+ * If a user ID is needed and no user is logged in, the operation should be prevented or deferred until authentication is complete.
+ */
 export const ADMIN_USER_ID = '3fbf35f7-5730-47d5-b9d2-f742b24c9d26';
 
 export const useOfferDialog = () => {

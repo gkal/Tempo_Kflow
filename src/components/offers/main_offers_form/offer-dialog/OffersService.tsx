@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import { OfferFormValues, DatabaseOffer } from './OfferDialogContext';
 import { normalizeSourceValue } from './FormUtils';
-import { ADMIN_USER_ID } from './OfferDialogContext';
 
 /**
  * Save offer data and get the ID
@@ -29,7 +28,7 @@ export const saveOfferAndGetId = async (
       formData.our_transport = formData.transport_type;
     }
     
-    const safeUserId = userId || ADMIN_USER_ID;
+    // Users must be logged in to reach this point
     const customerIdString = formData.customer_id || customerId;
 
     if (offerId && !offerId.startsWith('temp-')) {
@@ -48,7 +47,7 @@ export const saveOfferAndGetId = async (
         town: formData.town || null,
         hma: !!formData.hma,
         certificate: formData.certificate || null,
-        updated_by: safeUserId,
+        updated_by: userId,
         updated_at: new Date().toISOString(),
         contact_id: selectedContactId,
         created_at: formData.created_at || new Date().toISOString(),
@@ -89,8 +88,8 @@ export const saveOfferAndGetId = async (
         town: formData.town || null,
         hma: !!formData.hma,
         certificate: formData.certificate || null,
-        created_by: safeUserId,
-        updated_by: safeUserId,
+        created_by: userId,
+        updated_by: userId,
         created_at: formData.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
         contact_id: selectedContactId,
