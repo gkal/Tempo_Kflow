@@ -364,6 +364,7 @@ export default function CustomerFormLinkButton({
       }
       
       if (copySucceeded) {
+        // Update state to show copy success visual indicator
         setCopySuccess(true);
         
         // Show a small toast notification that the link is ready to paste
@@ -395,30 +396,11 @@ ${formUrl}
 
 Ευχαριστούμε,
 Η ομάδα μας`;
-      
-      // Create HTML email with a styled button
-      // Note: Gmail supports limited HTML in emails, so we use a simple styled anchor tag
-      const htmlEmail = `
-<html>
-<body>
-<p>Αγαπητέ Πελάτη,</p>
-<p>Σας στέλνουμε αυτόν τον σύνδεσμο για να συμπληρώσετε τα στοιχεία σας για την προσφορά.</p>
-<p style="text-align:center; margin:30px 0;">
-  <a href="${formUrl}" style="display:inline-block; padding:12px 20px; background-color:#52796f; color:#ffffff; text-decoration:none; font-weight:bold; border-radius:5px;">ΠΑΤΗΣΤΕ ΕΔΩ ΓΙΑ ΤΗ ΦΟΡΜΑ</a>
-</p>
-<p>Ο σύνδεσμος αυτός θα είναι ενεργός για 72 ώρες (3 ημέρες) από τη στιγμή που λάβατε αυτό το email.</p>
-<p>Ευχαριστούμε,<br>Η ομάδα μας</p>
-</body>
-</html>`;
-
-      // For Gmail compose with HTML body, we need to use a direct approach
-      // We'll create a new mailto: URL with HTML content
-      const mailtoUrl = `mailto:${recipientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyContent)}`;
 
       // Add recipient email to the Gmail URL if available
       const toParam = recipientEmail ? `&to=${encodeURIComponent(recipientEmail)}` : '';
       
-      // Open Gmail compose with the URL - using the same emailBodyContent to ensure consistency
+      // Open Gmail compose with the URL - using the plain text version that's more readable in Gmail
       window.open(`https://mail.google.com/mail/?view=cm&fs=1&tf=1${toParam}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBodyContent)}`, "_blank");
 
     } catch (error) {
@@ -505,7 +487,7 @@ ${formUrl}
         <Button
           onClick={handleCreateFormLink}
           disabled={loading}
-          className={`bg-[#52796f] hover:bg-[#52796f]/90 text-[#cad2c5] h-9 ${className}`}
+          className={`bg-[#52796f] hover:bg-[#52796f]/90 hover:underline text-[#cad2c5] h-9 ${className}`}
           size="sm"
           aria-label="Δημιουργία συνδέσμου φόρμας πελάτη"
           type="button"
