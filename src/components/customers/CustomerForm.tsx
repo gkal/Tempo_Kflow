@@ -11,7 +11,7 @@
  * - Duplicate customer detection (in progress)
  *******************************************************************/
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from '@/lib/supabaseClient';
 import { Search, Plus, ChevronDown, Trash2, Archive } from "lucide-react";
@@ -55,6 +55,14 @@ import CustomerFormFields from './CustomerFormFields';
 import CustomerFormLinkButton from "@/components/forms/CustomerFormLinkButton";
 
 // Map of normalized customer types that match the database constraint
+// Helper function to detect mixed Greek and English characters
+const hasMixedGreekAndEnglish = (text: string): boolean => {
+  if (!text) return false;
+  const hasGreek = /[\u0370-\u03FF]/.test(text); // Greek character range
+  const hasEnglish = /[A-Za-z]/.test(text);    // English character range
+  return hasGreek && hasEnglish;
+};
+
 const CUSTOMER_TYPE_MAP = {
   "Εταιρεία": "Εταιρεία",
   "Ιδιώτης": "Ιδιώτης",
@@ -171,7 +179,7 @@ interface Customer {
   town?: string;
   postal_code?: string;
   deleted?: boolean;
-  score?: number;
+  similarityScore?: number; // Added to hold the final match score, made optional
   matchReasons?: {
     companyName?: boolean;
     telephone?: boolean;
@@ -213,6 +221,7 @@ const CustomerForm = ({
     notes: "",
     primary_contact_id: "",
   });
+  const [showCompanyNameWarning, setShowCompanyNameWarning] = useState(false);
 
   // Phone formatting hook
   const { phoneValue, handlePhoneChange, setPhone, inputRef } = usePhoneFormat(formData.telephone);
@@ -392,6 +401,16 @@ const CustomerForm = ({
       onValidityChange(isValid);
     }
   }, [formData, phoneValue, onValidityChange]);
+
+  // Effect to check for mixed scripts in company_name
+  useEffect(() => {
+    if (formData.company_name && typeof formData.company_name === 'string') {
+      const isMixed = hasMixedGreekAndEnglish(formData.company_name);
+      setShowCompanyNameWarning(isMixed);
+    } else {
+      setShowCompanyNameWarning(false);
+    }
+  }, [formData.company_name]);
 
   const [saveDisabled, setSaveDisabled] = useState(false);
 
@@ -809,7 +828,7 @@ const CustomerForm = ({
   };
 
   // Helper function to find matches using company name and AFM
-  const findMatches = async () => {
+  const findMatches = useCallback(async () => {
     // Only search if we have at least 2 characters for company name or at least 5 digits for phone
     const phoneDigits = phoneValue ? phoneValue.replace(/\D/g, '').length : 0;
     const hasMinCompanyChars = formData.company_name && formData.company_name.length >= 2;
@@ -817,12 +836,12 @@ const CustomerForm = ({
     
     if (hasMinCompanyChars || hasMinPhoneDigits) {
       // Log what we're searching with
-      console.log('findMatches search criteria:', {
-        company_name: formData.company_name || 'None',
-        telephone: phoneValue || 'None',
-        phoneDigits: phoneDigits,
-        afm: formData.afm || 'None'
-      });
+      // console.log('findMatches search criteria:', {
+      //   company_name: formData.company_name || 'None',
+      //   telephone: phoneValue || 'None',
+      //   phoneDigits: phoneDigits,
+      //   afm: formData.afm || 'None'
+      // });
       
       const matches = await duplicateDetectionService.findPotentialDuplicates({
         company_name: formData.company_name,
@@ -830,23 +849,23 @@ const CustomerForm = ({
         afm: formData.afm || ''
       }, 40); // Reduced threshold to 40% to show more matches with our new scoring system
       
-      console.log('Find matches results:', {
-        searchTerm: formData.company_name || phoneValue,
-        results: matches.length,
-        matches: matches.map(m => ({ 
-          company: m.company_name, 
-          phone: m.telephone, 
-          score: m.score,
-          phoneSimilarity: m.originalScores?.phoneSimilarity,
-          nameSimilarity: m.originalScores?.nameSimilarity
-        }))
-      });
+      // console.log('Find matches results:', {
+      //   searchTerm: formData.company_name || phoneValue,
+      //   results: matches.length,
+      //   matches: matches.map(m => ({ 
+      //     company: m.company_name, 
+      //     phone: m.telephone, 
+      //     score: m.score,
+      //     phoneSimilarity: m.originalScores?.phoneSimilarity,
+      //     nameSimilarity: m.originalScores?.nameSimilarity
+      //   }))
+      // });
       
       setPotentialMatches(matches);
     } else {
       setPotentialMatches([]);
     }
-  };
+  }, [phoneValue, formData.company_name, formData.afm, setPotentialMatches, duplicateDetectionService]);
 
   // Effect for debounced search
   useEffect(() => {
@@ -880,7 +899,7 @@ const CustomerForm = ({
       // Clear matches if we're navigating or in edit mode
       setPotentialMatches([]);
     }
-  }, [phoneValue, formData.company_name, formData.afm, navigatingToCustomer, customerId, activeField]);
+  }, [findMatches, navigatingToCustomer, customerId, activeField, formData.company_name, formData.afm, phoneValue]);
 
   // Update the handlePhoneFieldFocus function
   const handlePhoneFieldFocus = () => {
@@ -975,6 +994,11 @@ const CustomerForm = ({
                       onInvalid={(e) => e.currentTarget.setCustomValidity('Παρακαλώ συμπληρώστε αυτό το πεδίο')}
                       onInput={(e) => e.currentTarget.setCustomValidity('')}
                     />
+                    {showCompanyNameWarning && (
+                      <div className="text-xs text-yellow-400 pt-1 pl-1">
+                        Ελληνικά/English Mixed = Πρόβλεμ?
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1277,22 +1301,22 @@ const CustomerForm = ({
                         <tr 
                           key={match.id} 
                           className={`${match.deleted ? 'opacity-60' : ''} cursor-pointer hover:bg-[#354f52]`}
-                          onClick={() => onSelectMatch(match.id, match.score)}
+                          onClick={() => onSelectMatch(match.id, match.similarityScore)}
                         >
                           <td className="px-3 py-1 whitespace-nowrap text-xs">
                             <span className={`inline-block px-1.5 py-0.5 rounded-full ${
-                              match.score && match.score >= 86
+                              (match.similarityScore ?? 0) >= 86
                                 ? 'bg-red-600 text-white' /* High confidence match (≥86%): red background, white text */
                                 : 'bg-yellow-400 text-black' /* Lower confidence match (<86%): yellow background, black text */
                             }`}>
-                              {match.score}%
+                              {(match.similarityScore ?? 0)}%
                             </span>
                           </td>
                           <td className="px-3 py-1 whitespace-nowrap text-xs">
                             <div className="flex items-center">
                               <span className={`font-medium ${
                                 match.matchReasons?.companyName 
-                                  ? match.score >= 80
+                                  ? (match.similarityScore ?? 0) >= 80
                                     ? 'border-b-2 border-red-600' /* High score: red underline */
                                     : 'border-b-2 border-yellow-400' /* Low score: yellow underline */
                                   : '' /* No underline if company name didn't match */
@@ -1309,20 +1333,20 @@ const CustomerForm = ({
                           </td>
                           <td className="px-3 py-1 whitespace-nowrap text-xs">
                             <span className={match.matchReasons?.afm 
-                              ? match.score >= 80
-                                ? 'border-b-2 border-red-600' /* High score: red underline */
-                                : 'border-b-2 border-yellow-400' /* Low score: yellow underline */
-                              : '' /* No underline if AFM didn't match */
+                                ? (match.similarityScore ?? 0) >= 80
+                                  ? 'border-b-2 border-red-600' /* High score: red underline */
+                                  : 'border-b-2 border-yellow-400' /* Low score: yellow underline */
+                                : '' /* No underline if AFM didn't match */
                             }>
                               {match.afm}
                             </span>
                           </td>
                           <td className="px-3 py-1 whitespace-nowrap text-xs">
                             <span className={match.matchReasons?.telephone 
-                              ? match.score >= 80
-                                ? 'border-b-2 border-red-600' /* High score: red underline */
-                                : 'border-b-2 border-yellow-400' /* Low score: yellow underline */
-                              : '' /* No underline if telephone didn't match */
+                                ? (match.similarityScore ?? 0) >= 80
+                                  ? 'border-b-2 border-red-600' /* High score: red underline */
+                                  : 'border-b-2 border-yellow-400' /* Low score: yellow underline */
+                                : '' /* No underline if telephone didn't match */
                             }>
                               {match.telephone}
                             </span>

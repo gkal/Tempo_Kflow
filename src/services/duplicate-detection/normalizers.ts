@@ -38,14 +38,17 @@ export const normalizeAfm = (afm: string): string => {
  * @returns Standardized phone number
  */
 export const normalizePhone = (phone: string): string => {
+  console.log('[normalizePhone] Input phone:', phone);
   if (!phone) return '';
   
   // Extract digits - this is our base normalized form for comparison
   const digits = phone.replace(/\D/g, '');
+  console.log('[normalizePhone] Extracted digits:', digits);
   
   // For very short inputs (like when user is typing), just return all digits
   // This ensures we don't lose matches as user continues typing
   if (digits.length <= 6) {
+    console.log('[normalizePhone] Condition: Short input (<=6 digits). Returning digits:', digits);
     return digits;
   }
   
@@ -56,21 +59,29 @@ export const normalizePhone = (phone: string): string => {
   const hasFormatting = phone.includes('-') || phone.includes('.') || 
                      phone.includes(' ') || phone.includes('/');
   
+  console.log('[normalizePhone] hasFormatting:', hasFormatting);
+  
   // Special case: Greek mobile numbers - ensure standard 10-digit format
   if (digits.startsWith('69') && digits.length >= 10) {
+    console.log('[normalizePhone] Checking Greek Mobile condition');
     const normalizedMobile = digits.substring(0, 10);
+    console.log('[normalizePhone] Condition: Greek Mobile. Returning:', normalizedMobile);
     return normalizedMobile;
   }
   
   // Special case: Greek landline numbers with area code
   if (digits.startsWith('2') && digits.length >= 10) {
+    console.log('[normalizePhone] Checking Greek Landline condition');
     const normalizedLandline = digits.substring(0, 10);
+    console.log('[normalizePhone] Condition: Greek Landline. Returning:', normalizedLandline);
     return normalizedLandline;
   }
   
   // Special case: International format (e.g. +30 prefix for Greece)
   if (digits.startsWith('30') && digits.length > 10) {
+    console.log('[normalizePhone] Checking International condition');
     const normalizedIntl = digits.substring(2); // Remove country code
+    console.log('[normalizePhone] Condition: International (30 prefix). Returning:', normalizedIntl);
     return normalizedIntl;
   }
   
@@ -80,11 +91,14 @@ export const normalizePhone = (phone: string): string => {
       phone.match(/^[0-9]{4}-[0-9]{2}\.[0-9]{2}\.[0-9]{2}$/) || // 6983-50.50.43
       phone.match(/^[0-9]{4}-[0-9]{2}\.?[0-9]{2}$/) // 6983-50.50 or 6983-5050
   )) {
+    console.log('[normalizePhone] Checking Specific formatting condition');
+    console.log('[normalizePhone] Condition: Specific formatting detected. Returning digits:', digits);
     // We still return digits for consistency, but the calling function
     // should be aware to also try the original format
     return digits;
   }
-  
-  // For any other case, just return all digits
+
+  console.log('[normalizePhone] Default condition');
+  console.log('[normalizePhone] Condition: Default. Returning digits:', digits);
   return digits;
-}; 
+};

@@ -4,7 +4,7 @@
  * Extracted from CustomerForm.tsx to improve modularity
  */
 
-import React, { useRef, useEffect, RefObject } from "react";
+import React, { useState, useRef, useEffect, RefObject } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +21,13 @@ import CustomerFormLinkButton from "@/components/forms/CustomerFormLinkButton";
 
 // Initialize logger
 const logger = createPrefixedLogger('CustomerFormFields');
+
+// Helper function to detect mixed Greek and English characters
+const hasMixedGreekAndEnglish = (text: string): boolean => {
+  const hasGreek = /[\u0370-\u03FF]/.test(text); // Greek character range
+  const hasEnglish = /[A-Za-z]/.test(text);    // English character range
+  return hasGreek && hasEnglish;
+};
 
 // Add form styles to document
 const addFormStyles = () => {
@@ -84,6 +91,21 @@ const CustomerFormFields: React.FC<CustomerFormFieldsProps> = ({
     isValidationEnabled,
     handlePhoneChange
   } = useCustomerForm();
+
+  const [showCompanyNameWarning, setShowCompanyNameWarning] = useState(false);
+
+  // Effect to check for mixed scripts in company_name
+  useEffect(() => {
+    console.log('[CustomerFormFields] company_name effect trigger. Value:', formData.company_name); // DEBUG LOG
+    if (formData.company_name && typeof formData.company_name === 'string') {
+      const isMixed = hasMixedGreekAndEnglish(formData.company_name);
+      console.log('[CustomerFormFields] company_name is string. isMixed:', isMixed); // DEBUG LOG
+      setShowCompanyNameWarning(isMixed);
+    } else {
+      console.log('[CustomerFormFields] company_name is null, undefined, or not a string.'); // DEBUG LOG
+      setShowCompanyNameWarning(false);
+    }
+  }, [formData.company_name]);
   
   // Refs for inputs
   const companyNameRef = useRef<HTMLInputElement>(null);
@@ -132,6 +154,11 @@ const CustomerFormFields: React.FC<CustomerFormFieldsProps> = ({
                   onInvalid={(e) => e.currentTarget.setCustomValidity('Παρακαλώ συμπληρώστε αυτό το πεδίο')}
                   onInput={(e) => e.currentTarget.setCustomValidity('')}
                 />
+                {showCompanyNameWarning && (
+                  <div className="text-red-500 text-xs mt-1" role="alert" aria-live="polite">
+                    Ελληνικά/English Mixed = Πρόβλεμ?
+                  </div>
+                )}
               </div>
             </div>
 

@@ -47,21 +47,29 @@ export const CustomerDuplicateDetection: React.FC = () => {
   // Check for potential duplicates as form data changes
   useEffect(() => {
     const timer = setTimeout(async () => {
+      console.log('[CustomerDuplicateDetection] useEffect triggered. formData:', JSON.parse(JSON.stringify(formData)));
       // Only check if we have at least one meaningful field filled
       if (formData.company_name.trim() || formData.telephone.trim() || formData.afm.trim()) {
         setIsDuplicateChecking(true);
         
         try {
           // Call the duplicate detection service
+          console.log('[CustomerDuplicateDetection] Calling checkForDuplicates with formData:', JSON.parse(JSON.stringify(formData)));
           const matches = await checkForDuplicates(
             formData,
             async (searchInput) => {
+              console.log('[CustomerDuplicateDetection] checkFunction in checkForDuplicates - searchInput:', searchInput);
               // Use findPotentialDuplicates directly since checkDuplicates isn't available
-              return await duplicateDetectionService.findPotentialDuplicates(searchInput);
+              const currentThreshold = 40; // As per previous findings, this component uses a threshold of 40
+              console.log('[CustomerDuplicateDetection] Calling duplicateDetectionService.findPotentialDuplicates with searchInput:', searchInput, 'and threshold:', currentThreshold);
+              const results = await duplicateDetectionService.findPotentialDuplicates(searchInput, currentThreshold);
+              console.log('[CustomerDuplicateDetection] Results from findPotentialDuplicates:', results);
+              return results;
             }
           );
           
           // Update the list of potential matches
+          console.log('[CustomerDuplicateDetection] Matches from checkForDuplicates to be set in state:', matches);
           setPotentialMatches(matches);
         } catch (error) {
           logger.error("Error checking for duplicates:", error);

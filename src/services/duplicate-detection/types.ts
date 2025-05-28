@@ -20,6 +20,8 @@ export interface Customer {
     nameSimilarity: number;
     afmSimilarity: number;
   };
+  similarityScore?: number; // Added to store the calculated duplicate score
+  matchType?: string; // Added to store the type of match (e.g., 'Exact Phone, Similar Name')
 }
 
 export interface CustomerSearchInput {
