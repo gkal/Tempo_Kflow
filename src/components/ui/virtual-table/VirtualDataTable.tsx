@@ -230,8 +230,44 @@ export function VirtualDataTable<T extends Record<string, any>>({
   stabilizeExpandedRows = true,
   changedRowId,
 }: VirtualDataTableProps<T>) {
+  // State for highlighting the previously selected row
+  const [highlightedRowId, setHighlightedRowId] = useState<string | null>(() => {
+    const selectedRowKey = `tableSelectedRow_${tableId}`;
+    return sessionStorage.getItem(selectedRowKey);
+  });
+  
+  // Clear highlighted row after a delay
+  useEffect(() => {
+    if (highlightedRowId) {
+      const timer = setTimeout(() => {
+        setHighlightedRowId(null);
+        sessionStorage.removeItem(`tableSelectedRow_${tableId}`);
+      }, 3000); // Highlight for 3 seconds
+      
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedRowId, tableId]);
+  
   // State
-  const [sorting, setSorting] = useState<SortingState>(() => []);
+  const [sorting, setSorting] = useState<SortingState>(() => {
+    // Try to get saved sorting from sessionStorage with unique key
+    const storageKey = `tableSorting_${tableId}`;
+    const savedSorting = sessionStorage.getItem(storageKey);
+    
+    if (savedSorting) {
+      try {
+        const parsedSorting = JSON.parse(savedSorting);
+        // Validate that the sorting is valid
+        if (Array.isArray(parsedSorting)) {
+          return parsedSorting;
+        }
+      } catch (e) {
+        console.error('Failed to parse saved sorting:', e);
+      }
+    }
+    
+    return [];
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -311,6 +347,12 @@ export function VirtualDataTable<T extends Record<string, any>>({
     const storageKey = `tableColumnOrder_${tableId}`;
     localStorage.setItem(storageKey, JSON.stringify(columnOrder));
   }, [columnOrder, tableId]);
+  
+  // Save sorting to sessionStorage whenever it changes
+  useEffect(() => {
+    const storageKey = `tableSorting_${tableId}`;
+    sessionStorage.setItem(storageKey, JSON.stringify(sorting));
+  }, [sorting, tableId]);
   
   // Convert the columns to TanStack Table format
   const tableColumns = useMemo(() => {
@@ -558,6 +600,66 @@ export function VirtualDataTable<T extends Record<string, any>>({
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
   const paddingBottom = virtualRows.length > 0 ? totalSize - virtualRows[virtualRows.length - 1].end : 0;
   
+  // Restore scroll position on mount
+  useEffect(() => {
+    if (isLoading) return;
+    
+    const scrollKey = `tableScrollPosition_${tableId}`;
+    const selectedRowKey = `tableSelectedRow_${tableId}`;
+    const savedScrollPosition = sessionStorage.getItem(scrollKey);
+    const savedSelectedRowId = sessionStorage.getItem(selectedRowKey);
+    
+    const restorePosition = () => {
+      // First try to restore by scroll position
+      if (savedScrollPosition && parentRef.current) {
+        const scrollPosition = parseInt(savedScrollPosition, 10);
+        parentRef.current.scrollTop = scrollPosition;
+      }
+      // If we have a selected row, try to scroll to it
+      else if (savedSelectedRowId && rows.length > 0) {
+        const rowIndex = rows.findIndex(row => getRowId(row.original as T) === savedSelectedRowId);
+        if (rowIndex !== -1 && rowVirtualizer) {
+          // Scroll to the row with some offset to center it
+          rowVirtualizer.scrollToIndex(rowIndex, { align: 'center' });
+        }
+      }
+    };
+    
+    // Try multiple times to ensure content is rendered
+    const timeouts = [100, 300, 500, 1000];
+    timeouts.forEach(delay => {
+      setTimeout(restorePosition, delay);
+    });
+    
+    // Clear the timeouts on cleanup
+    return () => {
+      timeouts.forEach((_, index) => clearTimeout(index));
+    };
+  }, [tableId, isLoading, rowVirtualizer, rows, getRowId]);
+  
+  // Save scroll position before unmount or navigation
+  useEffect(() => {
+    const saveScrollPosition = () => {
+      if (parentRef.current) {
+        const storageKey = `tableScrollPosition_${tableId}`;
+        sessionStorage.setItem(storageKey, parentRef.current.scrollTop.toString());
+      }
+    };
+    
+    // Save on component unmount
+    return () => {
+      saveScrollPosition();
+    };
+  }, [tableId]);
+  
+  // Also save scroll position on navigation (when clicking a row)
+  const saveScrollPositionRef = useCallback(() => {
+    if (parentRef.current) {
+      const storageKey = `tableScrollPosition_${tableId}`;
+      sessionStorage.setItem(storageKey, parentRef.current.scrollTop.toString());
+    }
+  }, [tableId]);
+  
   // Store initial column sizes
   const initialColumnSizesRef = React.useRef(columnSizing);
   
@@ -574,9 +676,13 @@ export function VirtualDataTable<T extends Record<string, any>>({
     
     if (onRowClick) {
       e.preventDefault();
+      // Save scroll position and clicked row ID before navigating
+      saveScrollPositionRef();
+      const rowId = getRowId(row);
+      sessionStorage.setItem(`tableSelectedRow_${tableId}`, rowId);
       onRowClick(row);
     }
-  }, [onRowClick]);
+  }, [onRowClick, saveScrollPositionRef, getRowId, tableId]);
   
   // Handle search column change
   const handleColumnChange = useCallback((value: string) => {
@@ -1066,6 +1172,7 @@ export function VirtualDataTable<T extends Record<string, any>>({
                     const rowId = getRowId(rowData);
                     const isExpanded = !!expandedRowIds[rowId];
                     const isChanged = changedRowId === rowId;
+                    const isHighlighted = highlightedRowId === rowId;
                     
                     return (
                       <React.Fragment key={rowId}>
@@ -1076,7 +1183,8 @@ export function VirtualDataTable<T extends Record<string, any>>({
                             !isChanged && "row-glow-transition",
                             onRowClick && "cursor-pointer",
                             isExpanded && "bg-[#354f52]/30 sticky top-0 z-10",
-                            isChanged && "row-changed"
+                            isChanged && "row-changed",
+                            isHighlighted && "bg-[#52796f]/30 transition-colors duration-500"
                           )}
                           onClick={e => onRowClick && handleRowClick(e, rowData)}
                           data-customer-id={rowId}
